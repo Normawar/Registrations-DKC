@@ -1,72 +1,40 @@
 
+
+// Updated src/app/roster/page.tsx
 'use client';
 
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { format, isValid, parse } from 'date-fns';
+import { useSearchParams, useRouter } from 'next/navigation';
+
 import { AppLayout } from '@/components/app-layout';
 import { AuthGuard, OrganizerGuard } from '@/components/auth-guard';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Table,
-  TableHeader,
-  TableRow,
-  TableHead,
-  TableBody,
-  TableCell,
-} from '@/components/ui/table';
+import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
+import { Search, PlusCircle, Trash2, Edit, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Check, FilePenLine, History } from 'lucide-react';
+import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { CSVUploadComponent } from '@/components/csv-upload';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { EnhancedPlayerSearchDialog } from '@/components/EnhancedPlayerSearchDialog';
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Download, ArrowUpDown, ArrowUp, ArrowDown, Check, MoreHorizontal, FilePenLine, Trash2, Edit, UserPlus, History, Separator } from 'lucide-react';
-import { generateTeamCode } from '@/lib/school-utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import Papa from 'papaparse';
-import { format, isValid, parse } from 'date-fns';
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-} from "@/components/ui/dropdown-menu";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose
-} from '@/components/ui/dialog';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
-import { Input } from '@/components/ui/input';
-import { useToast } from '@/hooks/use-toast';
-import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
-import { EnhancedPlayerSearchDialog } from '@/components/EnhancedPlayerSearchDialog';
-import { ScrollArea } from '@/components/ui/scroll-area';
-
-type SortableColumnKey = 'lastName' | 'teamCode' | 'uscfId' | 'regularRating' | 'grade' | 'section';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { generateTeamCode } from '@/lib/school-utils';
+import { Separator } from '@/components/ui/separator';
 
 const grades = ['Kindergarten', '1st Grade', '2nd Grade', '3rd Grade', '4th Grade', '5th Grade', '6th Grade', '7th Grade', '8th Grade', '9th Grade', '10th Grade', '11th Grade', '12th Grade'];
 const sections = ['Kinder-1st', 'Primary K-3', 'Elementary K-5', 'Middle School K-8', 'High School K-12', 'Championship'];
@@ -173,6 +141,7 @@ const DateInput = React.forwardRef<HTMLInputElement, {
 });
 DateInput.displayName = 'DateInput';
 
+
 const ChangeHistorySection = ({ player }: { player: MasterPlayer | null }) => {
     if (!player) {
         return (
@@ -255,6 +224,7 @@ const ChangeHistorySection = ({ player }: { player: MasterPlayer | null }) => {
         </div>
     );
 };
+
 
 function DistrictRostersPageContent() {
   const { isDbLoaded, dbDistricts, database: allPlayers, getSchoolsForDistrict, deletePlayer, updatePlayer, addPlayer } = useMasterDb();
@@ -1028,11 +998,23 @@ function UserRosterPageContent() {
 
       if (profile.role === 'individual' && !roster.some(p => p.id === playerToSave.id)) {
         const updatedStudentIds = [...(profile.studentIds || []), playerToSave.id];
-        await updateProfile({ studentIds: updatedStudentIds }, profile.user);
+        await updateProfile({ studentIds: updatedStudentIds });
         toast({ title: "Player Added to Your Roster" });
       }
 
       setIsEditOpen(false);
+    };
+
+    const handleDeletePlayer = async (player: MasterPlayer) => {
+        if (window.confirm(`Are you sure you want to remove ${player.firstName} ${player.lastName} from your roster?`)) {
+            if (profile?.role === 'individual') {
+                const updatedStudentIds = profile.studentIds?.filter(id => id !== player.id);
+                await updateProfile({ studentIds: updatedStudentIds });
+                toast({ title: 'Student Removed', description: `${player.firstName} has been removed from your list.` });
+            } else {
+                toast({ title: 'Action Not Supported', description: 'Sponsors cannot remove players directly, only organizers can delete records from the master database.' });
+            }
+        }
     };
 
     return (
@@ -1076,6 +1058,11 @@ function UserRosterPageContent() {
                                         <Button variant="ghost" size="sm" onClick={() => handleEditPlayer(player)}>
                                             <Edit className="h-4 w-4" />
                                         </Button>
+                                         {profile?.role === 'individual' && (
+                                            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeletePlayer(player)}>
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                         )}
                                     </TableCell>
                                 </TableRow>
                             ))
@@ -1086,7 +1073,7 @@ function UserRosterPageContent() {
             </Card>
             
             <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-                <DialogContent className="sm:max-w-4xl max-h-[95vh] flex flex-col p-0">
+                 <DialogContent className="sm:max-w-4xl max-h-[95vh] flex flex-col p-0">
                     <DialogHeader className="p-6 pb-4 border-b shrink-0">
                     <DialogTitle>{playerToEdit ? 'Edit Player' : 'Create New Player'}</DialogTitle>
                     <DialogDescription>
@@ -1106,14 +1093,14 @@ function UserRosterPageContent() {
                                 <FormField control={form.control} name="firstName" render={({ field }) => ( 
                                 <FormItem>
                                     <FormLabel>First Name</FormLabel>
-                                    <FormControl><Input {...field} /></FormControl>
+                                    <FormControl><Input {...field} value={field.value || ''} /></FormControl>
                                     <FormMessage />
                                 </FormItem> 
                                 )}/>
                                 <FormField control={form.control} name="lastName" render={({ field }) => ( 
                                 <FormItem>
                                     <FormLabel>Last Name</FormLabel>
-                                    <FormControl><Input {...field} /></FormControl>
+                                    <FormControl><Input {...field} value={field.value || ''} /></FormControl>
                                     <FormMessage />
                                 </FormItem> 
                                 )}/>
@@ -1233,6 +1220,11 @@ function UserRosterPageContent() {
                                 )} />
                             </div>
 
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                               <FormField control={form.control} name="dob" render={({ field }) => (<FormItem><FormLabel>Date of Birth</FormLabel><FormControl><DateInput value={field.value} onChange={field.onChange} placeholder="YYYY-MM-DD" /></FormControl><FormMessage /></FormItem>)} />
+                               <FormField control={form.control} name="uscfExpiration" render={({ field }) => (<FormItem><FormLabel>USCF Expiration</FormLabel><FormControl><DateInput value={field.value} onChange={field.onChange} placeholder="YYYY-MM-DD"/></FormControl><FormMessage /></FormItem>)} />
+                            </div>
+
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <FormField control={form.control} name="grade" render={({ field }) => (
                                 <FormItem>
@@ -1267,15 +1259,15 @@ function UserRosterPageContent() {
                             </div>
 
                             <div className="space-y-4">
-                            <h3 className="text-lg font-semibold border-b pb-2">Contact Information</h3>
-                            
-                            <FormField control={form.control} name="email" render={({ field }) => (
-                                <FormItem>
-                                <FormLabel>Email</FormLabel>
-                                <FormControl><Input type="email" {...field} value={field.value || ''}/></FormControl>
-                                <FormMessage />
-                                </FormItem>
-                            )} />
+                              <h3 className="text-lg font-semibold border-b pb-2">Contact Information</h3>
+                              
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email *</FormLabel><FormControl><Input type="email" {...field} value={field.value || ''}/></FormControl><FormMessage /></FormItem>)} />
+                                <FormField control={form.control} name="zipCode" render={({ field }) => ( <FormItem><FormLabel>Zip Code *</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>)} />
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <FormField control={form.control} name="state" render={({ field }) => ( <FormItem><FormLabel>State</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>)} />
+                              </div>
                             </div>
 
                             <Separator className="my-6" />
@@ -1288,11 +1280,15 @@ function UserRosterPageContent() {
                     </ScrollArea>
 
                     <DialogFooter className="p-6 pt-4 border-t bg-muted/30 shrink-0">
-                        <Button type="button" variant="ghost" onClick={() => setIsEditOpen(false)}>Cancel</Button>
+                        <div className="flex justify-end gap-3">
+                        <Button type="button" variant="ghost" onClick={() => setIsEditOpen(false)}>
+                            Cancel
+                        </Button>
                         <Button onClick={form.handleSubmit(onEditSubmit)}>Save Info</Button>
                         <Button onClick={form.handleSubmit(handleSaveAndAddToRoster)}>
                             {roster.some(p => p.id === playerToEdit?.id) ? 'Save and Update Roster' : 'Save and Add to Roster'}
                         </Button>
+                        </div>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
@@ -1331,6 +1327,3 @@ export default function RosterPage() {
         </AuthGuard>
     );
 }
-
-
-    
