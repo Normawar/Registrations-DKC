@@ -125,14 +125,35 @@ function UscfCrossReferencePageContent() {
               matchStatus: 'found_by_name',
             };
           } else if (finalMatches.length > 1) {
-            // Multiple matches found even after checks, flag for manual review
-             return {
-              ...row,
-              firebaseUsdId: 'Multiple Matches',
-              firebaseGrade: 'N/A',
-              firebaseTeam: 'N/A',
-              matchStatus: 'multiple_found',
-            };
+            // New logic: Score the multiple matches and pick the best one
+            let bestMatch: MasterPlayer | null = null;
+            let highestScore = -1;
+
+            finalMatches.forEach(match => {
+                let score = 0;
+                // Score based on grade match
+                if (row.GRADE && match.grade && row.GRADE.trim() === match.grade.trim()) {
+                    score += 2;
+                }
+                // Score based on school name partial match
+                if (row['POSSIBLE TEAM'] && match.school && match.school.toLowerCase().includes(row['POSSIBLE TEAM'].toLowerCase())) {
+                    score += 1;
+                }
+                if (score > highestScore) {
+                    highestScore = score;
+                    bestMatch = match;
+                }
+            });
+            
+            if (bestMatch) {
+                return {
+                    ...row,
+                    firebaseUsdId: bestMatch.uscfId,
+                    firebaseGrade: bestMatch.grade || 'Not Set',
+                    firebaseTeam: generateTeamCode(bestMatch),
+                    matchStatus: 'multiple_found', // Still flag as needing review
+                };
+            }
           }
         }
       }
