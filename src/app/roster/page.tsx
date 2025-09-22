@@ -286,6 +286,12 @@ function DistrictRostersPageContent() {
     setPlayerToEdit(player);
     setIsEditOpen(true);
   };
+
+  const handleCreateNewPlayer = () => {
+    setPlayerToEdit(null);
+    form.reset(); // Clear the form for a new entry
+    setIsEditOpen(true);
+  };
   
   const handleDeletePlayer = (player: MasterPlayer) => {
     setPlayerToDelete(player);
@@ -331,13 +337,15 @@ function DistrictRostersPageContent() {
   };
 
   const onEditSubmit = async (values: PlayerFormValues) => {
-    if (!playerToEdit || !profile) return;
-    const updatedPlayer: MasterPlayer = {
-      ...playerToEdit,
-      ...values
-    };
-    await updatePlayer(updatedPlayer, profile);
-    toast({ title: "Player Updated" });
+    if (!profile) return;
+    const playerToSave: MasterPlayer = {
+        ...(playerToEdit || {}), // Keep existing fields like history, dob, etc.
+        ...values, // Overwrite with form values
+        id: playerToEdit ? playerToEdit.id : values.uscfId || `temp_${Date.now()}` // Use existing ID or generate new
+    } as MasterPlayer;
+    
+    await updatePlayer(playerToSave, profile);
+    toast({ title: playerToEdit ? "Player Updated" : "Player Created" });
     setIsEditOpen(false);
     setPlayerToEdit(null);
   };
@@ -359,7 +367,10 @@ function DistrictRostersPageContent() {
           <CardHeader>
             <div className="flex justify-between items-center">
               <CardTitle>Roster Management</CardTitle>
-              <Button onClick={() => setIsSearchOpen(true)}><UserPlus className="mr-2 h-4 w-4"/> Add Player</Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setIsSearchOpen(true)}><UserPlus className="mr-2 h-4 w-4"/> Add Player</Button>
+                <Button onClick={handleCreateNewPlayer}><UserPlus className="mr-2 h-4 w-4"/> Create New Player</Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="pt-6 space-y-4">
@@ -504,13 +515,13 @@ function DistrictRostersPageContent() {
         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
           <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col p-0">
             <DialogHeader className="p-6 pb-0 border-b shrink-0">
-              <DialogTitle>Edit Player</DialogTitle>
-              <DialogDescription>Modify the player's information below.</DialogDescription>
+              <DialogTitle>{playerToEdit ? 'Edit Player' : 'Create New Player'}</DialogTitle>
+              <DialogDescription>{playerToEdit ? 'Modify the player\'s information below.' : 'Enter the details for the new player.'}</DialogDescription>
             </DialogHeader>
             <Tabs defaultValue="details" className="w-full h-full flex flex-col">
               <TabsList className="grid w-full grid-cols-2 mt-4 px-6">
                 <TabsTrigger value="details">Player Details</TabsTrigger>
-                <TabsTrigger value="history">Change History</TabsTrigger>
+                <TabsTrigger value="history" disabled={!playerToEdit}>Change History</TabsTrigger>
               </TabsList>
               <div className="flex-1 overflow-y-auto">
                 <TabsContent value="details" className="mt-0">
@@ -610,13 +621,12 @@ function DistrictRostersPageContent() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-
         <EnhancedPlayerSearchDialog
-          isOpen={isSearchOpen}
-          onOpenChange={setIsSearchOpen}
-          onPlayerSelected={handlePlayerSelectedFromSearch}
-          userProfile={profile}
-          preFilterByUserProfile={true}
+            isOpen={isSearchOpen}
+            onOpenChange={setIsSearchOpen}
+            onPlayerSelected={handlePlayerSelectedFromSearch}
+            userProfile={profile}
+            preFilterByUserProfile={true}
         />
       </div>
     </>
@@ -626,18 +636,23 @@ function DistrictRostersPageContent() {
 // New component for Sponsor/Individual view
 function UserRosterPageContent() {
     const { profile } = useSponsorProfile();
-    const { database: allPlayers, updatePlayer } = useMasterDb();
+    const { database: allPlayers, updatePlayer, addPlayer, isDbLoaded } = useMasterDb();
     const { toast } = useToast();
     const [isSearchOpen, setIsSearchOpen] = useState(false);
+    const [isEditOpen, setIsEditOpen] = useState(false);
+    const [playerToEdit, setPlayerToEdit] = useState<MasterPlayer | null>(null);
+
+    const form = useForm<PlayerFormValues>({
+        resolver: zodResolver(playerFormSchema)
+    });
     
     const roster = useMemo(() => {
-        if (!profile) return [];
+        if (!profile || !isDbLoaded) return [];
         if (profile.role === 'sponsor' || profile.role === 'district_coordinator') {
             return allPlayers.filter(p => p.district === profile.district && p.school === profile.school);
         }
         if (profile.role === 'individual') {
-             // For individuals, we'll assume a local storage link for now
-            try {
+             try {
               const storedStudentIds = localStorage.getItem(`parent_students_${profile.email}`);
               if (storedStudentIds) {
                 const studentIds = JSON.parse(storedStudentIds);
@@ -647,16 +662,16 @@ function UserRosterPageContent() {
             return [];
         }
         return [];
-    }, [profile, allPlayers]);
+    }, [profile, allPlayers, isDbLoaded]);
 
     const handlePlayerSelected = async (player: any) => {
         if (!profile) return;
         
         let playerToAdd: MasterPlayer;
 
-        if ('uscfId' in player) { // It's already a MasterPlayer
+        if ('uscfId' in player) {
             playerToAdd = player;
-        } else { // It's a USCFPlayer, needs conversion
+        } else { 
             const nameParts = player.name.split(', ');
             playerToAdd = {
                 id: player.uscf_id, uscfId: player.uscf_id,
@@ -667,7 +682,6 @@ function UserRosterPageContent() {
             };
         }
     
-        // Logic for Individual vs. Sponsor
         if (profile.role === 'individual') {
             try {
                 const key = `parent_students_${profile.email}`;
@@ -675,7 +689,6 @@ function UserRosterPageContent() {
                 if (!existing.includes(playerToAdd.id)) {
                     localStorage.setItem(key, JSON.stringify([...existing, playerToAdd.id]));
                     toast({ title: "Student Added", description: `${playerToAdd.firstName} ${playerToAdd.lastName} has been added to your list.` });
-                    // Force a re-render by updating state
                     window.dispatchEvent(new Event('storage'));
                 } else {
                     toast({ variant: 'destructive', title: "Student Already Added" });
@@ -685,16 +698,34 @@ function UserRosterPageContent() {
                 toast({ variant: 'destructive', title: "Error Saving Student" });
             }
         } else if (profile.role === 'sponsor' || profile.role === 'district_coordinator') {
-            const updatedPlayer = {
-                ...playerToAdd,
-                school: profile.school,
-                district: profile.district,
-            };
+            const updatedPlayer = { ...playerToAdd, school: profile.school, district: profile.district };
             await updatePlayer(updatedPlayer, profile);
             toast({ title: "Player Added to Roster", description: `${playerToAdd.firstName} ${playerToAdd.lastName} is now on the ${profile.school} roster.` });
         }
         
         setIsSearchOpen(false);
+    };
+
+    const handleCreateNewPlayer = () => {
+        setPlayerToEdit(null);
+        form.reset(); // Clear form
+        setIsEditOpen(true);
+    };
+
+    const onEditSubmit = async (values: PlayerFormValues) => {
+        if (!profile) return;
+        const playerToSave: MasterPlayer = {
+            ...(playerToEdit || {}),
+            ...values,
+            id: playerToEdit ? playerToEdit.id : values.uscfId || `temp_${Date.now()}`,
+            school: profile.school,
+            district: profile.district
+        } as MasterPlayer;
+        
+        await updatePlayer(playerToSave, profile);
+        toast({ title: playerToEdit ? "Player Updated" : "Player Created" });
+        setIsEditOpen(false);
+        setPlayerToEdit(null);
     };
     
     return (
@@ -704,7 +735,10 @@ function UserRosterPageContent() {
                     <h1 className="text-3xl font-bold font-headline">My Roster</h1>
                     <p className="text-muted-foreground">Manage your players and students.</p>
                 </div>
-                <Button onClick={() => setIsSearchOpen(true)}><UserPlus className="mr-2 h-4 w-4"/> Add Player/Student</Button>
+                <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setIsSearchOpen(true)}><UserPlus className="mr-2 h-4 w-4"/> Add from Database</Button>
+                    <Button onClick={handleCreateNewPlayer}><UserPlus className="mr-2 h-4 w-4"/> Create New Player</Button>
+                </div>
             </div>
             
             <Card className="mt-4">
@@ -746,6 +780,26 @@ function UserRosterPageContent() {
                 userProfile={profile}
                 preFilterByUserProfile={false}
             />
+            
+            <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>{playerToEdit ? 'Edit Player' : 'Create New Player'}</DialogTitle>
+                    </DialogHeader>
+                    <Form {...form}>
+                        <form onSubmit={form.handleSubmit(onEditSubmit)} className="space-y-4">
+                             <FormField control={form.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                             <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                             <FormField control={form.control} name="uscfId" render={({ field }) => ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input {...field} /></FormControl></FormItem> )}/>
+                             <DialogFooter>
+                                <Button type="button" variant="ghost" onClick={() => setIsEditOpen(false)}>Cancel</Button>
+                                <Button type="submit">Save Player</Button>
+                             </DialogFooter>
+                        </form>
+                    </Form>
+                </DialogContent>
+            </Dialog>
+
         </div>
     );
 }
