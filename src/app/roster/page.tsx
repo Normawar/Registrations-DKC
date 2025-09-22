@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { AppLayout } from '@/components/app-layout';
 import { OrganizerGuard } from '@/components/auth-guard';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
@@ -409,7 +409,7 @@ function DistrictRostersPageContent() {
                           <TableCell>{p.regularRating || 'N/A'}</TableCell>
                           <TableCell>{p.grade}</TableCell>
                           <TableCell>{p.section}</TableCell>
-                          <TableCell>{p.studentType === 'gt' && <Check className="text-green-600 h-5 w-5" />}</TableCell>
+                          <TableCell>{p.studentType === 'gt' && <Check className="text-green-600 h-5 w-5" /></TableCell>
                           <TableCell>
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
@@ -492,3 +492,5 @@ export default function GuardedDistrictRostersPage() {
         </OrganizerGuard>
     )
 }
+
+    
