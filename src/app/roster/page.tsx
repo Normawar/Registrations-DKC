@@ -129,7 +129,7 @@ function DistrictRostersPageContent() {
   const [playerToDelete, setPlayerToDelete] = useState<MasterPlayer | null>(null);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   
-  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(true); // Changed to true to show dialog
   const [playerToEdit, setPlayerToEdit] = useState<MasterPlayer | null>(null);
   const [schoolsForEditDistrict, setSchoolsForEditDistrict] = useState<string[]>([]);
 
@@ -138,6 +138,14 @@ function DistrictRostersPageContent() {
   });
   
   const editDistrict = form.watch('district');
+  
+  // Effect to pre-populate the dialog for demonstration
+  useEffect(() => {
+    if (isDbLoaded && allPlayers.length > 0) {
+      const samplePlayer = allPlayers.find(p => p.id === "90000001") || allPlayers[0];
+      setPlayerToEdit(samplePlayer);
+    }
+  }, [isDbLoaded, allPlayers]);
 
   useEffect(() => {
     if (editDistrict) {
