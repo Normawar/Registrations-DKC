@@ -1,5 +1,3 @@
-
-
 // src/app/signup/page.tsx - Updated with Data Correction for Organizer Account
 'use client';
 
@@ -103,20 +101,11 @@ async function correctOrganizerAccountData(email: string, password: string) {
 const SponsorSignUpForm = () => {
   const router = useRouter();
   const { toast } = useToast();
-  const { dbDistricts, getSchoolsForDistrict, schools: schoolData, isDbLoaded } = useMasterDb();
+  const { dbDistricts, getSchoolsForDistrict, allSchoolNames, isDbLoaded } = useMasterDb();
   const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
   const { updateProfile } = useSponsorProfile();
   const [isLoading, setIsLoading] = useState(false);
-
-  const allSchoolNames = useMemo(() => {
-    const schoolNames = schoolData.map(s => s.schoolName);
-    const uniqueSchoolNames = [...new Set(schoolNames)].sort();
-    if (!uniqueSchoolNames.includes('Homeschool')) {
-        return ['Homeschool', ...uniqueSchoolNames];
-    }
-    return uniqueSchoolNames;
-  }, [schoolData]);
-
+  
   const form = useForm<z.infer<typeof sponsorFormSchema>>({
     resolver: zodResolver(sponsorFormSchema),
     defaultValues: {
@@ -179,15 +168,14 @@ const SponsorSignUpForm = () => {
       const role: SponsorProfile['role'] = isCoordinator ? 'district_coordinator' : 'sponsor';
 
       const { password, email, ...profileValues } = values;
-      const schoolInfo = schoolData.find(s => s.schoolName === profileValues.school);
       
       const profileData: Omit<SponsorProfile, 'uid' | 'email'> = {
         ...profileValues,
         role: role,
         avatarType: 'icon',
         avatarValue: 'KingIcon',
-        schoolAddress: schoolInfo?.streetAddress || '',
-        schoolPhone: schoolInfo?.phone || '',
+        schoolAddress: '',
+        schoolPhone: '',
         isDistrictCoordinator: isCoordinator,
         forceProfileUpdate: true,
       };

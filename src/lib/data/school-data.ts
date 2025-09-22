@@ -1,5 +1,6 @@
 
 
+
 export type SchoolNote = {
   id: string;
   type: 'lesson' | 'general';
@@ -36,3 +37,4 @@ export const schoolData: School[] = [
   { "district": "TestMcAllen", "schoolName": "TestMcAllen", "streetAddress": "123 Test St", "city": "McAllen", "zip": "78501", "zip4": "", "phone": "(555)555-5555", "charter": "No", "students": "0", "state": "TX", "county": "Test" },
   { "district": "TestECISD", "schoolName": "Test Carmen Avila Elementary", "streetAddress": "123 Test St", "city": "Edinburg", "zip": "78540", "zip4": "", "phone": "(555)555-5555", "charter": "No", "students": "0", "state": "TX", "county": "Test" }
 ]
+
