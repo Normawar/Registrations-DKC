@@ -24,9 +24,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { schoolData } from '@/lib/data/school-data';
 import { Checkbox } from '@/components/ui/checkbox';
 import { db } from '@/lib/services/firestore-service';
-import { createUserByOrganizer, deleteAuthUserByEmail } from '@/app/users/actions';
-import { Loader2 } from 'lucide-react';
-import { Textarea } from '@/components/ui/textarea';
 import { useMasterDb } from '@/context/master-db-context';
 
 
@@ -66,34 +63,17 @@ const refinedUserSchema = baseUserFormSchema.refine(data => data.isSponsor || da
     path: ["isSponsor"], // This path can stay, error shows under first checkbox
 });
 
-const createUserFormSchema = baseUserFormSchema.extend({
-    password: z.string().min(6, 'Temporary password must be at least 6 characters.'),
-}).refine(data => data.isSponsor || data.isDistrictCoordinator || data.isOrganizer || data.isIndividual, {
-    message: "A user must have at least one role.",
-    path: ["isSponsor"],
-});
-
-
 type UserFormValues = z.infer<typeof refinedUserSchema>;
-type CreateUserFormValues = z.infer<typeof createUserFormSchema>;
 
 export default function UsersPage() {
     const { toast } = useToast();
     const { dbDistricts, getSchoolsForDistrict, allSchoolNames } = useMasterDb();
     const [users, setUsers] = useState<User[]>([]);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
-    const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [sortConfig, setSortConfig] = useState<{ key: SortableColumn; direction: 'ascending' | 'descending' } | null>({ key: 'lastName', direction: 'ascending' });
-    const [isCreatingUser, setIsCreatingUser] = useState(false);
-    
-    // State for force delete
-    const [emailsToDelete, setEmailsToDelete] = useState('');
-    const [isDeleting, setIsDeleting] = useState(false);
-    const [deleteResults, setDeleteResults] = useState<string[]>([]);
-    const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
     
     const uniqueDistricts = useMemo(() => {
         return ['None', ...dbDistricts].sort();
@@ -160,33 +140,12 @@ export default function UsersPage() {
     const form = useForm<UserFormValues>({
         resolver: zodResolver(refinedUserSchema),
     });
-    
-    const createForm = useForm<CreateUserFormValues>({
-        resolver: zodResolver(createUserFormSchema),
-        defaultValues: {
-            email: '',
-            isSponsor: true,
-            isDistrictCoordinator: false,
-            isOrganizer: false,
-            isIndividual: false,
-            firstName: '',
-            lastName: '',
-            school: '',
-            district: 'None',
-            phone: '',
-            bookkeeperEmail: '',
-            gtCoordinatorEmail: '',
-            password: '',
-        }
-    });
 
-    const handleDistrictChange = (district: string, formInstance: any, resetSchool: boolean = true) => {
-        formInstance.setValue('district', district);
+    const handleDistrictChange = (district: string) => {
+        form.setValue('district', district);
         const schools = getSchoolsForDistrict(district);
         setSchoolsForDistrict(schools);
-        if (resetSchool) {
-            formInstance.setValue('school', schools.length > 0 ? '' : 'Homeschool');
-        }
+        form.setValue('school', schools.length > 0 ? '' : 'Homeschool');
     };
     
     useEffect(() => {
@@ -206,7 +165,7 @@ export default function UsersPage() {
             bookkeeperEmail: editingUser.bookkeeperEmail || '',
             gtCoordinatorEmail: editingUser.gtCoordinatorEmail || '',
         });
-        handleDistrictChange(initialDistrict, form, false);
+        handleDistrictChange(initialDistrict);
       }
     }, [isDialogOpen, editingUser, form, allSchoolNames, getSchoolsForDistrict]);
 
@@ -264,105 +223,6 @@ export default function UsersPage() {
         }
     };
     
-    const handleCreateUser = async (values: CreateUserFormValues) => {
-        setIsCreatingUser(true);
-        try {
-            const { password, isSponsor, isOrganizer, isIndividual, ...profileData } = values;
-
-            let finalRole: User['role'];
-            if (isOrganizer) {
-              finalRole = 'organizer';
-            } else if (values.isDistrictCoordinator) {
-              finalRole = 'district_coordinator';
-            } else if (isSponsor) {
-              finalRole = 'sponsor';
-            } else {
-              finalRole = 'individual';
-            }
-
-            await createUserByOrganizer(values.email, password, { ...profileData, role: finalRole });
-            
-            toast({
-                title: "User Created Successfully",
-                description: `${values.email} has been created and can now log in with their temporary password.`,
-            });
-            loadUsers();
-            setIsCreateDialogOpen(false);
-            createForm.reset();
-        } catch (error) {
-            const message = error instanceof Error ? error.message : "An unknown error occurred.";
-            toast({
-                variant: 'destructive',
-                title: 'User Creation Failed',
-                description: message,
-            });
-        } finally {
-            setIsCreatingUser(false);
-        }
-    };
-    
-    const handleForceDelete = async () => {
-        const emails = emailsToDelete.split(/[\n,;]+/).map(e => e.trim().toLowerCase()).filter(Boolean);
-        if (emails.length === 0) {
-          toast({ variant: 'destructive', title: 'No Emails Provided', description: 'Please enter at least one email to delete.' });
-          return;
-        }
-
-        setIsDeleting(true);
-        setDeleteResults([]);
-        const log = (message: string) => setDeleteResults(prev => [...prev, message]);
-
-        if (!db) {
-            log('❌ Error: Firestore is not available.');
-            setIsDeleting(false);
-            return;
-        }
-
-        log(`Starting deletion for ${emails.length} user(s)...`);
-
-        try {
-            // Step 1: Delete Firestore documents
-            const usersRef = collection(db, 'users');
-            const firestoreBatch = writeBatch(db);
-            const foundUsersToDelete: {docId: string, email: string}[] = [];
-
-            for (let i = 0; i < emails.length; i += 30) {
-                const emailBatch = emails.slice(i, i + 30);
-                const q = query(usersRef, where('email', 'in', emailBatch));
-                const querySnapshot = await getDocs(q);
-                
-                querySnapshot.forEach(doc => {
-                    const userData = doc.data();
-                    log(`🔥 Queuing Firestore deletion for ${userData.email} (ID: ${doc.id})`);
-                    firestoreBatch.delete(doc.ref);
-                    foundUsersToDelete.push({ docId: doc.id, email: userData.email });
-                });
-            }
-            await firestoreBatch.commit();
-            log(`✅ Successfully deleted ${foundUsersToDelete.length} user records from Firestore.`);
-
-            // Step 2: Delete Auth users
-            for (const userToDelete of foundUsersToDelete) {
-                log(`🔥 Attempting to delete Auth user for ${userToDelete.email}...`);
-                const result = await deleteAuthUserByEmail(userToDelete.email);
-                log(`  -> ${result.message}`);
-            }
-          
-            log(`✅ Deletion process complete.`);
-            toast({ title: 'Deletion Complete', description: 'Check the log for details on deleted users.' });
-            
-            await loadUsers(); // Refresh user list
-            setEmailsToDelete('');
-
-        } catch (error) {
-            const message = error instanceof Error ? error.message : 'An unknown error occurred.';
-            log(`❌ Error during deletion: ${message}`);
-            toast({ variant: 'destructive', title: 'Error', description: message });
-        } finally {
-            setIsDeleting(false);
-        }
-    };
-
     const handleExportPsjaUsers = () => {
         const psjaUsers = users.filter(user => user.email.toLowerCase().endsWith('@psjaisd.us'));
         if (psjaUsers.length === 0) {
@@ -410,40 +270,7 @@ export default function UsersPage() {
                         <h1 className="text-3xl font-bold font-headline">User Management</h1>
                         <p className="text-muted-foreground">View, edit, and manage all system users.</p>
                     </div>
-                    <Button onClick={() => setIsCreateDialogOpen(true)}>
-                        <UserPlus className="mr-2 h-4 w-4" /> Create New User
-                    </Button>
                 </div>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Force Delete Users</CardTitle>
-                    <CardDescription>
-                      Permanently delete user accounts from Firestore and Firebase Authentication. Enter emails separated by commas, spaces, or new lines.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <Textarea
-                      placeholder="chiskie02@gmail.com, test@example.com"
-                      value={emailsToDelete}
-                      onChange={(e) => setEmailsToDelete(e.target.value)}
-                      rows={4}
-                      disabled={isDeleting}
-                    />
-                    <Button onClick={() => setIsDeleteAlertOpen(true)} disabled={isDeleting || !emailsToDelete} variant="destructive">
-                      {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-                      Permanently Delete {emailsToDelete.split(/[\n,;]+/).filter(Boolean).length} User(s)
-                    </Button>
-                    {deleteResults.length > 0 && (
-                        <div className="pt-4">
-                            <h4 className="font-semibold text-sm">Deletion Log:</h4>
-                            <pre className="bg-muted mt-2 p-4 rounded-md text-xs overflow-auto max-h-48 whitespace-pre-wrap">
-                                {deleteResults.join('\n')}
-                            </pre>
-                        </div>
-                    )}
-                  </CardContent>
-                </Card>
 
                 <Card>
                     <CardHeader>
@@ -552,7 +379,7 @@ export default function UsersPage() {
                                     <FormField control={form.control} name="district" render={({ field }) => (
                                         <FormItem>
                                             <FormLabel>District</FormLabel>
-                                            <Select onValueChange={(value) => handleDistrictChange(value, form)} value={field.value}>
+                                            <Select onValueChange={(value) => handleDistrictChange(value)} value={field.value}>
                                                 <FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl>
                                                 <SelectContent>
                                                     {uniqueDistricts.map((d) => (<SelectItem key={d} value={d}>{d}</SelectItem>))}
@@ -585,108 +412,6 @@ export default function UsersPage() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-
-            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-                <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col p-0">
-                    <DialogHeader className="p-6 pb-4 border-b shrink-0">
-                        <DialogTitle>Create New User</DialogTitle>
-                        <DialogDescription>Enter the new user's details and a temporary password.</DialogDescription>
-                    </DialogHeader>
-                     <ScrollArea className="flex-1 overflow-y-auto">
-                        <div className="p-6">
-                            <Form {...createForm}>
-                                <form id="user-create-form" onSubmit={createForm.handleSubmit(handleCreateUser)} className="space-y-4">
-                                    <FormField control={createForm.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
-                                    <FormField control={createForm.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
-                                    <FormField control={createForm.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
-                                    <FormField control={createForm.control} name="password" render={({ field }) => ( <FormItem><FormLabel>Temporary Password</FormLabel><FormControl><Input type="password" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
-                                    <FormField control={createForm.control} name="phone" render={({ field }) => ( <FormItem><FormLabel>Phone</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
-                                    
-                                    <FormItem>
-                                        <FormLabel>Roles</FormLabel>
-                                        <div className="space-y-2">
-                                            <FormField control={createForm.control} name="isSponsor" render={({ field }) => (
-                                                <FormItem className="flex flex-row items-center space-x-3 space-y-0"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><FormLabel>Sponsor</FormLabel></FormItem>
-                                            )} />
-                                            <FormField control={createForm.control} name="isDistrictCoordinator" render={({ field }) => (
-                                                <FormItem className="flex flex-row items-center space-x-3 space-y-0"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><FormLabel>District Coordinator</FormLabel></FormItem>
-                                            )} />
-                                            <FormField control={createForm.control} name="isOrganizer" render={({ field }) => (
-                                                <FormItem className="flex flex-row items-center space-x-3 space-y-0"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><FormLabel>Organizer</FormLabel></FormItem>
-                                            )} />
-                                            <FormField control={createForm.control} name="isIndividual" render={({ field }) => (
-                                                <FormItem className="flex flex-row items-center space-x-3 space-y-0"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><FormLabel>Individual</FormLabel></FormItem>
-                                            )} />
-                                        </div>
-                                        <FormMessage />
-                                    </FormItem>
-
-                                    {(createForm.watch('isSponsor') || createForm.watch('isDistrictCoordinator')) && (
-                                        <>
-                                            <FormField
-                                                control={createForm.control}
-                                                name="district"
-                                                render={({ field }) => (
-                                                    <FormItem>
-                                                        <FormLabel>District</FormLabel>
-                                                        <Select onValueChange={(value) => handleDistrictChange(value, createForm)} value={field.value}>
-                                                            <FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl>
-                                                            <SelectContent>
-                                                                {uniqueDistricts.map((d) => (<SelectItem key={d} value={d}>{d}</SelectItem>))}
-                                                            </SelectContent>
-                                                        </Select>
-                                                        <FormMessage />
-                                                    </FormItem>
-                                                )}
-                                            />
-                                            {createForm.watch('isSponsor') && (
-                                                <FormField
-                                                    control={createForm.control}
-                                                    name="school"
-                                                    render={({ field }) => (
-                                                        <FormItem>
-                                                            <FormLabel>School</FormLabel>
-                                                            <Select onValueChange={field.onChange} value={field.value} disabled={!createForm.watch('district')}>
-                                                                <FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl>
-                                                                <SelectContent>
-                                                                    {schoolsForDistrict.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
-                                                                </SelectContent>
-                                                            </Select>
-                                                            <FormMessage />
-                                                        </FormItem>
-                                                    )}
-                                                />
-                                            )}
-                                        </>
-                                    )}
-                                </form>
-                            </Form>
-                        </div>
-                    </ScrollArea>
-                    <DialogFooter className="p-6 pt-4 border-t shrink-0">
-                        <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
-                        <Button type="submit" form="user-create-form" disabled={isCreatingUser}>
-                            {isCreatingUser && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Create User
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-            
-            <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            This will attempt to permanently delete all users with the entered emails. This action cannot be undone.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleForceDelete} className="bg-destructive hover:bg-destructive/90">Yes, Delete Users</AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
         </AppLayout>
     );
 }
