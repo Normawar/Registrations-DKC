@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
@@ -25,7 +26,7 @@ import {
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Download, ArrowUpDown, ArrowUp, ArrowDown, Check, MoreHorizontal, FilePenLine, Trash2, Edit } from 'lucide-react';
+import { Download, ArrowUpDown, ArrowUp, ArrowDown, Check, MoreHorizontal, FilePenLine, Trash2, Edit, UserPlus } from 'lucide-react';
 import { generateTeamCode } from '@/lib/school-utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import Papa from 'papaparse';
@@ -64,6 +65,8 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { EnhancedPlayerSearchDialog } from '@/components/EnhancedPlayerSearchDialog';
+
 
 type SortableColumnKey = 'lastName' | 'teamCode' | 'uscfId' | 'regularRating' | 'grade' | 'section';
 
@@ -132,6 +135,8 @@ function DistrictRostersPageContent() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [playerToEdit, setPlayerToEdit] = useState<MasterPlayer | null>(null);
   const [schoolsForEditDistrict, setSchoolsForEditDistrict] = useState<string[]>([]);
+  
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const form = useForm<PlayerFormValues>({
     resolver: zodResolver(playerFormSchema)
@@ -337,6 +342,11 @@ function DistrictRostersPageContent() {
     setPlayerToEdit(null);
   };
 
+  const handlePlayerSelectedFromSearch = (player: any) => {
+    handleEditPlayer(player);
+    setIsSearchOpen(false);
+  };
+
   return (
     <>
       <div className="space-y-6">
@@ -346,6 +356,12 @@ function DistrictRostersPageContent() {
         </div>
 
         <Card>
+          <CardHeader>
+            <div className="flex justify-between items-center">
+              <CardTitle>Roster Management</CardTitle>
+              <Button onClick={() => setIsSearchOpen(true)}><UserPlus className="mr-2 h-4 w-4"/> Add Player</Button>
+            </div>
+          </CardHeader>
           <CardContent className="pt-6 space-y-4">
             <div className="flex flex-wrap items-end gap-4">
               <div>
@@ -594,6 +610,14 @@ function DistrictRostersPageContent() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        <EnhancedPlayerSearchDialog
+          isOpen={isSearchOpen}
+          onOpenChange={setIsSearchOpen}
+          onPlayerSelected={handlePlayerSelectedFromSearch}
+          userProfile={profile}
+          preFilterByUserProfile={true}
+        />
       </div>
     </>
   );
@@ -602,7 +626,9 @@ function DistrictRostersPageContent() {
 // New component for Sponsor/Individual view
 function UserRosterPageContent() {
     const { profile } = useSponsorProfile();
-    const { database: allPlayers } = useMasterDb();
+    const { database: allPlayers, updatePlayer } = useMasterDb();
+    const { toast } = useToast();
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
     
     const roster = useMemo(() => {
         if (!profile) return [];
@@ -610,19 +636,77 @@ function UserRosterPageContent() {
             return allPlayers.filter(p => p.district === profile.district && p.school === profile.school);
         }
         if (profile.role === 'individual') {
-            // This needs a way to get the individual's students.
-            // For now, let's assume they are linked via email or similar.
-            // This part might need more implementation details.
-            return allPlayers.filter(p => p.email === profile.email);
+             // For individuals, we'll assume a local storage link for now
+            try {
+              const storedStudentIds = localStorage.getItem(`parent_students_${profile.email}`);
+              if (storedStudentIds) {
+                const studentIds = JSON.parse(storedStudentIds);
+                return allPlayers.filter(p => studentIds.includes(p.id));
+              }
+            } catch (e) { console.error(e); }
+            return [];
         }
         return [];
     }, [profile, allPlayers]);
+
+    const handlePlayerSelected = async (player: any) => {
+        if (!profile) return;
+        
+        let playerToAdd: MasterPlayer;
+
+        if ('uscfId' in player) { // It's already a MasterPlayer
+            playerToAdd = player;
+        } else { // It's a USCFPlayer, needs conversion
+            const nameParts = player.name.split(', ');
+            playerToAdd = {
+                id: player.uscf_id, uscfId: player.uscf_id,
+                firstName: nameParts[1] || 'Unknown', lastName: nameParts[0] || 'Player',
+                state: player.state || 'TX', regularRating: player.rating_regular,
+                uscfExpiration: player.expiration_date,
+                grade: '', section: '', email: '', school: '', district: '', events: 0, eventIds: []
+            };
+        }
+    
+        // Logic for Individual vs. Sponsor
+        if (profile.role === 'individual') {
+            try {
+                const key = `parent_students_${profile.email}`;
+                const existing = JSON.parse(localStorage.getItem(key) || '[]');
+                if (!existing.includes(playerToAdd.id)) {
+                    localStorage.setItem(key, JSON.stringify([...existing, playerToAdd.id]));
+                    toast({ title: "Student Added", description: `${playerToAdd.firstName} ${playerToAdd.lastName} has been added to your list.` });
+                    // Force a re-render by updating state
+                    window.dispatchEvent(new Event('storage'));
+                } else {
+                    toast({ variant: 'destructive', title: "Student Already Added" });
+                }
+            } catch (e) {
+                console.error(e);
+                toast({ variant: 'destructive', title: "Error Saving Student" });
+            }
+        } else if (profile.role === 'sponsor' || profile.role === 'district_coordinator') {
+            const updatedPlayer = {
+                ...playerToAdd,
+                school: profile.school,
+                district: profile.district,
+            };
+            await updatePlayer(updatedPlayer, profile);
+            toast({ title: "Player Added to Roster", description: `${playerToAdd.firstName} ${playerToAdd.lastName} is now on the ${profile.school} roster.` });
+        }
+        
+        setIsSearchOpen(false);
+    };
     
     return (
         <div>
-            <h1 className="text-3xl font-bold font-headline">My Roster</h1>
-            <p className="text-muted-foreground">Manage your players and students.</p>
-            {/* You can build out the UI for sponsors/individuals here */}
+            <div className="flex justify-between items-center mb-4">
+                <div>
+                    <h1 className="text-3xl font-bold font-headline">My Roster</h1>
+                    <p className="text-muted-foreground">Manage your players and students.</p>
+                </div>
+                <Button onClick={() => setIsSearchOpen(true)}><UserPlus className="mr-2 h-4 w-4"/> Add Player/Student</Button>
+            </div>
+            
             <Card className="mt-4">
                 <CardHeader>
                     <CardTitle>{profile?.role === 'individual' ? 'My Students' : 'School Roster'}</CardTitle>
@@ -637,17 +721,31 @@ function UserRosterPageContent() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {roster.map(player => (
+                          {roster.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={3} className="text-center h-24">No players on this roster yet. Click "Add Player/Student" to start.</TableCell>
+                            </TableRow>
+                          ) : (
+                            roster.map(player => (
                                 <TableRow key={player.id}>
                                     <TableCell>{player.firstName} {player.lastName}</TableCell>
                                     <TableCell>{player.uscfId}</TableCell>
                                     <TableCell>{player.grade}</TableCell>
                                 </TableRow>
-                            ))}
+                            ))
+                          )}
                         </TableBody>
                     </Table>
                 </CardContent>
             </Card>
+
+            <EnhancedPlayerSearchDialog
+                isOpen={isSearchOpen}
+                onOpenChange={setIsSearchOpen}
+                onPlayerSelected={handlePlayerSelected}
+                userProfile={profile}
+                preFilterByUserProfile={false}
+            />
         </div>
     );
 }
