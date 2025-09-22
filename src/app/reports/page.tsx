@@ -270,7 +270,8 @@ function ReportsPageContent() {
                 <CardTitle>USCF Data Parser</CardTitle>
                 <CardDescription>Convert USCF affiliate or tournament data into clean CSV format.</CardDescription>
               </div>
-            </CardHeader>
+            </div>
+          </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground mb-4">
               Parse data copied from USCF affiliate reports or upload text files to generate clean CSV exports with player information, ratings, and titles.
