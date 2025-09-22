@@ -3,14 +3,14 @@
 // Updated src/app/players/page.tsx
 'use client';
 
-import React, { useState, useMemo, useEffect, useCallback, useRef, Suspense } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format, isValid, parse } from 'date-fns';
 import { useSearchParams, useRouter } from 'next/navigation';
 
-import { AppLayout } from "@/components/app-layout";
+import { AppLayout } from '@/components/app-layout';
 import { EnhancedPlayerSearchDialog } from '@/components/EnhancedPlayerSearchDialog';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import { Button } from '@/components/ui/button';
@@ -19,7 +19,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Search } from 'lucide-react';
+import { Search, Trash2 } from 'lucide-react';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { CSVUploadComponent } from '@/components/csv-upload';
@@ -27,6 +27,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { OrganizerGuard } from '@/components/auth-guard';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Checkbox } from '@/components/ui/checkbox';
 
 
 const grades = ['Kindergarten', '1st Grade', '2nd Grade', '3rd Grade', '4th Grade', '5th Grade', '6th Grade', '7th Grade', '8th Grade', '9th Grade', '10th Grade', '11th Grade', '12th Grade'];
@@ -82,22 +84,6 @@ const playerFormSchema = z.object({
 });
 
 type PlayerFormValues = z.infer<typeof playerFormSchema>;
-
-const createUserFormSchema = z.object({
-  email: z.string().email(),
-  role: z.enum(['sponsor', 'organizer', 'individual', 'district_coordinator']),
-  firstName: z.string().min(1, 'First name is required'),
-  lastName: z.string().min(1, 'Last name is required'),
-  school: z.string().optional(),
-  district: z.string().optional(),
-  isDistrictCoordinator: z.boolean().optional(),
-  phone: z.string().optional(),
-  bookkeeperEmail: z.string().email({ message: 'Please enter a valid email.' }).optional().or(z.literal('')),
-  gtCoordinatorEmail: z.string().email({ message: 'Please enter a valid email.' }).optional().or(z.literal('')),
-  password: z.string().min(6, 'Temporary password must be at least 6 characters.'),
-});
-
-type CreateUserFormValues = z.infer<typeof createUserFormSchema>;
 
 const DateInput = React.forwardRef<HTMLInputElement, {
   value?: Date;
@@ -178,7 +164,7 @@ const ChangeHistoryTab = ({ player }: { player: MasterPlayer | null }) => {
 
 
 function PlayersPageContent() {
-  const { addPlayer, updatePlayer, database } = useMasterDb();
+  const { addPlayer, updatePlayer, database, deletePlayer } = useMasterDb();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState<MasterPlayer | null>(null);
@@ -186,6 +172,8 @@ function PlayersPageContent() {
   const { profile } = useSponsorProfile();
   const searchParams = useSearchParams();
   const router = useRouter();
+  
+  const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
 
   const playerForm = useForm<PlayerFormValues>({
     resolver: zodResolver(playerFormSchema),
@@ -244,10 +232,9 @@ function PlayersPageContent() {
 
   const handlePlayerFormSubmit = async (values: PlayerFormValues) => {
     if (!editingPlayer) return;
-
+  
     const { uscfExpiration, dob, ...restOfValues } = values;
-
-    // If the ID was temporary and the new USCF ID is official, use the new ID as the document ID
+    
     const isNewPlayer = !database.some(p => p.id === editingPlayer.id);
     const idToUse = (editingPlayer.id.startsWith('temp_') && values.uscfId && values.uscfId.toUpperCase() !== 'NEW')
       ? values.uscfId 
@@ -256,7 +243,7 @@ function PlayersPageContent() {
     const updatedPlayerRecord: MasterPlayer = {
       ...editingPlayer,
       ...restOfValues,
-      id: idToUse, // Use the new ID if applicable
+      id: idToUse,
       dob: dob ? dob.toISOString() : undefined,
       uscfExpiration: uscfExpiration ? uscfExpiration.toISOString() : undefined,
     };
@@ -279,47 +266,45 @@ function PlayersPageContent() {
     setEditingPlayer(null);
   };
 
+  const handleBulkDelete = async () => {
+    if (selectedPlayerIds.length === 0) {
+        toast({ title: "No players selected", variant: "destructive" });
+        return;
+    }
+    if (confirm(`Are you sure you want to delete ${selectedPlayerIds.length} players? This action cannot be undone.`)) {
+        await Promise.all(selectedPlayerIds.map(id => deletePlayer(id)));
+        toast({ title: `${selectedPlayerIds.length} players deleted.` });
+        setSelectedPlayerIds([]);
+    }
+  };
+
   return (
     <AppLayout>
       <div className="container mx-auto p-6 space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Master Player Database</h1>
+            <h1 className="text-2xl font-bold text-gray-900">District Rosters</h1>
             <p className="text-sm text-gray-600 mt-1">
-              Search, manage, and register every player in the system.
+              Manage players associated with schools in your district.
             </p>
           </div>
           
           <div className="flex space-x-2">
+            {profile?.role === 'organizer' && selectedPlayerIds.length > 0 && (
+                <Button variant="destructive" onClick={handleBulkDelete}>
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete Selected ({selectedPlayerIds.length})
+                </Button>
+            )}
             <Button
               className="flex items-center"
               onClick={() => setIsSearchOpen(true)}
             >
               <Search className="w-4 h-4 mr-2" />
-              Search Players
+              Search & Add Players
             </Button>
           </div>
         </div>
-
-        <Card>
-            <CardHeader>
-                <CardTitle>Bulk Upload</CardTitle>
-                <CardDescription>Upload a CSV file to add or update multiple players in the master database at once.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <CSVUploadComponent />
-            </CardContent>
-        </Card>
-
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-8 text-center text-gray-500">
-            <Search className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-            <h2 className="text-lg font-medium text-gray-800">Search to Begin</h2>
-            <p className="mt-1 text-sm">
-                Use the "Search Players" button to find, edit, or add players to the master database. 
-                Displaying all {database.length.toLocaleString()} players at once is not supported for performance reasons.
-            </p>
-        </div>
-
 
         <EnhancedPlayerSearchDialog
           isOpen={isSearchOpen}
@@ -329,6 +314,57 @@ function PlayersPageContent() {
           userProfile={profile}
           preFilterByUserProfile={true}
         />
+        
+        <Card>
+            <CardContent className="pt-6">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            {profile?.role === 'organizer' && (
+                                <TableHead className="w-12">
+                                    <Checkbox 
+                                        onCheckedChange={(checked) => {
+                                            if(checked) {
+                                                const allIds = database.map(p => p.id);
+                                                setSelectedPlayerIds(allIds);
+                                            } else {
+                                                setSelectedPlayerIds([]);
+                                            }
+                                        }}
+                                    />
+                                </TableHead>
+                            )}
+                            <TableHead>Name</TableHead>
+                            <TableHead>School</TableHead>
+                            <TableHead>District</TableHead>
+                            <TableHead>USCF ID</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {database.map(player => (
+                            <TableRow key={player.id}>
+                                {profile?.role === 'organizer' && (
+                                    <TableCell>
+                                        <Checkbox 
+                                            checked={selectedPlayerIds.includes(player.id)}
+                                            onCheckedChange={(checked) => {
+                                                setSelectedPlayerIds(prev => 
+                                                    checked ? [...prev, player.id] : prev.filter(id => id !== player.id)
+                                                )
+                                            }}
+                                        />
+                                    </TableCell>
+                                )}
+                                <TableCell>{player.firstName} {player.lastName}</TableCell>
+                                <TableCell>{player.school}</TableCell>
+                                <TableCell>{player.district}</TableCell>
+                                <TableCell>{player.uscfId}</TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
 
         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
           <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col p-0">
