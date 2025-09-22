@@ -26,7 +26,7 @@ type MatchedPlayer = UploadedPlayer & {
   firebaseUsdId: string;
   firebaseGrade: string;
   firebaseTeam: string;
-  matchStatus: 'found' | 'not_found';
+  matchStatus: 'found_by_id' | 'found_by_name' | 'not_found' | 'multiple_found';
 };
 
 function UscfCrossReferencePageContent() {
@@ -65,41 +65,82 @@ function UscfCrossReferencePageContent() {
   };
 
   const crossReferenceData = (data: UploadedPlayer[]) => {
-    const playerMap = new Map<string, MasterPlayer>();
+    const playerMapById = new Map<string, MasterPlayer>();
+    const playerMapByName = new Map<string, MasterPlayer[]>();
+
     allPlayers.forEach(p => {
+      // Index by USCF ID
       if (p.uscfId && p.uscfId !== 'NEW') {
-        playerMap.set(p.uscfId, p);
+        playerMapById.set(p.uscfId, p);
+      }
+      
+      // Index by normalized full name
+      const normalizedName = `${p.firstName?.trim() || ''} ${p.lastName?.trim() || ''}`.toLowerCase();
+      if (normalizedName.trim()) {
+        if (!playerMapByName.has(normalizedName)) {
+          playerMapByName.set(normalizedName, []);
+        }
+        playerMapByName.get(normalizedName)!.push(p);
       }
     });
 
     const newMatchedData = data.map((row): MatchedPlayer => {
       const uscfId = row.USCF?.trim();
-      const firebasePlayer = playerMap.get(uscfId);
+      
+      // 1. Try to match by USCF ID first
+      if (uscfId) {
+        const firebasePlayer = playerMapById.get(uscfId);
+        if (firebasePlayer) {
+          return {
+            ...row,
+            firebaseUsdId: firebasePlayer.uscfId,
+            firebaseGrade: firebasePlayer.grade || 'Not Set',
+            firebaseTeam: generateTeamCode(firebasePlayer),
+            matchStatus: 'found_by_id',
+          };
+        }
+      }
 
-      if (firebasePlayer) {
+      // 2. If no USCF ID match, try to match by name
+      const normalizedRowName = row.Name?.trim().toLowerCase();
+      const nameMatches = playerMapByName.get(normalizedRowName);
+
+      if (nameMatches && nameMatches.length === 1) {
+        // Found a single, unique match by name
+        const firebasePlayer = nameMatches[0];
         return {
           ...row,
           firebaseUsdId: firebasePlayer.uscfId,
           firebaseGrade: firebasePlayer.grade || 'Not Set',
           firebaseTeam: generateTeamCode(firebasePlayer),
-          matchStatus: 'found',
+          matchStatus: 'found_by_name',
         };
-      } else {
-        return {
+      } else if (nameMatches && nameMatches.length > 1) {
+        // Multiple matches found for the same name
+         return {
           ...row,
-          firebaseUsdId: 'Not Found',
+          firebaseUsdId: 'Multiple Matches',
           firebaseGrade: 'N/A',
           firebaseTeam: 'N/A',
-          matchStatus: 'not_found',
+          matchStatus: 'multiple_found',
         };
       }
+
+      // 3. If no match found by ID or name
+      return {
+        ...row,
+        firebaseUsdId: 'Not Found',
+        firebaseGrade: 'N/A',
+        firebaseTeam: 'N/A',
+        matchStatus: 'not_found',
+      };
     });
 
     setMatchedData(newMatchedData);
     setIsProcessing(false);
     toast({
       title: 'Cross-Reference Complete',
-      description: `Found matches for ${newMatchedData.filter(p => p.matchStatus === 'found').length} out of ${newMatchedData.length} players.`,
+      description: `Found unique matches for ${newMatchedData.filter(p => p.matchStatus === 'found_by_id' || p.matchStatus === 'found_by_name').length} out of ${newMatchedData.length} players.`,
     });
   };
 
@@ -132,6 +173,16 @@ function UscfCrossReferencePageContent() {
     link.click();
     document.body.removeChild(link);
   };
+
+  const getStatusColor = (status: MatchedPlayer['matchStatus']) => {
+    switch(status) {
+        case 'found_by_id': return 'bg-green-50 text-green-800';
+        case 'found_by_name': return 'bg-blue-50 text-blue-800';
+        case 'multiple_found': return 'bg-yellow-50 text-yellow-800';
+        case 'not_found': return 'bg-red-50 text-red-800';
+        default: return '';
+    }
+  }
 
   return (
     <div className="space-y-8">
@@ -187,21 +238,25 @@ function UscfCrossReferencePageContent() {
                   <TableHead>Grade (Sheet)</TableHead>
                   <TableHead>Firebase Grade</TableHead>
                   <TableHead>Firebase Team Code</TableHead>
+                  <TableHead>Match Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isProcessing ? (
-                  <TableRow><TableCell colSpan={5} className="text-center">Processing...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="text-center">Processing...</TableCell></TableRow>
                 ) : matchedData.length === 0 ? (
-                  <TableRow><TableCell colSpan={5} className="h-24 text-center">Upload a file to see results.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="h-24 text-center">Upload a file to see results.</TableCell></TableRow>
                 ) : (
                   matchedData.map((player, index) => (
-                    <TableRow key={index} className={player.matchStatus === 'not_found' ? 'bg-red-50' : 'bg-green-50'}>
+                    <TableRow key={index} className={getStatusColor(player.matchStatus)}>
                       <TableCell>{player.Name}</TableCell>
                       <TableCell>{player.USCF}</TableCell>
                       <TableCell>{player.GRADE}</TableCell>
                       <TableCell className="font-medium">{player.firebaseGrade}</TableCell>
                       <TableCell className="font-mono font-medium">{player.firebaseTeam}</TableCell>
+                      <TableCell className="font-medium capitalize">
+                        {player.matchStatus.replace(/_/g, ' ')}
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
