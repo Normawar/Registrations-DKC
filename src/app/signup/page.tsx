@@ -101,7 +101,7 @@ async function correctOrganizerAccountData(email: string, password: string) {
 const SponsorSignUpForm = () => {
   const router = useRouter();
   const { toast } = useToast();
-  const { dbDistricts, getSchoolsForDistrict, allSchoolNames, isDbLoaded } = useMasterDb();
+  const { dbDistricts, getSchoolsForDistrict, allSchoolNames, isDbLoaded, schools } = useMasterDb();
   const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
   const { updateProfile } = useSponsorProfile();
   const [isLoading, setIsLoading] = useState(false);
@@ -168,14 +168,15 @@ const SponsorSignUpForm = () => {
       const role: SponsorProfile['role'] = isCoordinator ? 'district_coordinator' : 'sponsor';
 
       const { password, email, ...profileValues } = values;
+      const schoolInfo = schools.find(s => s.schoolName === profileValues.school);
       
       const profileData: Omit<SponsorProfile, 'uid' | 'email'> = {
         ...profileValues,
         role: role,
         avatarType: 'icon',
         avatarValue: 'KingIcon',
-        schoolAddress: '',
-        schoolPhone: '',
+        schoolAddress: schoolInfo?.streetAddress || '',
+        schoolPhone: schoolInfo?.phone || '',
         isDistrictCoordinator: isCoordinator,
         forceProfileUpdate: true,
       };

@@ -1,39 +1,9 @@
-
 // FIXED VERSION: Refactored to prevent recursion
 
 import { auth, db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, writeBatch, updateDoc } from 'firebase/firestore';
 import { sendPasswordResetEmail, type User, getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import type { SponsorProfile } from '@/hooks/use-sponsor-profile';
-
-// Add this at the very top of your current simple-auth.ts to identify the recursion
-
-let callDepth = 0;
-const MAX_DEPTH = 10;
-const callHistory: string[] = [];
-
-function trackCall(functionName: string, email?: string) {
-  callDepth++;
-  const callInfo = `${functionName}${email ? `(${email})` : ''} - depth: ${callDepth}`;
-  callHistory.push(callInfo);
-  
-  console.log(`🔄 ${callInfo}`);
-  
-  if (callDepth > MAX_DEPTH) {
-    console.error('🚨 STACK OVERFLOW DETECTED!');
-    console.error('Call history:', callHistory);
-    throw new Error(`Stack overflow detected at depth ${callDepth} in ${functionName}`);
-  }
-  
-  return () => {
-    callDepth--;
-    // console.log(`✅ ${functionName} completed - depth now: ${callDepth}`);
-  };
-}
-
-
-// Move all Firebase imports to the top level to prevent repeated dynamic imports
-// This is a common cause of stack overflow in Firebase apps
 
 // Email utilities remain the same
 export function normalizeEmail(email: string): string {
@@ -52,7 +22,6 @@ const authOperationsInProgress = new Set<string>();
 
 // FIXED: Simplified signup function that prevents recursion
 export async function simpleSignUp(email: string, password: string, userData: Omit<SponsorProfile, 'uid' | 'email'>) {
-  const cleanup = trackCall('simpleSignUp', email);
   const normalizedEmail = normalizeEmail(email);
   
   // Prevent concurrent operations on the same email
@@ -125,13 +94,11 @@ export async function simpleSignUp(email: string, password: string, userData: Om
     throw new Error(getAuthErrorMessage(error));
   } finally {
     authOperationsInProgress.delete(normalizedEmail);
-    cleanup();
   }
 }
 
 // FIXED: Extract special account handling to prevent nested complexity
 async function handleSpecialAccounts(normalizedEmail: string, trimmedPassword: string, authInstance: any): Promise<any | null> {
-  const cleanup = trackCall('handleSpecialAccounts', normalizedEmail);
   try {
     // Handle organizer account
     if (normalizedEmail === 'norma@dkchess.com') {
@@ -140,12 +107,10 @@ async function handleSpecialAccounts(normalizedEmail: string, trimmedPassword: s
     
     return null;
   } finally {
-    cleanup();
   }
 }
 
 async function handleOrganizerAccount(email: string, password: string, authInstance: any) {
-  const cleanup = trackCall('handleOrganizerAccount', email);
   try {
       let user: User;
     
@@ -183,13 +148,11 @@ async function handleOrganizerAccount(email: string, password: string, authInsta
     await setDoc(doc(db, 'users', user.uid), organizerProfile, { merge: true });
     return { success: true, user, profile: organizerProfile };
   } finally {
-    cleanup();
   }
 }
 
 // FIXED: Simplified signin function
 export async function simpleSignIn(email: string, password: string) {
-  const cleanup = trackCall('simpleSignIn', email);
   const normalizedEmail = normalizeEmail(email);
   
   if (authOperationsInProgress.has(normalizedEmail)) {
@@ -239,7 +202,6 @@ export async function simpleSignIn(email: string, password: string) {
     throw new Error(getAuthErrorMessage(error));
   } finally {
     authOperationsInProgress.delete(normalizedEmail);
-    cleanup();
   }
 }
 
@@ -270,7 +232,6 @@ function getTestAccountProfile(email: string): Partial<SponsorProfile> | null {
 }
 
 async function getOrCreateUserProfile(user: User, normalizedEmail: string): Promise<SponsorProfile> {
-  const cleanup = trackCall('getOrCreateUserProfile', normalizedEmail);
   try {
     const profileDoc = await getDoc(doc(db, 'users', user.uid));
     let profileData = profileDoc.exists() ? profileDoc.data() as SponsorProfile : null;
@@ -294,7 +255,6 @@ async function getOrCreateUserProfile(user: User, normalizedEmail: string): Prom
 
     return profileData;
   } finally {
-    cleanup();
   }
 }
 
@@ -550,7 +510,6 @@ export async function directFirebaseSignIn(email: string, password: string) {
 
 // Helper function to correct organizer account data
 export async function correctOrganizerAccountData(email: string, password: string) {
-  const cleanup = trackCall('correctOrganizerAccountData', email);
   try {
       console.log('🔧 Attempting to correct organizer account data for:', email);
     
@@ -589,6 +548,5 @@ export async function correctOrganizerAccountData(email: string, password: strin
     console.error('❌ Data correction failed:', error);
     throw error;
   } finally {
-      cleanup();
   }
 }

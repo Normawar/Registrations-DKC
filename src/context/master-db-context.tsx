@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useMemo } from 'react';
@@ -51,6 +50,7 @@ interface MasterDbContextType {
   dbPlayerCount: number;
   dbStates: string[];
   dbSchools: string[];
+  allSchoolNames: string[];
   dbDistricts: string[];
   getSchoolsForDistrict: (district: string) => string[];
   searchPlayers: (criteria: Partial<SearchCriteria>) => Promise<SearchResult>;
@@ -269,6 +269,16 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   const [playerCount, setPlayerCount] = useState(0);
 
   const dbSchools = useMemo(() => [...new Set(schools.map(s => s.schoolName))].sort(), [schools]);
+  
+  const allSchoolNames = useMemo(() => {
+    const schoolNames = schools.map(s => s.schoolName);
+    const uniqueSchoolNames = [...new Set(schoolNames)].sort();
+    if (!uniqueSchoolNames.includes('Homeschool')) {
+        return ['Homeschool', ...uniqueSchoolNames];
+    }
+    return uniqueSchoolNames;
+  }, [schools]);
+
   const dbDistricts = useMemo(() => {
     const districts = [...new Set(schools.map(s => s.district))].sort();
     if (!districts.includes('Homeschool')) {
@@ -282,13 +292,13 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
       return ['Homeschool'];
     }
     if (district === 'all' || !district) {
-      return dbSchools;
+      return allSchoolNames;
     }
     return schools
       .filter(s => s.district === district)
       .map(s => s.schoolName)
       .sort();
-  }, [schools, dbSchools]);
+  }, [schools, allSchoolNames]);
 
   const loadDatabase = useCallback(async () => {
     if (!db) return;
@@ -670,6 +680,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     dbPlayerCount: playerCount,
     dbStates: [],
     dbSchools,
+    allSchoolNames,
     dbDistricts,
     getSchoolsForDistrict,
     searchPlayers,
