@@ -1,5 +1,4 @@
 
-
 // Updated src/app/roster/page.tsx
 'use client';
 
@@ -19,7 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Search, PlusCircle, Trash2, Edit, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Check, FilePenLine, History } from 'lucide-react';
+import { Search, PlusCircle, Trash2, Edit, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Check, FilePenLine, History, UserPlus } from 'lucide-react';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { CSVUploadComponent } from '@/components/csv-upload';
@@ -586,6 +585,12 @@ function DistrictRostersPageContent() {
                           <Checkbox
                               onCheckedChange={(checked) => toggleSelectAllForSchool(players, !!checked)}
                               checked={players.length > 0 && players.every(p => selectedPlayers.includes(p.id))}
+                              ref={(el) => {
+                                  if (el) {
+                                      const isIndeterminate = players.length > 0 && players.some(p => selectedPlayers.includes(p.id)) && !players.every(p => selectedPlayers.includes(p.id));
+                                      el.indeterminate = isIndeterminate;
+                                  }
+                              }}
                           />
                         </TableHead>
                         <TableHead><Button variant="ghost" onClick={() => requestSort('lastName')} className="px-0 flex items-center gap-1">Player Name {getSortIcon('lastName')}</Button></TableHead>
@@ -1028,9 +1033,7 @@ function UserRosterPageContent() {
                                       <FormControl>
                                         <SelectTrigger><SelectValue placeholder="Select grade" /></SelectTrigger>
                                       </FormControl>
-                                      <SelectContent>
-                                        {grades.map(grade => <SelectItem key={grade} value={grade}>{grade}</SelectItem>)}
-                                      </SelectContent>
+                                      <SelectContent position="item-aligned">{grades.map(grade => <SelectItem key={grade} value={grade}>{grade}</SelectItem>)}</SelectContent>
                                     </Select>
                                     <FormMessage />
                                   </FormItem>
@@ -1043,9 +1046,7 @@ function UserRosterPageContent() {
                                       <FormControl>
                                         <SelectTrigger><SelectValue placeholder="Select section" /></SelectTrigger>
                                       </FormControl>
-                                      <SelectContent>
-                                        {sections.map(section => <SelectItem key={section} value={section}>{section}</SelectItem>)}
-                                      </SelectContent>
+                                      <SelectContent position="item-aligned">{sections.map(section => <SelectItem key={section} value={section}>{section}</SelectItem>)}</SelectContent>
                                     </Select>
                                     <FormMessage />
                                   </FormItem>
