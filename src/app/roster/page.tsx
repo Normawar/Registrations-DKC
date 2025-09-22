@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
@@ -90,90 +89,6 @@ const playerFormSchema = z.object({
 
 type PlayerFormValues = z.infer<typeof playerFormSchema>;
 
-// Shared Change History component
-const ChangeHistorySection = ({ player }: { player: MasterPlayer | null }) => {
-    if (!player) {
-        return (
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <History className="h-5 w-5 text-muted-foreground" />
-              Record Information
-            </h3>
-            <div className="p-6 text-center text-muted-foreground border rounded-md bg-muted/30">
-              Record information will be available after the player is created.
-            </div>
-          </div>
-        );
-    }
-
-    return (
-        <div className="space-y-4">
-            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <History className="h-5 w-5 text-muted-foreground" />
-              Record Information
-            </h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-md bg-muted/30">
-                <div>
-                    <h4 className="font-medium text-sm text-muted-foreground mb-2">RECORD CREATED</h4>
-                    <p className="text-sm font-semibold">
-                        {player.dateCreated 
-                            ? format(new Date(player.dateCreated), 'PPP p') 
-                            : 'Unknown Date'
-                        }
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                        Created by: {player.createdBy || 'Unknown User'}
-                    </p>
-                </div>
-                <div>
-                    <h4 className="font-medium text-sm text-muted-foreground mb-2">LAST UPDATED</h4>
-                    <p className="text-sm font-semibold">
-                        {player.dateUpdated 
-                            ? format(new Date(player.dateUpdated), 'PPP p') 
-                            : (player.dateCreated ? format(new Date(player.dateCreated), 'PPP p') : 'Unknown Date')
-                        }
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                        Updated by: {player.updatedBy || player.createdBy || 'Unknown User'}
-                    </p>
-                </div>
-            </div>
-
-            {player.changeHistory && player.changeHistory.length > 0 ? (
-                <div>
-                    <h4 className="font-medium text-sm text-muted-foreground mb-3">CHANGE HISTORY</h4>
-                    <div className="space-y-3 border rounded-md p-4 max-h-64 overflow-y-auto bg-background">
-                        {player.changeHistory.slice().reverse().map((entry, index) => (
-                            <div key={entry.timestamp || index} className="text-sm border-l-2 border-muted-foreground pl-4 pb-3 last:pb-0">
-                                <p className="font-medium text-foreground">
-                                    {format(new Date(entry.timestamp), 'PPP p')} by {entry.userName}
-                                </p>
-                                <ul className="list-disc pl-5 mt-2 space-y-1">
-                                    {entry.changes.map((change, changeIndex) => (
-                                        <li key={changeIndex} className="text-xs text-muted-foreground">
-                                            Field <span className="font-semibold text-foreground">{change.field}</span> changed from 
-                                            <span className="italic text-red-600 mx-1">'{String(change.oldValue)}'</span> to 
-                                            <span className="italic text-green-600 mx-1">'{String(change.newValue)}'</span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            ) : (
-                <div>
-                    <h4 className="font-medium text-sm text-muted-foreground mb-3">CHANGE HISTORY</h4>
-                    <div className="p-4 text-center text-xs text-muted-foreground border rounded-md bg-muted/20">
-                        No changes recorded for this player.
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-};
-
 const DateInput = React.forwardRef<HTMLInputElement, {
   value?: Date;
   onChange?: (date: Date | undefined) => void;
@@ -225,6 +140,91 @@ const DateInput = React.forwardRef<HTMLInputElement, {
 });
 DateInput.displayName = 'DateInput';
 
+// Updated ChangeHistoryTab component with enhanced information
+const ChangeHistorySection = ({ player }: { player: MasterPlayer | null }) => {
+    if (!player) {
+        return (
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <History className="h-5 w-5 text-muted-foreground" />
+              Record Information
+            </h3>
+            <div className="p-6 text-center text-muted-foreground border rounded-md bg-muted/30">
+              Record information will be available after the player is created.
+            </div>
+          </div>
+        );
+    }
+
+    return (
+        <div className="space-y-4">
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <History className="h-5 w-5 text-muted-foreground" />
+              Record Information
+            </h3>
+            
+            {/* Record Creation and Update Summary */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-md bg-muted/30">
+                <div>
+                    <h4 className="font-medium text-sm text-muted-foreground mb-2">RECORD CREATED</h4>
+                    <p className="text-sm font-semibold">
+                        {player.dateCreated 
+                            ? format(new Date(player.dateCreated), 'PPP p') 
+                            : 'Unknown Date'
+                        }
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                        Created by: {player.createdBy || 'Unknown User'}
+                    </p>
+                </div>
+                <div>
+                    <h4 className="font-medium text-sm text-muted-foreground mb-2">LAST UPDATED</h4>
+                    <p className="text-sm font-semibold">
+                        {player.dateUpdated 
+                            ? format(new Date(player.dateUpdated), 'PPP p') 
+                            : (player.dateCreated ? format(new Date(player.dateCreated), 'PPP p') : 'Unknown Date')
+                        }
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                        Updated by: {player.updatedBy || player.createdBy || 'Unknown User'}
+                    </p>
+                </div>
+            </div>
+
+            {/* Change History Details */}
+            {player.changeHistory && player.changeHistory.length > 0 ? (
+                <div>
+                    <h4 className="font-medium text-sm text-muted-foreground mb-3">CHANGE HISTORY</h4>
+                    <div className="space-y-3 border rounded-md p-4 max-h-64 overflow-y-auto bg-background">
+                        {player.changeHistory.slice().reverse().map((entry, index) => (
+                            <div key={entry.timestamp || index} className="text-sm border-l-2 border-muted-foreground pl-4 pb-3 last:pb-0">
+                                <p className="font-medium text-foreground">
+                                    {format(new Date(entry.timestamp), 'PPP p')} by {entry.userName}
+                                </p>
+                                <ul className="list-disc pl-5 mt-2 space-y-1">
+                                    {entry.changes.map((change, changeIndex) => (
+                                        <li key={changeIndex} className="text-xs text-muted-foreground">
+                                            Field <span className="font-semibold text-foreground">{change.field}</span> changed from 
+                                            <span className="italic text-red-600 mx-1">'{String(change.oldValue)}'</span> to 
+                                            <span className="italic text-green-600 mx-1">'{String(change.newValue)}'</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            ) : (
+                <div>
+                    <h4 className="font-medium text-sm text-muted-foreground mb-3">CHANGE HISTORY</h4>
+                    <div className="p-4 text-center text-xs text-muted-foreground border rounded-md bg-muted/20">
+                        No changes recorded for this player.
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
 
 function DistrictRostersPageContent() {
   const { isDbLoaded, dbDistricts, database: allPlayers, getSchoolsForDistrict, deletePlayer, updatePlayer, addPlayer } = useMasterDb();
@@ -639,19 +639,204 @@ function DistrictRostersPageContent() {
         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
             <DialogContent className="sm:max-w-4xl max-h-[95vh] flex flex-col p-0">
                 <DialogHeader className="p-6 pb-4 border-b shrink-0">
-                  <DialogTitle>{playerToEdit ? 'Edit Player' : 'Create New Player'}</DialogTitle>
-                  <DialogDescription>
-                    {playerToEdit ? 'Modify the player\'s information below.' : 'Enter the details for the new player.'}
-                  </DialogDescription>
+                    <DialogTitle>{playerToEdit ? 'Edit Player' : 'Create New Player'}</DialogTitle>
+                    <DialogDescription>
+                        {playerToEdit ? 'Modify the player\'s information below.' : 'Enter the details for the new player.'}
+                    </DialogDescription>
                 </DialogHeader>
+                
                 <ScrollArea className="flex-1 overflow-y-auto">
-                  <div className="p-6 space-y-6">
-                    <Form {...form}>
-                      <form id="edit-player-form" onSubmit={form.handleSubmit(onEditSubmit)} className="space-y-6">
-                        <ChangeHistorySection player={playerToEdit} />
-                      </form>
-                    </Form>
-                  </div>
+                    <div className="p-6 space-y-6">
+                        <Form {...form}>
+                            <form id="edit-player-form" onSubmit={form.handleSubmit(onEditSubmit)} className="space-y-6">
+                                
+                                {/* Player Information Section */}
+                                <div className="space-y-4">
+                                    <h3 className="text-lg font-semibold border-b pb-2">Player Information</h3>
+                                    
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <FormField control={form.control} name="firstName" render={({ field }) => ( 
+                                        <FormItem>
+                                            <FormLabel>First Name</FormLabel>
+                                            <FormControl><Input {...field} /></FormControl>
+                                            <FormMessage />
+                                        </FormItem> 
+                                        )}/>
+                                        <FormField control={form.control} name="lastName" render={({ field }) => ( 
+                                        <FormItem>
+                                            <FormLabel>Last Name</FormLabel>
+                                            <FormControl><Input {...field} /></FormControl>
+                                            <FormMessage />
+                                        </FormItem> 
+                                        )}/>
+                                        <FormField control={form.control} name="middleName" render={({ field }) => ( 
+                                        <FormItem>
+                                            <FormLabel>Middle Name (Optional)</FormLabel>
+                                            <FormControl><Input {...field} /></FormControl>
+                                            <FormMessage />
+                                        </FormItem> 
+                                        )}/>
+                                    </div>
+                                </div>
+
+                                {/* School Information Section */}
+                                <div className="space-y-4">
+                                    <h3 className="text-lg font-semibold border-b pb-2">School Information</h3>
+                                    
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <FormField control={form.control} name="district" render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>District</FormLabel>
+                                            <Select onValueChange={(v) => { 
+                                            field.onChange(v); 
+                                            setSchoolsForEditDistrict(getSchoolsForDistrict(v)); 
+                                            form.setValue('school', ''); 
+                                            }} value={field.value}>
+                                            <FormControl>
+                                                <SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                {dbDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                                            </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                        )} />
+                                        
+                                        <FormField control={form.control} name="school" render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>School</FormLabel>
+                                            <Select onValueChange={field.onChange} value={field.value}>
+                                            <FormControl>
+                                                <SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                {schoolsForEditDistrict.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                                            </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                        )} />
+                                    </div>
+
+                                    {editDistrict === 'PHARR-SAN JUAN-ALAMO ISD' && (
+                                        <FormField
+                                        control={form.control}
+                                        name="studentType"
+                                        render={({ field }) => (
+                                            <FormItem className="space-y-3">
+                                            <FormLabel>Student Type</FormLabel>
+                                            <FormControl>
+                                                <RadioGroup 
+                                                onValueChange={field.onChange} 
+                                                value={field.value || 'independent'} 
+                                                className="flex items-center space-x-4"
+                                                >
+                                                <FormItem className="flex items-center space-x-2 space-y-0">
+                                                    <FormControl><RadioGroupItem value="independent" /></FormControl>
+                                                    <FormLabel className="font-normal">Independent</FormLabel>
+                                                </FormItem>
+                                                <FormItem className="flex items-center space-x-2 space-y-0">
+                                                    <FormControl><RadioGroupItem value="gt" /></FormControl>
+                                                    <FormLabel className="font-normal">GT (Gifted & Talented)</FormLabel>
+                                                </FormItem>
+                                                </RadioGroup>
+                                            </FormControl>
+                                            <FormMessage />
+                                            </FormItem>
+                                        )}
+                                        />
+                                    )}
+                                </div>
+
+                                {/* Chess Information Section */}
+                                <div className="space-y-4">
+                                    <h3 className="text-lg font-semibold border-b pb-2">Chess Information</h3>
+                                    
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <FormField control={form.control} name="uscfId" render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>USCF ID</FormLabel>
+                                            <FormControl><Input {...field} /></FormControl>
+                                            <FormDescription>Enter USCF ID number or "NEW" for new players.</FormDescription>
+                                            <FormMessage />
+                                        </FormItem>
+                                        )} />
+                                        
+                                        <FormField control={form.control} name="regularRating" render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Rating</FormLabel>
+                                            <FormControl>
+                                            <Input 
+                                                type="text" 
+                                                placeholder="e.g., 1500, UNR, or NEW" 
+                                                value={field.value?.toString() || ''} 
+                                                onChange={(e) => { 
+                                                const value = e.target.value; 
+                                                if (value === '' || value.toUpperCase() === 'UNR' || value.toUpperCase() === 'NEW') { 
+                                                    field.onChange(undefined); 
+                                                } else { 
+                                                    field.onChange(value); 
+                                                } 
+                                                }} 
+                                            />
+                                            </FormControl>
+                                            <FormDescription>Enter rating, UNR, or NEW</FormDescription>
+                                            <FormMessage />
+                                        </FormItem>
+                                        )} />
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <FormField control={form.control} name="grade" render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Grade</FormLabel>
+                                            <Select onValueChange={field.onChange} value={field.value}>
+                                            <FormControl>
+                                                <SelectTrigger><SelectValue placeholder="Select grade" /></SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent position="item-aligned">{grades.map(grade => <SelectItem key={grade} value={grade}>{grade}</SelectItem>)}</SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                        )} />
+                                        
+                                        <FormField control={form.control} name="section" render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Section</FormLabel>
+                                            <Select onValueChange={field.onChange} value={field.value}>
+                                            <FormControl>
+                                                <SelectTrigger><SelectValue placeholder="Select section" /></SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent position="item-aligned">{sections.map(section => <SelectItem key={section} value={section}>{section}</SelectItem>)}</SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                        )} />
+                                    </div>
+                                </div>
+
+                                {/* Contact Information Section */}
+                                <div className="space-y-4">
+                                    <h3 className="text-lg font-semibold border-b pb-2">Contact Information</h3>
+                                    
+                                    <FormField control={form.control} name="email" render={({ field }) => (
+                                        <FormItem>
+                                        <FormLabel>Email (Optional)</FormLabel>
+                                        <FormControl><Input type="email" {...field} /></FormControl>
+                                        <FormMessage />
+                                        </FormItem>
+                                    )} />
+                                </div>
+
+                                <Separator className="my-6" />
+
+                                {/* Change History Section */}
+                                <ChangeHistorySection player={playerToEdit} />
+
+                            </form>
+                        </Form>
+                    </div>
                 </ScrollArea>
                 <div className="p-6 pt-4 border-t bg-muted/30 shrink-0">
                   <div className="flex justify-between">
@@ -707,7 +892,6 @@ function DistrictRostersPageContent() {
   );
 }
 
-// New component for Sponsor/Individual view
 function UserRosterPageContent() {
     const { profile } = useSponsorProfile();
     const { database: allPlayers, isDbLoaded, addPlayer, updatePlayer } = useMasterDb();
@@ -752,7 +936,6 @@ function UserRosterPageContent() {
     const onEditSubmit = async (values: PlayerFormValues) => {
         if (!profile) return;
         
-        // Check if the player is already on the user's roster (for individuals)
         const isAlreadyOnRoster = playerToEdit && roster.some(p => p.id === playerToEdit.id);
 
         if (playerToEdit && isAlreadyOnRoster) { // Updating existing player on roster
@@ -842,13 +1025,10 @@ function UserRosterPageContent() {
                 <DialogHeader>
                     <DialogTitle>{isPlayerOnRoster ? 'Edit Player' : 'Add Player to Roster'}</DialogTitle>
                 </DialogHeader>
-                {/* Simplified Form for non-organizers */}
                  <p className="text-sm text-muted-foreground">Fill in the player's details to add or update them on your roster.</p>
                 <DialogFooter>
                   <Button variant="ghost" onClick={() => setIsEditOpen(false)}>Cancel</Button>
                   <Button onClick={() => {
-                    // Logic to save the player would go here
-                    // This is a simplified version
                     onEditSubmit(playerToEdit as any);
                   }}>
                     {isPlayerOnRoster ? 'Update Player' : 'Add to Roster'}
@@ -891,5 +1071,3 @@ export default function RosterPage() {
         </AuthGuard>
     );
 }
-
-```
