@@ -28,6 +28,9 @@ type MatchedPlayer = UploadedPlayer & {
   firebaseSchool: string;
   firebaseDistrict: string;
   firebaseTeam: string;
+  firebaseDob: string;
+  firebaseEmail: string;
+  firebaseZipCode: string;
   matchStatus: 'found_by_id' | 'found_by_name' | 'not_found' | 'multiple_found';
 };
 
@@ -77,19 +80,26 @@ function UscfCrossReferencePageContent() {
     const newMatchedData = data.map((row): MatchedPlayer => {
       const uscfId = row.USCF?.trim();
       
+      const formatFirebasePlayer = (player: MasterPlayer, status: MatchedPlayer['matchStatus']): MatchedPlayer => {
+        return {
+          ...row,
+          firebaseUsdId: player.uscfId,
+          firebaseGrade: player.grade || 'Not Set',
+          firebaseSchool: player.school || 'Not Set',
+          firebaseDistrict: player.district || 'Not Set',
+          firebaseTeam: generateTeamCode(player),
+          firebaseDob: player.dob ? format(new Date(player.dob), 'yyyy-MM-dd') : 'Not Set',
+          firebaseEmail: player.email || 'Not Set',
+          firebaseZipCode: player.zipCode || 'Not Set',
+          matchStatus: status,
+        };
+      };
+
       // 1. Try to match by USCF ID first (highest accuracy)
       if (uscfId) {
         const firebasePlayer = playerMapById.get(uscfId);
         if (firebasePlayer) {
-          return {
-            ...row,
-            firebaseUsdId: firebasePlayer.uscfId,
-            firebaseGrade: firebasePlayer.grade || 'Not Set',
-            firebaseSchool: firebasePlayer.school || 'Not Set',
-            firebaseDistrict: firebasePlayer.district || 'Not Set',
-            firebaseTeam: generateTeamCode(firebasePlayer),
-            matchStatus: 'found_by_id',
-          };
+          return formatFirebasePlayer(firebasePlayer, 'found_by_id');
         }
       }
 
@@ -119,29 +129,16 @@ function UscfCrossReferencePageContent() {
           }
 
           if (finalMatches.length === 1) {
-            // Found a single, unique match by name (and possibly grade)
-            const firebasePlayer = finalMatches[0];
-            return {
-              ...row,
-              firebaseUsdId: firebasePlayer.uscfId,
-              firebaseGrade: firebasePlayer.grade || 'Not Set',
-              firebaseSchool: firebasePlayer.school || 'Not Set',
-              firebaseDistrict: firebasePlayer.district || 'Not Set',
-              firebaseTeam: generateTeamCode(firebasePlayer),
-              matchStatus: 'found_by_name',
-            };
+            return formatFirebasePlayer(finalMatches[0], 'found_by_name');
           } else if (finalMatches.length > 1) {
-            // New logic: Score the multiple matches and pick the best one
             let bestMatch: MasterPlayer | null = null;
             let highestScore = -1;
 
             finalMatches.forEach(match => {
                 let score = 0;
-                // Score based on grade match
                 if (row.GRADE && match.grade && row.GRADE.trim() === match.grade.trim()) {
                     score += 2;
                 }
-                // Score based on school name partial match
                 if (row['POSSIBLE TEAM'] && match.school && match.school.toLowerCase().includes(row['POSSIBLE TEAM'].toLowerCase())) {
                     score += 1;
                 }
@@ -152,15 +149,7 @@ function UscfCrossReferencePageContent() {
             });
             
             if (bestMatch) {
-                return {
-                    ...row,
-                    firebaseUsdId: bestMatch.uscfId,
-                    firebaseGrade: bestMatch.grade || 'Not Set',
-                    firebaseSchool: bestMatch.school || 'Not Set',
-                    firebaseDistrict: bestMatch.district || 'Not Set',
-                    firebaseTeam: generateTeamCode(bestMatch),
-                    matchStatus: 'multiple_found', // Still flag as needing review
-                };
+                return formatFirebasePlayer(bestMatch, 'multiple_found');
             }
           }
         }
@@ -174,6 +163,9 @@ function UscfCrossReferencePageContent() {
         firebaseSchool: 'N/A',
         firebaseDistrict: 'N/A',
         firebaseTeam: 'N/A',
+        firebaseDob: 'N/A',
+        firebaseEmail: 'N/A',
+        firebaseZipCode: 'N/A',
         matchStatus: 'not_found',
       };
     });
@@ -205,6 +197,9 @@ function UscfCrossReferencePageContent() {
         'FIREBASE SCHOOL': p.firebaseSchool,
         'FIREBASE DISTRICT': p.firebaseDistrict,
         'FIREBASE TEAM': p.firebaseTeam,
+        'FIREBASE DOB': p.firebaseDob,
+        'FIREBASE EMAIL': p.firebaseEmail,
+        'FIREBASE ZIP': p.firebaseZipCode,
         'MATCH STATUS': p.matchStatus,
     }));
 
@@ -280,24 +275,26 @@ function UscfCrossReferencePageContent() {
                   <TableHead>Name (Sheet)</TableHead>
                   <TableHead>USCF ID (Sheet)</TableHead>
                   <TableHead>Firebase School</TableHead>
-                  <TableHead>Firebase District</TableHead>
-                  <TableHead>Firebase Team</TableHead>
+                  <TableHead>Firebase DOB</TableHead>
+                  <TableHead>Firebase Email</TableHead>
+                  <TableHead>Firebase Zip</TableHead>
                   <TableHead>Match Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isProcessing ? (
-                  <TableRow><TableCell colSpan={6} className="text-center">Processing...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="text-center">Processing...</TableCell></TableRow>
                 ) : matchedData.length === 0 ? (
-                  <TableRow><TableCell colSpan={6} className="h-24 text-center">Upload a file to see results.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="h-24 text-center">Upload a file to see results.</TableCell></TableRow>
                 ) : (
                   matchedData.map((player, index) => (
                     <TableRow key={index} className={getStatusColor(player.matchStatus)}>
                       <TableCell>{player.Name}</TableCell>
                       <TableCell>{player.USCF}</TableCell>
                       <TableCell>{player.firebaseSchool}</TableCell>
-                      <TableCell>{player.firebaseDistrict}</TableCell>
-                      <TableCell className="font-mono font-medium">{player.firebaseTeam}</TableCell>
+                      <TableCell>{player.firebaseDob}</TableCell>
+                      <TableCell>{player.firebaseEmail}</TableCell>
+                      <TableCell>{player.firebaseZipCode}</TableCell>
                       <TableCell className="font-medium capitalize">
                         {player.matchStatus.replace(/_/g, ' ')}
                       </TableCell>
