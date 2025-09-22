@@ -3,7 +3,7 @@
 // Updated src/app/players/page.tsx
 'use client';
 
-import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -249,7 +249,7 @@ function PlayersPageContent() {
 
     // If the ID was temporary and the new USCF ID is official, use the new ID as the document ID
     const isNewPlayer = !database.some(p => p.id === editingPlayer.id);
-    const idToUse = (editingPlayer.id.startsWith('temp_') && values.uscfId.toUpperCase() !== 'NEW')
+    const idToUse = (editingPlayer.id.startsWith('temp_') && values.uscfId && values.uscfId.toUpperCase() !== 'NEW')
       ? values.uscfId 
       : editingPlayer.id;
 
