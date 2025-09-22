@@ -1,3 +1,4 @@
+
 // src/app/signup/page.tsx - Updated with Data Correction for Organizer Account
 'use client';
 
@@ -101,7 +102,8 @@ async function correctOrganizerAccountData(email: string, password: string) {
 const SponsorSignUpForm = () => {
   const router = useRouter();
   const { toast } = useToast();
-  const { dbDistricts, getSchoolsForDistrict, allSchoolNames, isDbLoaded, schools } = useMasterDb();
+  // CORRECTED: Only destructure what's needed, avoid loading the full 'database'
+  const { dbDistricts, getSchoolsForDistrict, isDbLoaded, schools } = useMasterDb();
   const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
   const { updateProfile } = useSponsorProfile();
   const [isLoading, setIsLoading] = useState(false);
@@ -125,13 +127,7 @@ const SponsorSignUpForm = () => {
 
   const handleDistrictChange = (district: string, resetSchool: boolean = true) => {
     form.setValue('district', district);
-    let filteredSchools: string[];
-    if (district === 'None') {
-      filteredSchools = allSchoolNames;
-    } else {
-      filteredSchools = getSchoolsForDistrict(district);
-      filteredSchools.unshift("All Schools");
-    }
+    const filteredSchools = getSchoolsForDistrict(district);
     setSchoolsForDistrict([...new Set(filteredSchools)]);
 
     if (resetSchool) {
@@ -145,10 +141,11 @@ const SponsorSignUpForm = () => {
 
   useEffect(() => {
     if (isDbLoaded) {
-      handleDistrictChange(form.getValues('district'), false);
+      // Set initial schools based on the default district value
+      const initialSchools = getSchoolsForDistrict(form.getValues('district'));
+      setSchoolsForDistrict(initialSchools);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDbLoaded]);
+  }, [isDbLoaded, form, getSchoolsForDistrict]);
   
   async function onSubmit(values: z.infer<typeof sponsorFormSchema>) {
     setIsLoading(true);
