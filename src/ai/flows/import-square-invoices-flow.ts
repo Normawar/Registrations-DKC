@@ -55,10 +55,7 @@ const importSquareInvoicesFlow = ai.defineFlow(
     
     try {
         console.log('Fetching all invoices from Square. This might take a moment...');
-        const { result: { invoices } } = await squareClient.invoicesApi.listInvoices({
-            locationId,
-            limit: 200
-        });
+        const { result: { invoices } } = await squareClient.invoicesApi.listInvoices(locationId, undefined, 200);
 
         if (!invoices) {
             return { created: 0, updated: 0, failed: 0, errors: ['No invoices found in Square for this location.'] };
