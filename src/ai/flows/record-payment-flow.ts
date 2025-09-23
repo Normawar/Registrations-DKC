@@ -4,13 +4,12 @@
  * @fileOverview Records a payment against a Square invoice using the Square API.
  */
 
-import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { ApiError } from 'square';
 import { randomUUID } from 'crypto';
 import { getSquareClient } from '@/lib/square-client';
 
-const RecordPaymentInputSchema = z.object({
+export const RecordPaymentInputSchema = z.object({
   invoiceId: z.string().describe('The ID of the invoice to record a payment for.'),
   amount: z.number().describe('The payment amount in dollars.'),
   note: z.string().optional().describe('A note for the payment, e.g., check number or transaction ID.'),
@@ -21,7 +20,7 @@ const RecordPaymentInputSchema = z.object({
 });
 export type RecordPaymentInput = z.infer<typeof RecordPaymentInputSchema>;
 
-const RecordPaymentOutputSchema = z.object({
+export const RecordPaymentOutputSchema = z.object({
   paymentId: z.string(),
   status: z.string(),
   totalPaid: z.number(),
@@ -30,17 +29,6 @@ const RecordPaymentOutputSchema = z.object({
 export type RecordPaymentOutput = z.infer<typeof RecordPaymentOutputSchema>;
 
 export async function recordPayment(input: RecordPaymentInput): Promise<RecordPaymentOutput> {
-  return recordPaymentFlow(input);
-}
-
-
-const recordPaymentFlow = ai.defineFlow(
-  {
-    name: 'recordPaymentFlow',
-    inputSchema: RecordPaymentInputSchema,
-    outputSchema: RecordPaymentOutputSchema,
-  },
-  async (input) => {
     if (input.requestingUserRole !== 'organizer') {
         throw new Error('Only organizers can record payments.');
     }
@@ -88,5 +76,4 @@ const recordPaymentFlow = ai.defineFlow(
             throw new Error('An unexpected error occurred during payment recording.');
         }
     }
-  }
-);
+}

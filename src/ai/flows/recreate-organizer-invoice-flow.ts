@@ -5,7 +5,6 @@
  * This flow cancels the original invoice and creates a new one with a revision number.
  */
 
-import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { randomUUID } from 'crypto';
 import { ApiError } from 'square';
@@ -19,7 +18,7 @@ const LineItemSchema = z.object({
   note: z.string().optional().describe('Any additional notes for the line item.'),
 });
 
-const RecreateOrganizerInvoiceInputSchema = z.object({
+export const RecreateOrganizerInvoiceInputSchema = z.object({
     originalInvoiceId: z.string().describe('The ID of the invoice to cancel and replace.'),
     sponsorName: z.string().describe('The name of the person or entity to be invoiced.'),
     sponsorEmail: z.string().email().describe('The email of the invoice recipient.'),
@@ -35,7 +34,7 @@ const RecreateOrganizerInvoiceInputSchema = z.object({
 });
 export type RecreateOrganizerInvoiceInput = z.infer<typeof RecreateOrganizerInvoiceInputSchema>;
 
-const RecreateOrganizerInvoiceOutputSchema = z.object({
+export const RecreateOrganizerInvoiceOutputSchema = z.object({
   oldInvoiceId: z.string(),
   newInvoiceId: z.string(),
   invoiceNumber: z.string().optional(),
@@ -45,16 +44,6 @@ const RecreateOrganizerInvoiceOutputSchema = z.object({
 export type RecreateOrganizerInvoiceOutput = z.infer<typeof RecreateOrganizerInvoiceOutputSchema>;
 
 export async function recreateOrganizerInvoice(input: RecreateOrganizerInvoiceInput): Promise<RecreateOrganizerInvoiceOutput> {
-  return recreateOrganizerInvoiceFlow(input);
-}
-
-const recreateOrganizerInvoiceFlow = ai.defineFlow(
-  {
-    name: 'recreateOrganizerInvoiceFlow',
-    inputSchema: RecreateOrganizerInvoiceInputSchema,
-    outputSchema: RecreateOrganizerInvoiceOutputSchema,
-  },
-  async (input) => {
     const squareClient = await getSquareClient();
 
     try {
@@ -102,5 +91,4 @@ const recreateOrganizerInvoiceFlow = ai.defineFlow(
         throw new Error('An unexpected error occurred during organizer invoice recreation.');
       }
     }
-  }
-);
+}

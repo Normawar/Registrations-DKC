@@ -8,34 +8,23 @@
  * - CancelInvoiceOutput - The return type for the cancelInvoice function.
  */
 
-import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { ApiError } from 'square';
 import { getSquareClient } from '@/lib/square-client';
 
-const CancelInvoiceInputSchema = z.object({
+export const CancelInvoiceInputSchema = z.object({
   invoiceId: z.string().describe('The ID of the invoice to cancel.'),
   requestingUserRole: z.string().describe('Role of user requesting the cancellation'),
 });
 export type CancelInvoiceInput = z.infer<typeof CancelInvoiceInputSchema>;
 
-const CancelInvoiceOutputSchema = z.object({
+export const CancelInvoiceOutputSchema = z.object({
   invoiceId: z.string(),
   status: z.string(),
 });
 export type CancelInvoiceOutput = z.infer<typeof CancelInvoiceOutputSchema>;
 
 export async function cancelInvoice(input: CancelInvoiceInput): Promise<CancelInvoiceOutput> {
-  return cancelInvoiceFlow(input);
-}
-
-const cancelInvoiceFlow = ai.defineFlow(
-  {
-    name: 'cancelInvoiceFlow',
-    inputSchema: CancelInvoiceInputSchema,
-    outputSchema: CancelInvoiceOutputSchema,
-  },
-  async (input) => {
     if (input.requestingUserRole !== 'organizer') {
         throw new Error('Only organizers can cancel invoices.');
     }
@@ -112,5 +101,4 @@ const cancelInvoiceFlow = ai.defineFlow(
         throw new Error('An unexpected error occurred during invoice cancellation.');
       }
     }
-  }
-);
+}

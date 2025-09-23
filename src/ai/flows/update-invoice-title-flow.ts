@@ -8,19 +8,18 @@
  * - UpdateInvoiceTitleOutput - The return type for the updateInvoiceTitle function.
  */
 
-import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { ApiError } from 'square';
 import { randomUUID } from 'crypto';
 import { getSquareClient } from '@/lib/square-client';
 
-const UpdateInvoiceTitleInputSchema = z.object({
+export const UpdateInvoiceTitleInputSchema = z.object({
   invoiceId: z.string().describe('The ID of the invoice to update.'),
   title: z.string().describe('The new title for the invoice.'),
 });
 export type UpdateInvoiceTitleInput = z.infer<typeof UpdateInvoiceTitleInputSchema>;
 
-const UpdateInvoiceTitleOutputSchema = z.object({
+export const UpdateInvoiceTitleOutputSchema = z.object({
   invoiceId: z.string(),
   title: z.string(),
   status: z.string(),
@@ -28,16 +27,6 @@ const UpdateInvoiceTitleOutputSchema = z.object({
 export type UpdateInvoiceTitleOutput = z.infer<typeof UpdateInvoiceTitleOutputSchema>;
 
 export async function updateInvoiceTitle(input: UpdateInvoiceTitleInput): Promise<UpdateInvoiceTitleOutput> {
-  return updateInvoiceTitleFlow(input);
-}
-
-const updateInvoiceTitleFlow = ai.defineFlow(
-  {
-    name: 'updateInvoiceTitleFlow',
-    inputSchema: UpdateInvoiceTitleInputSchema,
-    outputSchema: UpdateInvoiceTitleOutputSchema,
-  },
-  async (input) => {
     const squareClient = await getSquareClient();
     const { invoicesApi } = squareClient;
       
@@ -109,5 +98,4 @@ const updateInvoiceTitleFlow = ai.defineFlow(
         throw new Error('An unexpected error occurred during invoice update.');
       }
     }
-  }
-);
+}

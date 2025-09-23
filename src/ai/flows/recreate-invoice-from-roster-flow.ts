@@ -1,4 +1,5 @@
 
+'use server';
 
 /**
  * @fileOverview Recreates an invoice with an updated player roster.
@@ -6,7 +7,6 @@
  * It now properly handles PSJA split invoices.
  */
 
-import {ai} from '@/ai/genkit';
 import { ApiError } from 'square';
 import { createInvoice } from './create-invoice-flow';
 import { cancelInvoice } from './cancel-invoice-flow';
@@ -19,18 +19,7 @@ import {
 } from './schemas';
 import { getSquareClient } from '@/lib/square-client';
 
-
 export async function recreateInvoiceFromRoster(input: RecreateInvoiceInput): Promise<RecreateInvoiceOutput> {
-  return recreateInvoiceFromRosterFlow(input);
-}
-
-const recreateInvoiceFromRosterFlow = ai.defineFlow(
-  {
-    name: 'recreateInvoiceFromRosterFlow',
-    inputSchema: RecreateInvoiceInputSchema,
-    outputSchema: RecreateInvoiceOutputSchema,
-  },
-  async (input) => {
     if (input.requestingUserRole !== 'organizer') {
         throw new Error('Only organizers can modify existing invoices.');
     }
@@ -127,5 +116,4 @@ const recreateInvoiceFromRosterFlow = ai.defineFlow(
         throw new Error('An unexpected error occurred during invoice recreation.');
       }
     }
-  }
-);
+}
