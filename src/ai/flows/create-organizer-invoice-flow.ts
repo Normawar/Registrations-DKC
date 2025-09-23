@@ -4,43 +4,12 @@
  * @fileOverview Creates a general-purpose invoice with the Square API.
  *
  * - createOrganizerInvoice - A function that handles the invoice creation process for organizers.
- * - CreateOrganizerInvoiceInput - The input type for the function.
- * - CreateOrganizerInvoiceInvoiceOutput - The return type for the function.
  */
 
-import {z} from 'genkit';
 import { randomUUID } from 'crypto';
 import { ApiError, type InvoiceRecipient, type Address } from 'square';
 import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
-
-const LineItemSchema = z.object({
-  name: z.string().describe('The name or description of the line item.'),
-  amount: z.number().describe('The cost of the line item in dollars.'),
-  note: z.string().optional().describe('Any additional notes for the line item.'),
-});
-
-export const CreateOrganizerInvoiceInputSchema = z.object({
-    sponsorName: z.string().describe('The name of the person or entity to be invoiced.'),
-    sponsorEmail: z.string().email().describe('The email of the invoice recipient.'),
-    bookkeeperEmail: z.string().email().or(z.literal('')).optional(),
-    gtCoordinatorEmail: z.string().email().or(z.literal('')).optional(),
-    schoolName: z.string().describe('The school associated with this invoice.'),
-    schoolAddress: z.string().optional().describe('The address of the school.'),
-    schoolPhone: z.string().optional().describe('The phone number of the school.'),
-    district: z.string().optional().describe('The school district.'),
-    invoiceTitle: z.string().describe('The main title for the invoice.'),
-    lineItems: z.array(LineItemSchema).min(1).describe('An array of items to be included in the invoice.'),
-    invoiceNumber: z.string().optional(),
-});
-export type CreateOrganizerInvoiceInput = z.infer<typeof CreateOrganizerInvoiceInputSchema>;
-
-export const CreateOrganizerInvoiceOutputSchema = z.object({
-  invoiceId: z.string().describe('The unique ID for the generated invoice.'),
-  invoiceNumber: z.string().optional().describe('The user-facing invoice number.'),
-  status: z.string().describe('The status of the invoice (e.g., DRAFT, PUBLISHED).'),
-  invoiceUrl: z.string().url().describe('The URL to view the invoice online.'),
-});
-export type CreateOrganizerInvoiceOutput = z.infer<typeof CreateOrganizerInvoiceOutputSchema>;
+import { type CreateOrganizerInvoiceInput, type CreateOrganizerInvoiceOutput } from './schemas';
 
 export async function createOrganizerInvoice(input: CreateOrganizerInvoiceInput): Promise<CreateOrganizerInvoiceOutput> {
     const squareClient = await getSquareClient();

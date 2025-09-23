@@ -4,48 +4,13 @@
  * @fileOverview Creates an invoice for a USCF membership with the Square API.
  *
  * - createMembershipInvoice - A function that handles the invoice creation process.
- * - CreateMembershipInvoiceInput - The input type for the function.
- * - CreateMembershipInvoiceOutput - The return type for the function.
  */
 
-import {z} from 'genkit';
 import { randomUUID } from 'crypto';
 import { ApiError, type InvoiceRecipient, type Address } from 'square';
 import { format } from 'date-fns';
 import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
-
-const PlayerInfoSchema = z.object({
-  firstName: z.string().describe('The first name of the player.'),
-  middleName: z.string().optional().describe('The middle name of the player.'),
-  lastName: z.string().describe('The last name of the player.'),
-  email: z.string().email().describe('The email of the player.'),
-  phone: z.string().optional().describe('The phone number of the player.'),
-  dob: z.string().describe("The player's date of birth in ISO 8601 format."),
-  zipCode: z.string().describe("The player's zip code."),
-});
-
-export const CreateMembershipInvoiceInputSchema = z.object({
-    purchaserName: z.string().describe('The name of the person paying for the membership.'),
-    purchaserEmail: z.string().email().describe('The email of the person paying for the membership.'),
-    bookkeeperEmail: z.string().email().or(z.literal('')).optional(),
-    gtCoordinatorEmail: z.string().email().or(z.literal('')).optional(),
-    schoolName: z.string().describe('The name of the school associated with the purchaser.'),
-    schoolAddress: z.string().optional().describe('The address of the school.'),
-    schoolPhone: z.string().optional().describe('The phone number of the school.'),
-    district: z.string().optional().describe('The school district.'),
-    membershipType: z.string().describe('The type of USCF membership being purchased.'),
-    fee: z.number().describe('The cost of the membership.'),
-    players: z.array(PlayerInfoSchema).describe('An array of players receiving the membership.'),
-});
-export type CreateMembershipInvoiceInput = z.infer<typeof CreateMembershipInvoiceInputSchema>;
-
-export const CreateMembershipInvoiceOutputSchema = z.object({
-  invoiceId: z.string().describe('The unique ID for the generated invoice.'),
-  invoiceNumber: z.string().optional().describe('The user-facing invoice number.'),
-  status: z.string().describe('The status of the invoice (e.g., DRAFT, PUBLISHED).'),
-  invoiceUrl: z.string().url().describe('The URL to view the invoice online.'),
-});
-export type CreateMembershipInvoiceOutput = z.infer<typeof CreateMembershipInvoiceOutputSchema>;
+import { type CreateMembershipInvoiceInput, type CreateMembershipInvoiceOutput } from './schemas';
 
 export async function createMembershipInvoice(input: CreateMembershipInvoiceInput): Promise<CreateMembershipInvoiceOutput> {
     if (input.membershipType.toLowerCase().includes('error') || input.membershipType.toLowerCase().includes('invalid')) {

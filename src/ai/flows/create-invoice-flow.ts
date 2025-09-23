@@ -4,11 +4,8 @@
  * @fileOverview Creates an invoice with the Square API and saves player data to Firestore.
  *
  * - createInvoice - A function that handles the invoice creation process.
- * - CreateInvoiceInput - The input type for the createInvoice function.
- * - CreateInvoiceOutput - The return type for the createInvoice function.
  */
 
-import {z} from 'genkit';
 import { randomUUID } from 'crypto';
 import { ApiError, type OrderLineItem, type InvoiceRecipient, type Address } from 'square';
 import { format } from 'date-fns';
@@ -16,47 +13,8 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase-admin';
 import { generateTeamCode } from '@/lib/school-utils';
 import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
+import { type CreateInvoiceInput, type CreateInvoiceOutput } from './schemas';
 
-const PlayerInvoiceInfoSchema = z.object({
-  playerName: z.string().describe('The full name of the player.'),
-  uscfId: z.string().describe('The USCF ID of the player.'),
-  baseRegistrationFee: z.number().describe('The base registration fee for the event.'),
-  lateFee: z.number().optional().nullable().describe('The late fee applied, if any.'),
-  uscfAction: z.boolean().describe('Whether a USCF membership action (new/renew) is needed.'),
-  isGtPlayer: z.boolean().optional().describe('Whether the player is in the Gifted & Talented program.'),
-  section: z.string().optional().describe('The tournament section for the player.'),
-  waiveLateFee: z.boolean().optional().describe('Flag to waive late fee for a player.'),
-});
-
-export const CreateInvoiceInputSchema = z.object({
-    sponsorName: z.string().describe('The name of the sponsor to be invoiced.'),
-    sponsorEmail: z.string().email().describe('The email of the sponsor.'),
-    sponsorPhone: z.string().optional().describe('The phone number of the sponsor.'),
-    bookkeeperEmail: z.string().email().or(z.literal('')).optional(),
-    gtCoordinatorEmail: z.string().email().or(z.literal('')).optional(),
-    schoolName: z.string().describe('The name of the school associated with the sponsor.'),
-    schoolAddress: z.string().optional().describe('The street address of the school.'),
-    schoolPhone: z.string().optional().describe('The phone number of the school.'),
-    district: z.string().optional().describe('The school district.'),
-    teamCode: z.string().optional().describe('An optional team code. If provided, it will be used. If not, it will be generated.'),
-    eventName: z.string().describe('The name of the event.'),
-    eventDate: z.string().describe('The date of the event in ISO 8601 format.'),
-    uscfFee: z.number().describe('The fee for a new or renewing USCF membership.'),
-    players: z.array(PlayerInvoiceInfoSchema).describe('An array of players to be invoiced.'),
-    invoiceNumber: z.string().optional().describe('A custom invoice number to assign. If not provided, Square will generate one.'),
-    substitutionFee: z.number().optional().describe('A fee for substitutions, if applicable.'),
-    description: z.string().optional().describe('An optional description or note for the invoice.'),
-    revisionMessage: z.string().optional().describe('Revision message to include in invoice description'),
-});
-export type CreateInvoiceInput = z.infer<typeof CreateInvoiceInputSchema>;
-
-export const CreateInvoiceOutputSchema = z.object({
-  invoiceId: z.string().describe('The unique ID for the generated invoice.'),
-  invoiceNumber: z.string().optional().describe('The user-facing invoice number.'),
-  status: z.string().describe('The status of the invoice (e.g., DRAFT, PUBLISHED).'),
-  invoiceUrl: z.string().url().describe('The URL to view the invoice online.'),
-});
-export type CreateInvoiceOutput = z.infer<typeof CreateInvoiceOutputSchema>;
 
 export async function createInvoice(input: CreateInvoiceInput): Promise<CreateInvoiceOutput> {
     // Step 0: Globally fix all null or undefined fields in players
