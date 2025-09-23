@@ -14,12 +14,8 @@ import type { CreateInvoiceInput, CreateInvoiceOutput } from './schemas';
  */
 export async function createIndividualInvoice(input: CreateInvoiceInput): Promise<CreateInvoiceOutput> {
   // CRITICAL: Ensure database is initialized before proceeding.
-  // The createInvoice function this calls already has this check.
-  
-  // This is a direct wrapper around the main createInvoice flow,
-  // ensuring the data format is correct for an individual registration.
-  // The `individual-registration-dialog` now constructs the `players` array,
-  // making this fully compatible with the main `createInvoice` function.
+  // The createInvoice function this calls already has this check, but we add it here
+  // for robustness and to prevent the server action from crashing prematurely.
   try {
     const result = await createInvoice(input);
     return result;
