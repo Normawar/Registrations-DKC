@@ -19,7 +19,7 @@
 ## Critical Architecture Rules
 
 ### Server-Side Logic (Strict Requirement)
-All database writes, payments, and sensitive operations MUST occur in Server Actions or API Routes. NO direct client-side access to Firebase services (except for the `useMasterDb` read-only context).
+All database writes, payments, and sensitive operations MUST occur in Server Actions or API Routes. 
 
 ```typescript
 // ✅ Correct: Server Actions or API Routes
@@ -27,9 +27,6 @@ All database writes, payments, and sensitive operations MUST occur in Server Act
 export async function serverAction(data: FormData) {
   // Database queries and business logic here
 }
-
-// ❌ Wrong: Client-side database access
-import { db } from '@/lib/services/firestore-service'; // Don't import db on client for writes
 ```
 
 ### Hydration Error Prevention
@@ -63,7 +60,7 @@ applicationId: "sq0idp-2nOEj3tUd-PtlED-EdE3MQ"
 ```
 
 ### ✅ Reliable Square Client Pattern (CRITICAL)
-Due to environment initialization issues, the Square client **MUST** be instantiated directly inside the server action or flow that uses it. **DO NOT** use a shared client instance.
+Due to environment initialization issues, the Square client **MUST** be instantiated directly inside the server action or flow that uses it. **DO NOT** use a shared client instance from `square-client.ts`.
 
 ```typescript
 // ✅ Correct: Initialize inside the server action
@@ -79,9 +76,52 @@ export async function mySquareAction(input: any) {
   // ... use squareClient here
 }
 
-// ❌ Wrong: Using a shared/imported client
-import { getSquareClient } from '@/lib/square-client';
-const client = getSquareClient(); // This pattern has failed and is forbidden.
+// ❌ Wrong: Using a shared/imported client is forbidden.
+```
+
+## Firebase Integration
+
+### ✅ Critical Exception: Firestore Write Pattern
+Due to persistent and unresolvable initialization failures of the `firebase-admin` SDK in this specific deployment environment, a critical exception to the server-side logic rule is required for database writes.
+
+- **For most Server Actions (especially invoice creation), use the client-side SDK**: Import the client `db` instance from `@/lib/services/firestore-service`. This pattern has proven to be the only reliable method for Firestore writes in this environment.
+
+```typescript
+// ✅ Correct (Required Exception): Using CLIENT SDK in a Server Action
+'use server';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '@/lib/services/firestore-service'; // Import client DB
+
+export async function createInvoiceAction(data: any) {
+  const invoiceRef = doc(db, 'invoices', data.id);
+  await setDoc(invoiceRef, data); // This works
+}
+```
+
+- **Admin SDK for Admin-Only Tasks**: The `firebase-admin` SDK (via `getDb()` and `getAdminAuth()` from `@/lib/firebase-admin`) should ONLY be used for operations that absolutely require admin privileges, such as user management in `src/app/users/actions.ts`. For all other database operations in server actions, use the client SDK pattern above.
+
+### Module Import Rules (Critical)
+- **`'use server'` files for INVOICES/PAYMENTS**: MUST import `db` from `@/lib/services/firestore-service`.
+- **`'use server'` files for USER MANAGEMENT**: MUST import from `@/lib/firebase-admin`.
+- **`'use client'` files**: MUST import from `@/lib/firebase` or `@/lib/services/firestore-service`.
+- **NEVER** import `@/lib/firebase-admin` in a client component.
+
+### User Deletion (Force Delete)
+```typescript
+'use server';
+import { getDb, getAdminAuth } from '@/lib/firebase-admin';
+
+export async function forceDeleteUser(userId: string) {
+  const db = getDb();
+  const auth = getAdminAuth();
+  
+  // Must delete from BOTH:
+  // 1. Firestore database
+  await db.collection('users').doc(userId).delete();
+  
+  // 2. Firebase Authentication
+  await auth.deleteUser(userId);
+}
 ```
 
 ## Genkit AI Implementation
@@ -161,51 +201,6 @@ function MyComponent() {
 }
 ```
 
-## Firebase Integration
-
-### ✅ Reliable Firebase Admin SDK Pattern (CRITICAL)
-The Firebase Admin SDK has proven to be unreliable when initialized at the module level in this environment. It **MUST** be initialized just-in-time using the getter functions from `firebase-admin.ts`.
-
-```typescript
-// ✅ Correct: Use the getter function inside the server action
-'use server';
-import { getDb, getAdminAuth } from '@/lib/firebase-admin';
-
-export async function myDbAction() {
-  const db = getDb(); // Get instance just-in-time
-  const auth = getAdminAuth();
-  
-  // Now you can safely use db and auth
-  await db.collection('users').get();
-}
-
-// ❌ Wrong: Importing the instance directly
-import { db } from '@/lib/firebase-admin'; // FORBIDDEN: This will be null/undefined
-```
-
-### Module Import Rules (Critical)
-- **`'use server'` files**: MUST import from `@/lib/firebase-admin`.
-- **`'use client'` files**: MUST import from `@/lib/firebase` or `@/lib/services/firestore-service`.
-- **NEVER** mix these imports. A server file must never import the client SDK, and a client file must never import the admin SDK.
-
-### User Deletion (Force Delete)
-```typescript
-'use server';
-import { getDb, getAdminAuth } from '@/lib/firebase-admin';
-
-export async function forceDeleteUser(userId: string) {
-  const db = getDb();
-  const auth = getAdminAuth();
-  
-  // Must delete from BOTH:
-  // 1. Firestore database
-  await db.collection('users').doc(userId).delete();
-  
-  // 2. Firebase Authentication
-  await auth.deleteUser(userId);
-}
-```
-
 ## Production Deployment
 
 ### apphosting.yaml (Required Format)
@@ -222,8 +217,8 @@ runConfig:
 - **Hard-coded client initialization inside server actions is the only reliable pattern.**
 
 ### Firebase Admin SDK
-- **Direct import of `db` or `adminAuth` will fail.** Always use the `getDb()` and `getAdminAuth()` functions inside your server-side code.
-- Private key formatting is critical. Newlines must be properly escaped (`\\n`).
+- **Direct import of `db` or `adminAuth` will fail.** Always use the `getDb()` and `getAdminAuth()` functions inside your server-side code for admin-only tasks.
+- For most database operations in server actions, use the client SDK as per the exception documented above.
 
 ### Build Errors
 - Never import server-side packages (e.g., `firebase-admin`) in client code.
