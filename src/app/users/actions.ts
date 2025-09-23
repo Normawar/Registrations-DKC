@@ -1,8 +1,6 @@
-
 'use server';
 
-import { getAuth } from 'firebase-admin/auth';
-import { db as adminDb } from '@/lib/firebase-admin';
+import { adminAuth, db as adminDb } from '@/lib/firebase-admin';
 
 /**
  * Server action to fetch all users from Firestore
@@ -80,22 +78,15 @@ export async function updateUserAction(
     const querySnapshot = await usersRef.where('email', '==', originalEmail).get();
     
     if (querySnapshot.empty) {
-      // Try to find by document ID (some users might have email as ID)
-      const docRef = usersRef.doc(originalEmail);
-      const doc = await docRef.get();
-      
-      if (!doc.exists) {
-        return { 
-          success: false, 
-          error: 'User not found in database' 
-        };
-      }
-      
-      // Update the document
-      await docRef.update({
-        ...userData,
-        updatedAt: new Date().toISOString()
-      });
+        // Fallback: If UID was used as doc ID, which is the correct pattern now
+        try {
+            const userRecord = await adminAuth.getUserByEmail(originalEmail);
+            const docRef = usersRef.doc(userRecord.uid);
+            await docRef.update({ ...userData, updatedAt: new Date().toISOString() });
+            return { success: true };
+        } catch(e) {
+             return { success: false, error: 'User not found in database or auth.' };
+        }
     } else {
       // Update the first matching document
       const docRef = querySnapshot.docs[0].ref;
@@ -115,9 +106,11 @@ export async function updateUserAction(
   }
 }
 
+
 /**
  * Server action to permanently delete users from both Firestore and Firebase Authentication.
  * This is a protected action intended for organizers.
+ * This version is corrected to properly handle deletion from both services.
  */
 export async function forceDeleteUsersAction(emails: string[]): Promise<{ 
   deleted: string[], 
@@ -129,82 +122,81 @@ export async function forceDeleteUsersAction(emails: string[]): Promise<{
     return { deleted: [], failed: [] };
   }
   
-  const adminAuth = getAuth();
   const deletedEmails: string[] = [];
   const failedDeletions: { email: string, reason: string }[] = [];
 
   for (const email of emails) {
+    let uid: string | null = null;
     try {
       console.log(`Processing deletion for: ${email}`);
       
-      // Step 1: Try to find user in Firebase Auth
-      let uid: string | null = null;
+      // Step 1: Find user in Firebase Auth to get their UID.
+      // This is the most reliable way to link Auth and Firestore records.
       try {
         const userRecord = await adminAuth.getUserByEmail(email);
         uid = userRecord.uid;
         console.log(`Found user in Auth with UID: ${uid}`);
-        
-        // Delete from Firebase Authentication
-        await adminAuth.deleteUser(uid);
-        console.log(`Deleted ${email} from Firebase Auth`);
       } catch (authError: any) {
-        console.log(`User ${email} not found in Auth:`, authError.code);
-        // Continue to try Firestore deletion even if not in Auth
+        if (authError.code === 'auth/user-not-found') {
+          // User doesn't exist in Auth. This is okay, we'll still try to clean up Firestore.
+          console.log(`User ${email} not found in Firebase Auth. Will attempt Firestore cleanup only.`);
+        } else {
+          // For other auth errors, we should stop and report it.
+          throw new Error(`Firebase Auth error: ${authError.message}`);
+        }
       }
 
-      // Step 2: Delete from Firestore - try multiple approaches
-      let firestoreDeleted = false;
-      
-      // Try deleting by UID if we have it
+      // Step 2: Delete from Firebase Authentication if UID was found.
       if (uid) {
         try {
-          const userDocRef = adminDb.collection('users').doc(uid);
-          const docSnap = await userDocRef.get();
-          if (docSnap.exists) {
-            await userDocRef.delete();
-            console.log(`Deleted ${email} from Firestore by UID`);
-            firestoreDeleted = true;
-          }
-        } catch (error) {
-          console.log(`Failed to delete by UID:`, error);
+          await adminAuth.deleteUser(uid);
+          console.log(`Deleted ${email} from Firebase Auth (UID: ${uid})`);
+        } catch (deleteError: any) {
+          // Log the error but continue, as we still want to try deleting from Firestore.
+          console.error(`Failed to delete user from Auth: ${deleteError.message}`);
+          failedDeletions.push({ email, reason: `Auth Deletion Failed: ${deleteError.message}` });
+          continue; // Move to next email if Auth deletion fails
         }
       }
-      
-      // Try deleting by email as document ID (legacy format)
-      try {
-        const emailDocRef = adminDb.collection('users').doc(email);
-        const emailDocSnap = await emailDocRef.get();
-        if (emailDocSnap.exists) {
-          await emailDocRef.delete();
-          console.log(`Deleted ${email} from Firestore by email as ID`);
+
+      // Step 3: Delete from Firestore.
+      let firestoreDeleted = false;
+      // Primary method: Delete by UID.
+      if (uid) {
+        const userDocRef = adminDb.collection('users').doc(uid);
+        const docSnap = await userDocRef.get();
+        if (docSnap.exists) {
+          await userDocRef.delete();
+          console.log(`Deleted ${email} from Firestore by UID.`);
           firestoreDeleted = true;
         }
-      } catch (error) {
-        console.log(`Failed to delete by email as ID:`, error);
       }
       
-      // Try finding and deleting by email field query
-      try {
+      // Fallback method: Find by email field if deletion by UID didn't happen.
+      // This cleans up records that might not be keyed by UID.
+      if (!firestoreDeleted) {
         const usersQuery = adminDb.collection('users').where('email', '==', email);
         const querySnapshot = await usersQuery.get();
         
         if (!querySnapshot.empty) {
-          const deletePromises = querySnapshot.docs.map(doc => doc.ref.delete());
-          await Promise.all(deletePromises);
-          console.log(`Deleted ${querySnapshot.size} document(s) for ${email} by email query`);
+          const batch = adminDb.batch();
+          querySnapshot.docs.forEach(doc => batch.delete(doc.ref));
+          await batch.commit();
+          console.log(`Deleted ${querySnapshot.size} document(s) for ${email} by email field query.`);
           firestoreDeleted = true;
         }
-      } catch (error) {
-        console.log(`Failed to delete by email query:`, error);
       }
 
+      // Step 4: Report success
+      // We consider it a success if the user is gone from either Auth or Firestore.
       if (uid || firestoreDeleted) {
         deletedEmails.push(email);
         console.log(`Successfully processed deletion for: ${email}`);
       } else {
+        // This case happens if user was not in Auth and not found in Firestore.
         failedDeletions.push({ 
           email, 
-          reason: 'User not found in Auth or Firestore' 
+          reason: 'User not found in Auth or Firestore.' 
         });
         console.log(`Failed to find/delete: ${email}`);
       }
