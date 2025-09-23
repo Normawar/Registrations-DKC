@@ -101,6 +101,16 @@ export function SponsorRegistrationDialog({
     return { isRegistered: false, message: 'Available for registration' };
   };
 
+  const getUscfStatusForPlayer = (player: MasterPlayer) => {
+    if (!player.uscfId || player.uscfId.toUpperCase() === 'NEW') {
+      return 'new';
+    }
+    if (!player.uscfExpiration || new Date(player.uscfExpiration) < new Date(event?.date)) {
+      return 'renewing';
+    }
+    return 'current';
+  };
+
   const toggleStudentSelection = (student: MasterPlayer) => {
     const status = getStudentRegistrationStatus(student);
     if (status.isRegistered) return;
@@ -110,12 +120,11 @@ export function SponsorRegistrationDialog({
       if (isSelected) {
         return rest;
       } else {
-        const isExpired = !student.uscfExpiration || new Date(student.uscfExpiration) < new Date(event?.date);
         return {
           ...prev,
           [student.id]: {
             section: student.section || 'High School K-12',
-            uscfStatus: !student.uscfId || student.uscfId.toUpperCase() === 'NEW' ? 'new' : isExpired ? 'renewing' : 'current'
+            uscfStatus: getUscfStatusForPlayer(student),
           }
         };
       }
@@ -533,10 +542,9 @@ export function SponsorRegistrationDialog({
       const newSelections = rosterPlayers
         .filter(student => !getStudentRegistrationStatus(student).isRegistered)
         .reduce((acc, student) => {
-          const isExpired = !student.uscfExpiration || new Date(student.uscfExpiration) < new Date(event?.date);
           acc[student.id] = {
             section: student.section || 'High School K-12',
-            uscfStatus: !student.uscfId || student.uscfId.toUpperCase() === 'NEW' ? 'new' : isExpired ? 'renewing' : 'current'
+            uscfStatus: getUscfStatusForPlayer(student),
           };
           return acc;
         }, {} as Record<string, { section: string; uscfStatus: string }>);
@@ -544,6 +552,13 @@ export function SponsorRegistrationDialog({
     } else {
       setSelectedStudents({});
     }
+  };
+  
+  const getUscfStatusBadge = (status: string) => {
+    if (status === 'current') return <Badge variant="default" className="bg-green-600">Current</Badge>;
+    if (status === 'new') return <Badge variant="destructive">New (+$24)</Badge>;
+    if (status === 'renewing') return <Badge variant="destructive">Expired (+$24)</Badge>;
+    return <Badge variant="outline">{status}</Badge>;
   };
 
   const renderStandardFeeBreakdown = () => (
@@ -742,6 +757,8 @@ export function SponsorRegistrationDialog({
                 {rosterPlayers.map(student => {
                   const status = getStudentRegistrationStatus(student);
                   const isSelected = !!selectedStudents[student.id];
+                  const uscfStatus = isSelected ? selectedStudents[student.id].uscfStatus : getUscfStatusForPlayer(student);
+                  const isPsjaGt = profile?.district === 'PHARR-SAN JUAN-ALAMO ISD' && student.studentType === 'gt';
                   
                   return (
                     <Card 
@@ -791,40 +808,28 @@ export function SponsorRegistrationDialog({
                         {isSelected && (
                           <div className="mt-4 pt-4 border-t grid grid-cols-2 gap-4">
                             <div>
-                              <Label htmlFor={`section-${student.id}`}>Section</Label>
-                              <Select
-                                value={selectedStudents[student.id]?.section || ''}
-                                onValueChange={(value) => updateStudentSelection(student.id, 'section', value)}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select section" />
-                                </SelectTrigger>
+                                <Label htmlFor={`section-${student.id}`}>Section</Label>
+                                <Select value={selectedStudents[student.id]?.section || ''} onValueChange={(value) => updateStudentSelection(student.id, 'section', value)}>
+                                <SelectTrigger><SelectValue placeholder="Select section" /></SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="Kinder-1st">Kinder-1st</SelectItem>
-                                  <SelectItem value="Primary K-3">Primary K-3</SelectItem>
-                                  <SelectItem value="Elementary K-5">Elementary K-5</SelectItem>
-                                  <SelectItem value="Middle School K-8">Middle School K-8</SelectItem>
-                                  <SelectItem value="High School K-12">High School K-12</SelectItem>
-                                  <SelectItem value="Championship">Championship</SelectItem>
+                                    <SelectItem value="Kinder-1st">Kinder-1st</SelectItem>
+                                    <SelectItem value="Primary K-3">Primary K-3</SelectItem>
+                                    <SelectItem value="Elementary K-5">Elementary K-5</SelectItem>
+                                    <SelectItem value="Middle School K-8">Middle School K-8</SelectItem>
+                                    <SelectItem value="High School K-12">High School K-12</SelectItem>
+                                    <SelectItem value="Championship">Championship</SelectItem>
                                 </SelectContent>
-                              </Select>
+                                </Select>
                             </div>
-                            
-                            <div>
-                              <Label htmlFor={`uscf-${student.id}`}>USCF Status</Label>
-                              <Select
-                                value={selectedStudents[student.id]?.uscfStatus || ''}
-                                onValueChange={(value) => updateStudentSelection(student.id, 'uscfStatus', value)}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select USCF status" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="current">Current Member</SelectItem>
-                                  <SelectItem value="new">New Member (+$24)</SelectItem>
-                                  <SelectItem value="renewing">Renewing Member (+$24)</SelectItem>
-                                </SelectContent>
-                              </Select>
+                            <div className="space-y-2">
+                                <Label>USCF Status</Label>
+                                <div className="p-2 rounded-md border bg-background h-10 flex items-center">
+                                    {isPsjaGt ? (
+                                        <Badge variant="outline" className="text-xs">District Covered</Badge>
+                                    ) : (
+                                        getUscfStatusBadge(uscfStatus)
+                                    )}
+                                </div>
                             </div>
                           </div>
                         )}

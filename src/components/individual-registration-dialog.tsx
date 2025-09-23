@@ -99,6 +99,16 @@ export function IndividualRegistrationDialog({
     return { isRegistered: false, source: null, message: 'Available for registration' };
   };
 
+  const getUscfStatusForPlayer = (player: MasterPlayer) => {
+    if (!player.uscfId || player.uscfId.toUpperCase() === 'NEW') {
+      return 'new';
+    }
+    if (!player.uscfExpiration || new Date(player.uscfExpiration) < new Date(event?.date)) {
+      return 'renewing';
+    }
+    return 'current';
+  };
+
   const toggleStudentSelection = (student: MasterPlayer) => {
     const status = getStudentRegistrationStatus(student);
     if (status.isRegistered) return;
@@ -108,12 +118,11 @@ export function IndividualRegistrationDialog({
       if (isSelected) {
         return rest;
       } else {
-        const isExpired = !student.uscfExpiration || new Date(student.uscfExpiration) < new Date(event.date);
         return {
           ...prev,
           [student.id]: {
             section: student.section || 'High School K-12',
-            uscfStatus: student.uscfId.toUpperCase() === 'NEW' ? 'new' : isExpired ? 'renewing' : 'current'
+            uscfStatus: getUscfStatusForPlayer(student),
           }
         };
       }
@@ -269,6 +278,13 @@ export function IndividualRegistrationDialog({
     }
   };
 
+  const getUscfStatusBadge = (status: string) => {
+    if (status === 'current') return <Badge variant="default" className="bg-green-600">Current</Badge>;
+    if (status === 'new') return <Badge variant="destructive">New (+$24)</Badge>;
+    if (status === 'renewing') return <Badge variant="destructive">Expired (+$24)</Badge>;
+    return <Badge variant="outline">{status}</Badge>;
+  };
+
   if (!event) return null;
   
   const isPsjaRestricted = event.isPsjaOnly;
@@ -318,6 +334,8 @@ export function IndividualRegistrationDialog({
               {parentStudents.map(student => {
                 const status = getStudentRegistrationStatus(student);
                 const isSelected = !!selectedStudents[student.id];
+                const uscfStatus = isSelected ? selectedStudents[student.id].uscfStatus : getUscfStatusForPlayer(student);
+                
                 return (
                   <Card key={student.id} className={`cursor-pointer transition-colors ${status.isRegistered ? 'opacity-50 cursor-not-allowed' : isSelected ? 'ring-2 ring-primary bg-primary/5' : 'hover:bg-muted/50'}`} onClick={() => !status.isRegistered && toggleStudentSelection(student)}>
                     <CardContent className="p-4">
@@ -337,8 +355,26 @@ export function IndividualRegistrationDialog({
                       </div>
                       {isSelected && (
                         <div className="mt-4 pt-4 border-t grid grid-cols-2 gap-4">
-                          <div><Label htmlFor={`section-${student.id}`}>Section</Label><Select value={selectedStudents[student.id]?.section || ''} onValueChange={(value) => updateStudentSelection(student.id, 'section', value)}><SelectTrigger><SelectValue placeholder="Select section" /></SelectTrigger><SelectContent><SelectItem value="Kinder-1st">Kinder-1st</SelectItem><SelectItem value="Primary K-3">Primary K-3</SelectItem><SelectItem value="Elementary K-5">Elementary K-5</SelectItem><SelectItem value="Middle School K-8">Middle School K-8</SelectItem><SelectItem value="High School K-12">High School K-12</SelectItem><SelectItem value="Championship">Championship</SelectItem></SelectContent></Select></div>
-                          <div><Label htmlFor={`uscf-${student.id}`}>USCF Status</Label><Select value={selectedStudents[student.id]?.uscfStatus || ''} onValueChange={(value) => updateStudentSelection(student.id, 'uscfStatus', value)}><SelectTrigger><SelectValue placeholder="Select USCF status" /></SelectTrigger><SelectContent><SelectItem value="current">Current Member</SelectItem><SelectItem value="new">New Member (+$24)</SelectItem><SelectItem value="renewing">Renewing Member (+$24)</SelectItem></SelectContent></Select></div>
+                          <div>
+                            <Label htmlFor={`section-${student.id}`}>Section</Label>
+                            <Select value={selectedStudents[student.id]?.section || ''} onValueChange={(value) => updateStudentSelection(student.id, 'section', value)}>
+                              <SelectTrigger><SelectValue placeholder="Select section" /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Kinder-1st">Kinder-1st</SelectItem>
+                                <SelectItem value="Primary K-3">Primary K-3</SelectItem>
+                                <SelectItem value="Elementary K-5">Elementary K-5</SelectItem>
+                                <SelectItem value="Middle School K-8">Middle School K-8</SelectItem>
+                                <SelectItem value="High School K-12">High School K-12</SelectItem>
+                                <SelectItem value="Championship">Championship</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>USCF Status</Label>
+                            <div className="p-2 rounded-md border bg-background h-10 flex items-center">
+                              {getUscfStatusBadge(uscfStatus)}
+                            </div>
+                          </div>
                         </div>
                       )}
                     </CardContent>
