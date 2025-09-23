@@ -33,8 +33,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SponsorRegistrationDialog } from "@/components/sponsor-registration-dialog";
 import { SponsorGuard } from "@/components/auth-guard";
-import { collection, getDocs, query, where } from "firebase/firestore";
-import { db } from "@/lib/firebase"; // Correctly import client-side db
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { MasterPlayer } from "@/lib/data/full-master-player-data";
 
 function DashboardContent() {
@@ -277,7 +277,7 @@ function DashboardContent() {
                               <TableCell>
                                 <div className="flex items-center gap-3">
                                   <Avatar className="h-9 w-9">
-                                    <AvatarImage src={`https://placehold.co/40x40.png`} alt={`${player.firstName} ${player.lastName}`} data-ai-hint="person face" />
+                                    <AvatarImage src={`https://picsum.photos/seed/${player.id}/40/40`} alt={`${player.firstName} ${player.lastName}`} data-ai-hint="person face" />
                                     <AvatarFallback>{player.firstName.charAt(0)}{player.lastName.charAt(0)}</AvatarFallback>
                                   </Avatar>
                                   <div>

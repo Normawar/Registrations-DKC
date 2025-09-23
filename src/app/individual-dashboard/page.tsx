@@ -247,7 +247,7 @@ function IndividualDashboardContent() {
                                 <TableCell>
                                     <Link href={`/players?edit=${player.id}`} className="flex items-center gap-3 group">
                                         <Avatar className="h-9 w-9">
-                                        <AvatarImage src={`https://placehold.co/40x40.png`} alt={`${player.firstName} ${player.lastName}`} data-ai-hint="person face" />
+                                        <AvatarImage src={`https://picsum.photos/seed/${player.id}/40/40`} alt={`${player.firstName} ${player.lastName}`} data-ai-hint="person face" />
                                         <AvatarFallback>{player.firstName.charAt(0)}{player.lastName.charAt(0)}</AvatarFallback>
                                         </Avatar>
                                         <div>
