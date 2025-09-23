@@ -269,10 +269,12 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
   const [playerCount, setPlayerCount] = useState(0);
 
-  const dbSchools = useMemo(() => [...new Set(schools.map(s => s.schoolName))].sort(), [schools]);
+  const dbSchools = useMemo(() => {
+    return [...new Set(schools.map(s => s.schoolName).filter(Boolean))].sort();
+  }, [schools]);
   
   const allSchoolNames = useMemo(() => {
-    const schoolNames = schools.map(s => s.schoolName);
+    const schoolNames = schools.map(s => s.schoolName).filter(Boolean); // Filter out empty strings
     const uniqueSchoolNames = [...new Set(schoolNames)].sort();
     if (!uniqueSchoolNames.includes('Homeschool')) {
         return ['Homeschool', ...uniqueSchoolNames];
@@ -281,7 +283,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   }, [schools]);
 
   const dbDistricts = useMemo(() => {
-    const districts = [...new Set(schools.map(s => s.district))].sort();
+    const districts = [...new Set(schools.map(s => s.district).filter(Boolean))].sort(); // Filter out empty strings
     if (!districts.includes('Homeschool')) {
       districts.unshift('Homeschool');
     }
@@ -296,7 +298,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
       return allSchoolNames;
     }
     return schools
-      .filter(s => s.district === district)
+      .filter(s => s.district === district && s.schoolName) // Filter out empty school names
       .map(s => s.schoolName)
       .sort();
   }, [schools, allSchoolNames]);
