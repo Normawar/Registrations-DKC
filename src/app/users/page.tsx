@@ -5,7 +5,6 @@ import { useState, useMemo, useEffect, useTransition } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { collection, getDocs, doc, setDoc, query, where } from 'firebase/firestore';
 import Papa from 'papaparse';
 
 import { AppLayout } from "@/components/app-layout";
@@ -13,20 +12,19 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { useToast } from '@/hooks/use-toast';
-import { MoreHorizontal, Trash2, FilePenLine, ArrowUpDown, ArrowUp, ArrowDown, Download, UserPlus, Loader2 } from 'lucide-react';
+import { MoreHorizontal, Trash2, FilePenLine, ArrowUpDown, ArrowUp, ArrowDown, Download, Loader2 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { schoolData } from '@/lib/data/school-data';
 import { Checkbox } from '@/components/ui/checkbox';
-import { db } from '@/lib/firebase';
 import { useMasterDb } from '@/context/master-db-context';
 import { Textarea } from '@/components/ui/textarea';
-import { forceDeleteUsersAction } from './actions';
 
+// Import server actions instead of direct Firestore
+import { fetchUsersAction, updateUserAction, forceDeleteUsersAction } from './actions';
 
 type User = {
     email: string;
@@ -49,7 +47,7 @@ const baseUserFormSchema = z.object({
   isSponsor: z.boolean().default(false),
   isDistrictCoordinator: z.boolean().default(false),
   isOrganizer: z.boolean().default(false),
-  isIndividual: z.boolean().default(false), // Added Individual role
+  isIndividual: z.boolean().default(false),
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
   school: z.string().optional(),
@@ -59,22 +57,26 @@ const baseUserFormSchema = z.object({
   gtCoordinatorEmail: z.string().email({ message: 'Please enter a valid email.' }).optional().or(z.literal('')),
 });
 
-const refinedUserSchema = baseUserFormSchema.refine(data => data.isSponsor || data.isDistrictCoordinator || data.isOrganizer || data.isIndividual, {
+const refinedUserSchema = baseUserFormSchema.refine(
+  data => data.isSponsor || data.isDistrictCoordinator || data.isOrganizer || data.isIndividual,
+  {
     message: "A user must have at least one role.",
-    path: ["isSponsor"], // This path can stay, error shows under first checkbox
-});
+    path: ["isSponsor"],
+  }
+);
 
 type UserFormValues = z.infer<typeof refinedUserSchema>;
 
 export default function UsersPage() {
     const { toast } = useToast();
-    const { dbDistricts, getSchoolsForDistrict, allSchoolNames } = useMasterDb();
+    const { dbDistricts, getSchoolsForDistrict } = useMasterDb();
     const [users, setUsers] = useState<User[]>([]);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [sortConfig, setSortConfig] = useState<{ key: SortableColumn; direction: 'ascending' | 'descending' } | null>({ key: 'lastName', direction: 'ascending' });
+    const [isLoadingUsers, setIsLoadingUsers] = useState(false);
     
     // State for force delete with useTransition
     const [isPending, startTransition] = useTransition();
@@ -85,12 +87,30 @@ export default function UsersPage() {
         return ['None', ...dbDistricts].sort();
     }, [dbDistricts]);
 
+    // Replace direct Firestore access with server action
     const loadUsers = async () => {
-        if (!db) return;
-        const usersCol = collection(db, 'users');
-        const userSnapshot = await getDocs(usersCol);
-        const userList = userSnapshot.docs.map(doc => doc.data() as User);
-        setUsers(userList);
+        setIsLoadingUsers(true);
+        try {
+            const result = await fetchUsersAction();
+            if (result.error) {
+                toast({ 
+                    variant: 'destructive', 
+                    title: "Failed to load users", 
+                    description: result.error 
+                });
+            } else {
+                setUsers(result.users);
+            }
+        } catch (error) {
+            console.error('Error loading users:', error);
+            toast({ 
+                variant: 'destructive', 
+                title: "Failed to load users", 
+                description: "An unexpected error occurred" 
+            });
+        } finally {
+            setIsLoadingUsers(false);
+        }
     };
 
     useEffect(() => {
@@ -173,26 +193,18 @@ export default function UsersPage() {
         });
         handleDistrictChange(initialDistrict);
       }
-    }, [isDialogOpen, editingUser, form, allSchoolNames, getSchoolsForDistrict]);
+    }, [isDialogOpen, editingUser, form, getSchoolsForDistrict]);
 
     const handleEditUser = (user: User) => {
         setEditingUser(user);
         setIsDialogOpen(true);
     };
 
+    // Replace direct Firestore update with server action
     const onSubmit = async (values: UserFormValues) => {
-        if (!editingUser || !db) return;
-
-        const userSnapshot = await getDocs(query(collection(db, 'users'), where('email', '==', editingUser.email)));
-        if (userSnapshot.empty) {
-            toast({ variant: 'destructive', title: "Update Failed", description: "Could not find the user to update." });
-            return;
-        }
-        const userDocId = userSnapshot.docs[0].id;
+        if (!editingUser) return;
 
         try {
-            const userRef = doc(db, "users", userDocId);
-
             let finalRole: User['role'];
             if (values.isOrganizer) {
                 finalRole = 'organizer';
@@ -204,35 +216,57 @@ export default function UsersPage() {
                 finalRole = 'individual'; 
             }
 
-            const dataToSave: any = { 
-                ...values, 
+            const userData = {
+                email: values.email,
+                firstName: values.firstName,
+                lastName: values.lastName,
                 role: finalRole,
                 isDistrictCoordinator: finalRole === 'district_coordinator' || values.isDistrictCoordinator,
-                updatedAt: new Date().toISOString()
+                school: values.school,
+                district: values.district,
+                phone: values.phone,
+                bookkeeperEmail: values.bookkeeperEmail,
+                gtCoordinatorEmail: values.gtCoordinatorEmail,
             };
 
-            delete dataToSave.isSponsor;
-            delete dataToSave.isOrganizer;
-            delete dataToSave.isIndividual;
+            console.log('Updating user with data:', userData);
 
-            console.log('Updating user with data:', dataToSave);
-
-            await setDoc(userRef, dataToSave, { merge: true });
-
-            loadUsers();
-            toast({ title: "User Updated", description: `${values.email}'s information has been updated.` });
-            setIsDialogOpen(false);
-            setEditingUser(null);
+            const result = await updateUserAction(editingUser.email, userData);
+            
+            if (result.success) {
+                await loadUsers();
+                toast({ 
+                    title: "User Updated", 
+                    description: `${values.email}'s information has been updated.` 
+                });
+                setIsDialogOpen(false);
+                setEditingUser(null);
+            } else {
+                toast({ 
+                    variant: 'destructive', 
+                    title: "Update Failed", 
+                    description: result.error || "Could not update user in the database." 
+                });
+            }
         } catch (error) {
             console.error("Error updating user:", error);
-            toast({ variant: 'destructive', title: "Update Failed", description: "Could not update user in the database." });
+            toast({ 
+                variant: 'destructive', 
+                title: "Update Failed", 
+                description: "An unexpected error occurred." 
+            });
         }
     };
     
     const handleForceDelete = () => {
         const emails = emailsToDelete.split(/[\n,;]+/).map(e => e.trim().toLowerCase()).filter(Boolean);
+        
         if (emails.length === 0) {
-            toast({ variant: 'destructive', title: 'No Emails Provided', description: 'Please enter at least one email to delete.' });
+            toast({ 
+                variant: 'destructive', 
+                title: 'No Emails Provided', 
+                description: 'Please enter at least one email to delete.' 
+            });
             return;
         }
     
@@ -240,21 +274,41 @@ export default function UsersPage() {
             return;
         }
         
+        console.log('Starting deletion for emails:', emails);
+        
         startTransition(async () => {
-            setDeleteResults([]);
-            const log = (message: string) => setDeleteResults(prev => [...prev, message]);
-        
-            log(`Starting deletion for ${emails.length} user(s)...`);
-        
-            const { deleted, failed } = await forceDeleteUsersAction(emails);
-        
-            deleted.forEach(email => log(`✅ Successfully deleted user: ${email}`));
-            failed.forEach(({ email, reason }) => log(`❌ Failed to delete user: ${email}. Reason: ${reason}`));
-        
-            log(`\n🎉 Deletion process complete.`);
-            toast({ title: 'Deletion Complete', description: `Processed ${emails.length} emails. Check log for details.` });
+            try {
+                setDeleteResults([]);
+                const log = (message: string) => {
+                    console.log(message);
+                    setDeleteResults(prev => [...prev, message]);
+                };
             
-            await loadUsers(); // Refresh user list
+                log(`Starting deletion for ${emails.length} user(s)...`);
+            
+                const { deleted, failed } = await forceDeleteUsersAction(emails);
+            
+                deleted.forEach(email => log(`✅ Successfully deleted user: ${email}`));
+                failed.forEach(({ email, reason }) => log(`❌ Failed to delete user: ${email}. Reason: ${reason}`));
+            
+                log(`\n🎉 Deletion process complete.`);
+                
+                toast({ 
+                    title: 'Deletion Complete', 
+                    description: `Processed ${emails.length} emails. Check log for details.`,
+                    variant: deleted.length > 0 ? 'default' : 'destructive'
+                });
+                
+                await loadUsers();
+            } catch (error) {
+                console.error('Error in handleForceDelete:', error);
+                toast({
+                    variant: 'destructive',
+                    title: 'Deletion Failed',
+                    description: error instanceof Error ? error.message : 'An unexpected error occurred'
+                });
+                setDeleteResults(prev => [...prev, `❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`]);
+            }
         });
     };
 
@@ -325,54 +379,60 @@ export default function UsersPage() {
                         </div>
                     </CardHeader>
                     <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>
-                                        <Button variant="ghost" onClick={() => requestSort('email')} className="px-0">
-                                            Email {getSortIcon('email')}
-                                        </Button>
-                                    </TableHead>
-                                    <TableHead>
-                                        <Button variant="ghost" onClick={() => requestSort('lastName')} className="px-0">
-                                            Name {getSortIcon('lastName')}
-                                        </Button>
-                                    </TableHead>
-                                    <TableHead>
-                                        <Button variant="ghost" onClick={() => requestSort('role')} className="px-0">
-                                            Role {getSortIcon('role')}
-                                        </Button>
-                                    </TableHead>
-                                    <TableHead>
-                                        <Button variant="ghost" onClick={() => requestSort('school')} className="px-0">
-                                            School / District {getSortIcon('school')}
-                                        </Button>
-                                    </TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {sortedUsers.map((user, index) => (
-                                    <TableRow key={`${user.email}-${index}`}>
-                                        <TableCell className="font-mono">{user.email}</TableCell>
-                                        <TableCell>{user.firstName} {user.lastName}</TableCell>
-                                        <TableCell className='capitalize'>
-                                            {user.role}
-                                            {user.isDistrictCoordinator && user.role === 'sponsor' && <span className="text-xs text-primary font-semibold ml-2">(Coordinator)</span>}
-                                        </TableCell>
-                                        <TableCell>{user.school || 'N/A'}{user.district ? ` / ${user.district}`: ''}</TableCell>
-                                        <TableCell className="text-right">
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                                                <DropdownMenuContent>
-                                                    <DropdownMenuItem onClick={() => handleEditUser(user)}><FilePenLine className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        </TableCell>
+                        {isLoadingUsers ? (
+                            <div className="flex justify-center py-8">
+                                <Loader2 className="h-6 w-6 animate-spin" />
+                            </div>
+                        ) : (
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>
+                                            <Button variant="ghost" onClick={() => requestSort('email')} className="px-0">
+                                                Email {getSortIcon('email')}
+                                            </Button>
+                                        </TableHead>
+                                        <TableHead>
+                                            <Button variant="ghost" onClick={() => requestSort('lastName')} className="px-0">
+                                                Name {getSortIcon('lastName')}
+                                            </Button>
+                                        </TableHead>
+                                        <TableHead>
+                                            <Button variant="ghost" onClick={() => requestSort('role')} className="px-0">
+                                                Role {getSortIcon('role')}
+                                            </Button>
+                                        </TableHead>
+                                        <TableHead>
+                                            <Button variant="ghost" onClick={() => requestSort('school')} className="px-0">
+                                                School / District {getSortIcon('school')}
+                                            </Button>
+                                        </TableHead>
+                                        <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
+                                </TableHeader>
+                                <TableBody>
+                                    {sortedUsers.map((user, index) => (
+                                        <TableRow key={`${user.email}-${index}`}>
+                                            <TableCell className="font-mono">{user.email}</TableCell>
+                                            <TableCell>{user.firstName} {user.lastName}</TableCell>
+                                            <TableCell className='capitalize'>
+                                                {user.role}
+                                                {user.isDistrictCoordinator && user.role === 'sponsor' && <span className="text-xs text-primary font-semibold ml-2">(Coordinator)</span>}
+                                            </TableCell>
+                                            <TableCell>{user.school || 'N/A'}{user.district ? ` / ${user.district}`: ''}</TableCell>
+                                            <TableCell className="text-right">
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                                    <DropdownMenuContent>
+                                                        <DropdownMenuItem onClick={() => handleEditUser(user)}><FilePenLine className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        )}
                     </CardContent>
                 </Card>
                 
