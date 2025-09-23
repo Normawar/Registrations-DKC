@@ -22,10 +22,11 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useMasterDb } from '@/context/master-db-context';
 import { Textarea } from '@/components/ui/textarea';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+
 
 // Import server actions instead of direct Firestore
 import { fetchUsersAction, updateUserAction, forceDeleteUsersAction } from './actions';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 type User = {
     email: string;
@@ -272,12 +273,13 @@ export default function UsersPage() {
             });
             return;
         }
-
+    
         // Store emails and open confirmation dialog
         setEmailsToConfirmDelete(emails);
         setIsDeleteConfirmOpen(true);
     };
-
+    
+    // Add this new function to handle the confirmed deletion:
     const handleConfirmedDelete = () => {
         const emails = emailsToConfirmDelete;
         console.log('Starting deletion for emails:', emails);
@@ -462,7 +464,7 @@ export default function UsersPage() {
                             rows={4}
                             disabled={isPending}
                         />
-                        <Button onClick={handleForceDelete} disabled={isPending || !emailsToDelete.trim()} variant="destructive">
+                        <Button onClick={handleForceDelete} disabled={isPending} variant="destructive">
                             {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
                             Permanently Delete Users
                         </Button>
@@ -554,18 +556,20 @@ export default function UsersPage() {
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Confirm User Deletion</AlertDialogTitle>
-                        <AlertDialogDescription className="space-y-2">
-                            <p>Are you sure you want to permanently delete {emailsToConfirmDelete.length} user(s)?</p>
-                            <p className="font-semibold">This will remove their authentication record AND Firestore data.</p>
-                            <p className="text-destructive font-bold">This action CANNOT be undone.</p>
-                            {emailsToConfirmDelete.length <= 5 && (
-                                <div className="mt-2 p-2 bg-muted rounded text-sm">
-                                    <p className="font-medium mb-1">Users to be deleted:</p>
-                                    {emailsToConfirmDelete.map((email, i) => (
-                                        <p key={i} className="text-muted-foreground">• {email}</p>
-                                    ))}
-                                </div>
-                            )}
+                        <AlertDialogDescription>
+                            <div className="space-y-2">
+                                <span>Are you sure you want to permanently delete {emailsToConfirmDelete.length} user(s)?</span>
+                                <span className="block font-semibold">This will remove their authentication record AND Firestore data.</span>
+                                <span className="block text-destructive font-bold">This action CANNOT be undone.</span>
+                                {emailsToConfirmDelete.length <= 5 && (
+                                    <div className="mt-2 p-2 bg-muted rounded text-sm">
+                                        <span className="block font-medium mb-1">Users to be deleted:</span>
+                                        {emailsToConfirmDelete.map((email, i) => (
+                                            <span key={i} className="block text-muted-foreground">• {email}</span>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
