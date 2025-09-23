@@ -113,7 +113,7 @@ const SponsorSignUpForm = () => {
     defaultValues: {
       firstName: "",
       lastName: "",
-      district: "None",
+      district: "Homeschool",
       school: "Homeschool",
       email: "",
       phone: "",
@@ -131,7 +131,7 @@ const SponsorSignUpForm = () => {
     setSchoolsForDistrict([...new Set(filteredSchools)]);
 
     if (resetSchool) {
-        if (district === 'None') {
+        if (district === 'Homeschool') {
             form.setValue('school', 'Homeschool');
         } else {
             form.setValue('school', '');
@@ -161,7 +161,7 @@ const SponsorSignUpForm = () => {
         return;
       }
 
-      const isCoordinator = values.school === 'All Schools' && values.district !== 'None';
+      const isCoordinator = values.school === 'All Schools' && values.district !== 'Homeschool';
       const role: SponsorProfile['role'] = isCoordinator ? 'district_coordinator' : 'sponsor';
 
       const { password, email, ...profileValues } = values;

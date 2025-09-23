@@ -1,8 +1,4 @@
 
-// This file is no longer used for data fetching in the main application flow.
-// The EnhancedPlayerSearchDialog now fetches school data directly from the client.
-// This route can be kept for debugging or removed.
-
 import { NextResponse } from 'next/server';
 import { NextRequest } from 'next/server';
 import { db } from '@/lib/firebase-admin';
@@ -17,9 +13,6 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const district = searchParams.get('district');
     
-    console.log('Fetching schools for district from admin SDK:', district);
-    
-    // Now queries the 'schools' collection for better performance and accuracy
     let schoolsRef: FirebaseFirestore.Query<FirebaseFirestore.DocumentData> = db.collection('schools');
     
     if (district && district !== 'all') {
@@ -37,8 +30,6 @@ export async function GET(request: NextRequest) {
     });
     
     const sortedSchools = [...schools].sort();
-    
-    console.log(`Found ${sortedSchools.length} unique schools for district: ${district || 'all'}`);
     
     return NextResponse.json(sortedSchools);
   } catch (error) {

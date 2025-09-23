@@ -284,11 +284,9 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
 
   const dbDistricts = useMemo(() => {
     const districts = [...new Set(schools.map(s => s.district).filter(Boolean))].sort();
-    const homeschoolIndex = districts.indexOf('Homeschool');
-    if (homeschoolIndex > -1) {
-      districts.splice(homeschoolIndex, 1);
+    if (!districts.includes('Homeschool')) {
+      districts.unshift('Homeschool');
     }
-    districts.unshift('Homeschool');
     return districts;
   }, [schools]);
   
@@ -306,28 +304,29 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   }, [schools, allSchoolNames]);
 
   const loadDatabase = useCallback(async () => {
+    if (!db) {
+        setIsDbLoaded(true);
+        setIsDbError(true);
+        return;
+    }
     setIsDbLoaded(false);
     
     try {
-      const [playersRes, schoolsRes] = await Promise.all([
-        fetch('/api/players'),
-        fetch('/api/schools')
+      const [playersSnapshot, schoolsSnapshot] = await Promise.all([
+        getDocs(collection(db, 'players')),
+        getDocs(collection(db, 'schools'))
       ]);
 
-      if (!playersRes.ok || !schoolsRes.ok) {
-        throw new Error('Failed to fetch data from API');
-      }
-
-      const players = await playersRes.json();
-      const schoolList = await schoolsRes.json();
+      const players = playersSnapshot.docs.map(doc => doc.data() as MasterPlayer);
+      const schoolList = schoolsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as School));
       
       setDatabase(players);
-      setSchools(schoolList.map((name: string) => ({ schoolName: name, district: '', id: name } as School))); // Simplified for now
+      setSchools(schoolList);
       setPlayerCount(players.length);
       setIsDbLoaded(true);
       
     } catch (error: any) {
-      console.error('Failed to load data via API:', error);
+      console.error('Failed to load data from Firestore:', error);
       setIsDbLoaded(false);
       setIsDbError(true);
     }

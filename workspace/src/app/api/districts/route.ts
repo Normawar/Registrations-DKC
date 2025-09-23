@@ -1,21 +1,18 @@
 
-// This file is no longer used for data fetching in the main application flow.
-// The EnhancedPlayerSearchDialog now fetches district data directly from the client.
-// This route can be kept for debugging or removed.
-
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase-admin';
 
 export async function GET() {
+  if (!db) {
+    console.error('Firestore admin not initialized');
+    return NextResponse.json({ error: 'Firestore is not configured' }, { status: 500 });
+  }
+
   try {
-    console.log('Fetching districts from admin SDK...');
-    
-    // This now queries the 'schools' collection for a more accurate district list
     const schoolsRef = db.collection('schools');
     const snapshot = await schoolsRef.get();
     
     const districts = new Set<string>();
-    
     snapshot.forEach(doc => {
       const data = doc.data();
       if (data.district && data.district.trim()) {
@@ -23,9 +20,7 @@ export async function GET() {
       }
     });
     
-    const sortedDistricts = [...districts].sort();
-    
-    console.log(`Found ${sortedDistricts.length} unique districts from schools collection`);
+    const sortedDistricts = ['Homeschool', ...[...districts].filter(d => d !== 'Homeschool').sort()];
     
     return NextResponse.json(sortedDistricts);
   } catch (error) {
