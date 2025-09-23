@@ -207,6 +207,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   };
 
   const menuItems = getMenuItems();
+  const profileUpdateRequired = profile?.forceProfileUpdate === true;
 
   const AvatarComponent = profile && profile.avatarType === 'icon' ? icons[profile.avatarValue] : null;
   const teamCode = profile ? generateTeamCode({ schoolName: profile.school, district: profile.district }) : null;
@@ -283,10 +284,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                         let badgeCount = 0;
                         if (item.href === '/requests') badgeCount = pendingRequestsCount;
                         else if (item.href === '/payment-authorization') badgeCount = pendingPaymentsCount;
+                        
+                        const isDisabled = profileUpdateRequired && item.href !== '/profile';
+
                         return (
                            <SidebarMenuItem key={item.href}>
-                              <SidebarMenuButton asChild isActive={pathname.startsWith(item.href)} tooltip={{ children: item.label, side: "right" }}>
-                                  <Link href={item.href}>
+                              <SidebarMenuButton asChild isActive={pathname.startsWith(item.href)} disabled={isDisabled} tooltip={{ children: item.label, side: "right" }}>
+                                  <Link href={isDisabled ? '#' : item.href} aria-disabled={isDisabled}>
                                       <item.icon className="w-5 h-5" />
                                       <span>{item.label}</span>
                                   </Link>
@@ -302,10 +306,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                   let badgeCount = 0;
                   if (item.href === '/requests') badgeCount = pendingRequestsCount;
                   else if (item.href === '/payment-authorization') badgeCount = pendingPaymentsCount;
+                  
+                  const isDisabled = profileUpdateRequired && item.href !== '/profile';
+
                   return (
                     <SidebarMenuItem key={item.href}>
-                      <SidebarMenuButton asChild isActive={pathname.startsWith(item.href)} tooltip={{ children: item.label, side: "right" }}>
-                        <Link href={item.href}>
+                      <SidebarMenuButton asChild isActive={pathname.startsWith(item.href)} disabled={isDisabled} tooltip={{ children: item.label, side: "right" }}>
+                        <Link href={isDisabled ? '#' : item.href} aria-disabled={isDisabled} tabIndex={isDisabled ? -1 : undefined}>
                           <item.icon className="w-5 h-5" />
                           <span>{item.label}</span>
                         </Link>
@@ -355,5 +362,3 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   );
 }
-
-    
