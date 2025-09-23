@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview Creates an invoice with the Square API and saves player data to Firestore.
@@ -13,6 +12,32 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service'; // USING CLIENT SDK
 import { generateTeamCode } from '@/lib/school-utils';
 import { type CreateInvoiceInput, type CreateInvoiceOutput } from './schemas';
+
+/**
+ * Formats a phone number for Square API
+ * Square expects phone numbers in E.164 format or a valid regional format
+ */
+function formatPhoneForSquare(phone: string | null | undefined): string | null {
+  if (!phone) return null;
+  
+  // Remove all non-numeric characters
+  const cleaned = phone.replace(/\D/g, '');
+  
+  // Check if it's a valid length (10 digits for US numbers, 11 if starts with 1)
+  if (cleaned.length === 10) {
+    // Format as US number with country code
+    return `+1${cleaned}`;
+  } else if (cleaned.length === 11 && cleaned.startsWith('1')) {
+    // Already has US country code
+    return `+${cleaned}`;
+  } else if (cleaned.length > 10 && cleaned.startsWith('1')) {
+    // Might have extra digits, try to extract valid US number
+    return `+${cleaned.substring(0, 11)}`;
+  }
+  
+  // Return null if we can't format it properly
+  return null;
+}
 
 // This function now acts as a standalone Server Action.
 export async function createInvoice(input: CreateInvoiceInput): Promise<CreateInvoiceOutput> {
@@ -83,8 +108,10 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
     const companyName = input.district ? `${input.schoolName} / ${input.district}` : input.schoolName;
     const finalTeamCode = input.teamCode || generateTeamCode({ schoolName: input.schoolName, district: input.district });
     const customerName = input.sponsorName || input.parentName || 'Customer';
-    const phoneNumber = (input.sponsorPhone?.trim() || input.schoolPhone?.trim()) || null;
-
+    
+    // Format phone number properly for Square API
+    const rawPhone = input.sponsorPhone?.trim() || input.schoolPhone?.trim() || null;
+    const phoneNumber = formatPhoneForSquare(rawPhone);
 
     let customerId: string;
     if (searchCustomersResponse.result.customers?.length) {
@@ -94,7 +121,8 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
         companyName,
         address: { addressLine1: input.schoolAddress },
       };
-      if (phoneNumber && phoneNumber.length >= 10) {
+      // Only add phone number if it's properly formatted
+      if (phoneNumber) {
         updatePayload.phoneNumber = phoneNumber;
       }
       await customersApi.updateCustomer(customerId, updatePayload);
@@ -109,7 +137,8 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
         address: { addressLine1: input.schoolAddress },
         note: `Team Code: ${finalTeamCode}`,
       };
-      if (phoneNumber && phoneNumber.length >= 10) {
+      // Only add phone number if it's properly formatted
+      if (phoneNumber) {
         createPayload.phoneNumber = phoneNumber;
       }
       const createCustomerResponse = await customersApi.createCustomer(createPayload);
