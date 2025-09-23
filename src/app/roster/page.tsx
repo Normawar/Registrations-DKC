@@ -1,4 +1,5 @@
 
+
 // Updated src/app/roster/page.tsx
 'use client';
 
@@ -18,7 +19,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Search, PlusCircle, Trash2, Edit, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Check, FilePenLine, History, UserPlus } from 'lucide-react';
+import { Search, PlusCircle, Trash2, Edit, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Check, FilePenLine, History, UserPlus, Download } from 'lucide-react';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { CSVUploadComponent } from '@/components/csv-upload';
@@ -31,9 +32,10 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { generateTeamCode } from '@/lib/school-utils';
 import { Separator } from '@/components/ui/separator';
+import Papa from 'papaparse';
 
 const grades = ['Kindergarten', '1st Grade', '2nd Grade', '3rd Grade', '4th Grade', '5th Grade', '6th Grade', '7th Grade', '8th Grade', '9th Grade', '10th Grade', '11th Grade', '12th Grade'];
 const sections = ['Kinder-1st', 'Primary K-3', 'Elementary K-5', 'Middle School K-8', 'High School K-12', 'Championship'];
@@ -1078,7 +1080,7 @@ function UserRosterPageContent() {
 
                     <div className="p-6 pt-4 border-t bg-muted/30 shrink-0">
                       <div className="flex justify-between">
-                        {playerToEdit ? (
+                        {playerToEdit && profile?.role === 'individual' ? (
                           <Button 
                             type="button" 
                             variant="destructive" 
@@ -1088,7 +1090,7 @@ function UserRosterPageContent() {
                             }}
                           >
                             <Trash2 className="h-4 w-4 mr-2" />
-                            {profile?.role === 'individual' ? 'Remove From My List' : 'Delete Player'}
+                            Remove From My List
                           </Button>
                         ) : (
                           <div></div>
