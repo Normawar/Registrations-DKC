@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useMasterDb, type MasterPlayer } from "@/context/master-db-context";
 import { School, User, DollarSign, CheckCircle, Lock, AlertCircle, Clock } from "lucide-react";
 import { format, differenceInHours, isSameDay, startOfDay } from "date-fns";
-import { createInvoice } from '@/ai/flows/create-invoice-flow';
+import { createIndividualInvoice } from '@/ai/flows/create-individual-invoice-flow';
 import { InvoiceDetailsDialog } from '@/components/invoice-details-dialog';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 
@@ -183,14 +183,6 @@ export function IndividualRegistrationDialog({
     setIsSubmitting(true);
   
     try {
-      const generateIndividualTeamCode = (lastName: string): string => {
-        const sanitized = lastName.replace(/[^A-Za-z]/g, '').toUpperCase();
-        const timestamp = Date.now().toString().slice(-4);
-        return `IND-${sanitized.slice(0, 4)}${timestamp}`;
-      };
-  
-      const teamCode = generateIndividualTeamCode(parentProfile.lastName);
-
       const { fee: currentFee } = getFeeForEvent();
       const lateFeeAmount = currentFee - event.regularFee;
   
@@ -200,29 +192,26 @@ export function IndividualRegistrationDialog({
         
         return {
           playerName: `${student.firstName} ${student.lastName}`,
-          uscfId: student.uscfId || '',
+          uscfId: student.uscfId || 'NEW',
           baseRegistrationFee: event.regularFee,
           lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0,
           uscfAction: details.uscfStatus !== 'current',
+          isGtPlayer: student.studentType === 'gt',
           section: details.section,
         };
       });
-  
-      const result = await createInvoice({
+
+      const result = await createIndividualInvoice({
         sponsorName: `${parentProfile.firstName} ${parentProfile.lastName}`,
         parentName: `${parentProfile.firstName} ${parentProfile.lastName}`, // Explicitly for individual
         sponsorEmail: parentProfile.email,
         sponsorPhone: parentProfile.phone || '',
         schoolName: 'Individual Registration',
-        teamCode: teamCode,
+        teamCode: generateTeamCode({ schoolName: 'Individual', district: 'Individual' }),
         eventName: event.name,
         eventDate: event.date,
         uscfFee: 24,
         players: playersToInvoice,
-        bookkeeperEmail: undefined,
-        gtCoordinatorEmail: undefined,
-        schoolAddress: '',
-        schoolPhone: '',
         district: 'Individual',
       });
   
@@ -238,8 +227,8 @@ export function IndividualRegistrationDialog({
         parentName: `${parentProfile.firstName} ${parentProfile.lastName}`,
         schoolName: 'Individual Registration',
         district: 'Individual',
-        teamCode: teamCode,
-        invoiceTitle: `${teamCode} @ ${format(new Date(event.date), 'MM/dd/yyyy')} ${event.name}`,
+        teamCode: generateTeamCode({ schoolName: 'Individual', district: 'Individual' }),
+        invoiceTitle: `${generateTeamCode({ schoolName: 'Individual', district: 'Individual' })} @ ${format(new Date(event.date), 'MM/dd/yyyy')} ${event.name}`,
         selections: Object.fromEntries(Object.entries(selectedStudents).map(([playerId, details]) => [ playerId, { ...details, status: 'active' } ])),
         totalInvoiced: feeBreakdown.total,
         totalAmount: feeBreakdown.total,
