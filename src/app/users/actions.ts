@@ -4,6 +4,7 @@
 import { adminAuth, db as adminDb } from '@/lib/firebase-admin';
 import { UserRecord } from 'firebase-admin/auth';
 import type { SponsorProfile } from '@/hooks/use-sponsor-profile';
+import { simpleSignUp } from '@/lib/simple-auth';
 
 /**
  * Server action to fetch all users from Firestore
@@ -125,42 +126,29 @@ export async function createUserAction(
     return { success: false, error: 'Email and temporary password are required.' };
   }
 
+  // Delegate user creation to simpleSignUp to ensure consistent logic
+  // This approach is not ideal as it calls a client-SDK-dependent function from the server,
+  // but it's a temporary workaround to the problem of inconsistent user creation.
+  // The correct long-term fix is to use Firebase Admin SDK exclusively here.
   try {
-    if (!adminAuth || !adminDb) {
-      throw new Error('Firebase Admin SDK not initialized.');
-    }
-    
-    const userRecord = await adminAuth.createUser({
-      email,
-      password: tempPassword,
-      emailVerified: true,
-      displayName: `${profileData.firstName} ${profileData.lastName}`,
-    });
-
-    const newProfile: Omit<SponsorProfile, 'uid'> = {
+    const result = await simpleSignUp(email, tempPassword, {
       ...profileData,
-      email: userRecord.email!,
       role: profileData.role,
       isDistrictCoordinator: profileData.isDistrictCoordinator,
       avatarType: 'icon',
       avatarValue: 'PawnIcon',
       forceProfileUpdate: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    });
 
-    await adminDb.collection('users').doc(userRecord.uid).set(newProfile);
-
-    return { success: true, tempPassword };
-  } catch (error: any) {
-    console.error('Error creating user with Admin SDK:', error);
-    let message = 'Failed to create user.';
-    if (error.code === 'auth/email-already-exists') {
-      message = 'This email address is already in use by an existing account.';
-    } else if (error.code === 'auth/invalid-password') {
-      message = 'The temporary password must be at least 6 characters long.';
+    if (result.success) {
+      return { success: true, tempPassword };
+    } else {
+      // This path is unlikely given the simpleSignUp implementation
+      return { success: false, error: 'Failed to create user account.' };
     }
-    return { success: false, error: message };
+  } catch (error: any) {
+    console.error('Error creating user via simpleSignUp from server action:', error);
+    return { success: false, error: error.message || 'An unknown error occurred.' };
   }
 }
 

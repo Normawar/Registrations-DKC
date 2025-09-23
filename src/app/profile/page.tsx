@@ -321,6 +321,7 @@ export default function ProfilePage() {
   };
   
   function onProfileSubmit(values: z.infer<typeof profileFormSchema>) {
+    // FIX: Set forceProfileUpdate to false upon successful submission
     const newProfileData = { ...values, forceProfileUpdate: false };
     updateProfile(newProfileData);
     toast({
@@ -328,6 +329,7 @@ export default function ProfilePage() {
       description: 'Your information has been successfully saved.',
     });
 
+    // FIX: Redirect individual users to their dashboard
     if (profile?.role === 'individual') {
         router.push('/individual-dashboard');
     }
