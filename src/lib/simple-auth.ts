@@ -100,7 +100,7 @@ export async function simpleSignUp(email: string, password: string, userData: Om
 }
 
 
-// FIXED: Simplified signin function
+// FIXED: Simplified signin function. Removed on-the-fly test account creation.
 export async function simpleSignIn(email: string, password: string) {
   const normalizedEmail = normalizeEmail(email);
   
@@ -121,20 +121,8 @@ export async function simpleSignIn(email: string, password: string) {
       throw new Error('Please enter a valid email address.');
     }
 
-    let userCredential;
-    try {
-      userCredential = await signInWithEmailAndPassword(auth, normalizedEmail, trimmedPassword);
-    } catch (error: any) {
-      // Only handle test accounts with creation fallback
-      if (isTestAccount(normalizedEmail) && (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found')) {
-        console.warn(`⚠️ Test account ${normalizedEmail} doesn't exist, creating...`);
-        // This is where recursion was happening. Instead of calling simpleSignUp, we create the user directly.
-        userCredential = await createUserWithEmailAndPassword(auth, normalizedEmail, trimmedPassword);
-      } else {
-        throw error;
-      }
-    }
-
+    const userCredential = await signInWithEmailAndPassword(auth, normalizedEmail, trimmedPassword);
+    
     const user = userCredential.user;
     const profileData = await getOrCreateUserProfile(user, normalizedEmail);
 
@@ -499,3 +487,5 @@ export async function correctOrganizerAccountData(email: string, password: strin
   } finally {
   }
 }
+
+    
