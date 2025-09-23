@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useMasterDb, type SearchCriteria, type SearchResult, type MasterPlayer } from '@/context/master-db-context';
 import type { SponsorProfile } from '@/hooks/use-sponsor-profile';
 import { ExternalLink } from 'lucide-react';

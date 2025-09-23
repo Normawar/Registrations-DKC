@@ -283,7 +283,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   }, [schools]);
 
   const dbDistricts = useMemo(() => {
-    const districts = [...new Set(schools.map(s => s.district).filter(Boolean))].sort(); // Filter out empty strings
+    const districts = [...new Set(schools.map(s => s.district).filter(Boolean))].sort();
     if (!districts.includes('Homeschool')) {
       districts.unshift('Homeschool');
     }
@@ -298,34 +298,35 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
       return allSchoolNames;
     }
     return schools
-      .filter(s => s.district === district && s.schoolName) // Filter out empty school names
+      .filter(s => s.district === district && s.schoolName && s.schoolName.trim() !== '')
       .map(s => s.schoolName)
       .sort();
   }, [schools, allSchoolNames]);
 
   const loadDatabase = useCallback(async () => {
+    if (!db) {
+        setIsDbLoaded(true);
+        setIsDbError(true);
+        return;
+    }
     setIsDbLoaded(false);
     
     try {
-      const [playersRes, schoolsRes] = await Promise.all([
-        fetch('/api/players'),
-        fetch('/api/schools')
+      const [playersSnapshot, schoolsSnapshot] = await Promise.all([
+        getDocs(collection(db, 'players')),
+        getDocs(collection(db, 'schools'))
       ]);
 
-      if (!playersRes.ok || !schoolsRes.ok) {
-        throw new Error('Failed to fetch data from API');
-      }
-
-      const players = await playersRes.json();
-      const schoolList = await schoolsRes.json();
+      const players = playersSnapshot.docs.map(doc => doc.data() as MasterPlayer);
+      const schoolList = schoolsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as School));
       
       setDatabase(players);
-      setSchools(schoolList.map((name: string) => ({ schoolName: name, district: '', id: name } as School))); // Simplified for now
+      setSchools(schoolList);
       setPlayerCount(players.length);
       setIsDbLoaded(true);
       
     } catch (error: any) {
-      console.error('Failed to load data via API:', error);
+      console.error('Failed to load data from Firestore:', error);
       setIsDbLoaded(false);
       setIsDbError(true);
     }

@@ -1,4 +1,3 @@
-
 // src/app/api/districts/route.ts
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase-admin';
