@@ -22,7 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { schoolData } from '@/lib/data/school-data';
 import { Checkbox } from '@/components/ui/checkbox';
-import { db } from '@/lib/services/firestore-service';
+import { db } from '@/lib/firebase';
 import { useMasterDb } from '@/context/master-db-context';
 import { Textarea } from '@/components/ui/textarea';
 import { forceDeleteUsersAction } from './actions';
@@ -230,7 +230,7 @@ export default function UsersPage() {
     };
     
     const handleForceDelete = async () => {
-        const emails = emailsToDelete.split(/[\\n,;]+/).map(e => e.trim().toLowerCase()).filter(Boolean);
+        const emails = emailsToDelete.split(/[\n,;]+/).map(e => e.trim().toLowerCase()).filter(Boolean);
         if (emails.length === 0) {
             toast({ variant: 'destructive', title: 'No Emails Provided', description: 'Please enter at least one email to delete.' });
             return;
