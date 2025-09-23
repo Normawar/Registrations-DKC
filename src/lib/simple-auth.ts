@@ -1,9 +1,8 @@
-
 // src/lib/simple-auth.ts - Refactored for clarity and robustness
 
 import { auth, db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
-import { sendPasswordResetEmail, type User, getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { sendPasswordResetEmail, type User, getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 import type { SponsorProfile } from '@/hooks/use-sponsor-profile';
 
 // Email utilities remain the same
@@ -179,15 +178,15 @@ function createFallbackProfile(user: User, normalizedEmail: string): SponsorProf
 function getAuthErrorMessage(error: any): string {
   const errorMessages: Record<string, string> = {
     'auth/email-already-in-use': 'An account with this email already exists.',
-    'auth/wrong-password': 'Incorrect password.',
+    'auth/wrong-password': 'Incorrect password. Please try again.',
     'auth/weak-password': 'Password is too weak. Please use at least 8 characters.',
     'auth/invalid-email': 'Please enter a valid email address.',
-    'auth/invalid-credential': 'Invalid email or password.',
-    'auth/user-not-found': 'No account found with this email.',
-    'auth/network-request-failed': 'Network error. Please check your connection.',
+    'auth/invalid-credential': 'The email or password you entered is incorrect. Please try again.',
+    'auth/user-not-found': 'No account found with this email address.',
+    'auth/network-request-failed': 'Network error. Please check your connection and try again.',
   };
 
-  return errorMessages[error.code] || error.message || 'Authentication failed.';
+  return errorMessages[error.code] || error.message || 'Authentication failed. Please try again.';
 }
 
 export const resetPassword = async (email: string): Promise<void> => {
@@ -212,4 +211,29 @@ export function checkFirebaseConfig() {
       process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
     )
   };
+}
+
+export async function updateUserPassword(currentPassword: string, newPassword: string): Promise<void> {
+    const user = auth.currentUser;
+    if (!user || !user.email) {
+      throw new Error("No user is currently signed in.");
+    }
+    
+    try {
+      const credential = EmailAuthProvider.credential(user.email, currentPassword);
+      await reauthenticateWithCredential(user, credential);
+      await updatePassword(user, newPassword);
+    } catch (error: any) {
+      if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        throw new Error("The current password you entered is incorrect.");
+      }
+      if (error.code === 'auth/weak-password') {
+        throw new Error("The new password is too weak. It must be at least 8 characters long.");
+      }
+      if (error.code === 'auth/requires-recent-login') {
+          throw new Error("This operation is sensitive and requires recent authentication. Please sign out and sign in again before changing your password.");
+      }
+      console.error("Error updating password:", error);
+      throw new Error("An unexpected error occurred while updating the password.");
+    }
 }
