@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -356,7 +355,7 @@ export default function UnifiedInvoiceRegistrations() {
       'COMPED': 'default',
       'UNPAID': 'destructive', 
       'OVERDUE': 'destructive',
-      'CANCELED': 'secondary',
+      'CANCELED': 'destructive',
       'PARTIALLY_PAID': 'secondary',
     };
     
@@ -438,7 +437,7 @@ export default function UnifiedInvoiceRegistrations() {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold">Invoice & Registration Management</h1>
+            <h1 className="text-3xl font-bold">Invoice &amp; Registration Management</h1>
             <p className="text-muted-foreground">
               Complete overview of all sponsorship invoices and student registrations
             </p>
@@ -496,7 +495,7 @@ export default function UnifiedInvoiceRegistrations() {
               ) : (
                 <Skeleton className="h-8 w-3/4" />
               )}
-              <p className="text-xs text-muted-foreground">Gifted & Talented total</p>
+              <p className="text-xs text-muted-foreground">Gifted &amp; Talented total</p>
             </CardContent>
           </Card>
 
@@ -613,7 +612,7 @@ export default function UnifiedInvoiceRegistrations() {
 
         <Card>
           <CardHeader>
-            <CardTitle>All Invoices & Registrations</CardTitle>
+            <CardTitle>All Invoices &amp; Registrations</CardTitle>
             <CardDescription>
               Showing {filteredAndSortedData.length} registration record(s)
               {isLoading && " (Loading...)"}
