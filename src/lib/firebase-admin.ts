@@ -1,9 +1,15 @@
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+
+import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
+import { getFirestore, Firestore } from 'firebase-admin/firestore';
+import { getAuth, Auth } from 'firebase-admin/auth';
+
+let app: App;
+let db: Firestore;
+let authAdmin: Auth;
 
 if (!getApps().length) {
   try {
-    initializeApp({
+    app = initializeApp({
       credential: cert({
         projectId: "chessmate-w17oa",
         clientEmail: "firebase-adminsdk-fbsvc@chessmate-w17oa.iam.gserviceaccount.com",
@@ -41,7 +47,14 @@ cE5GUcP1QhjhdFtUPf/xRpiSpooAuLHgtSoI+NcCQewBAuaOKewk4O2lUbm7XIYd
     console.log('Firebase Admin initialized successfully');
   } catch (error) {
     console.error('Failed to initialize Firebase Admin:', error);
+    // Set to null if initialization fails
+    app = null as any; 
   }
+} else {
+  app = getApps()[0];
 }
 
-export const db = getFirestore();
+db = getFirestore(app);
+authAdmin = getAuth(app);
+
+export { db, authAdmin };

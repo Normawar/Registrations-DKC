@@ -1,3 +1,4 @@
+
 'use client';
 
 import { AppLayout } from "@/components/app-layout";
@@ -22,7 +23,7 @@ import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useEvents } from "@/hooks/use-events";
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { format, isSameDay } from "date-fns";
 import { Info, FileText, ImageIcon, Lock } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
@@ -33,7 +34,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { SponsorRegistrationDialog } from "@/components/sponsor-registration-dialog";
 import { SponsorGuard } from "@/components/auth-guard";
 import { collection, getDocs, query, where } from "firebase/firestore";
-import { db } from "@/lib/services/firestore-service";
+import { db } from "@/lib/firebase"; // Correctly import client-side db
 import { MasterPlayer } from "@/lib/data/full-master-player-data";
 
 function DashboardContent() {
@@ -49,14 +50,16 @@ function DashboardContent() {
   const [dataLoaded, setDataLoaded] = useState(false);
   
   const loadDashboardData = useCallback(async () => {
-    if (!db || !profile || dataLoaded) return;
+    if (!db || !profile) return;
 
     try {
-      setDataLoaded(false); // Set loading state
+      setDataLoaded(false); 
+      
       const playersQuery = query(collection(db, 'players'), 
         where('district', '==', profile.district), 
         where('school', '==', profile.school)
       );
+      
       const allPlayersSnapshotPromise = getDocs(collection(db, 'players'));
       
       let invoicesQuery = query(collection(db, 'invoices'));
@@ -100,15 +103,15 @@ function DashboardContent() {
       setDataLoaded(true);
     } catch (error) {
       console.error("Failed to load dashboard data:", error);
-      setDataLoaded(true); // Ensure loading completes even on error
+      setDataLoaded(true); 
     }
-  }, [profile, dataLoaded]); // Depend on profile and dataLoaded flag
+  }, [profile]);
   
   useEffect(() => {
-    if (profile && !loading && !dataLoaded) {
+    if (profile && !loading) {
       loadDashboardData();
     }
-  }, [profile, loading, loadDashboardData, dataLoaded]);
+  }, [profile, loading, loadDashboardData]);
 
   const playersWithMissingInfo = useMemo(() => {
     return rosterPlayers.filter(player => {

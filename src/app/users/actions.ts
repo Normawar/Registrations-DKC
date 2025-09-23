@@ -2,7 +2,6 @@
 'use server';
 
 import { getAuth } from 'firebase-admin/auth';
-import { getFirestore } from 'firebase-admin/firestore';
 import { db as adminDb } from '@/lib/firebase-admin';
 
 /**
