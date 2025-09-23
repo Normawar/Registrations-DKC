@@ -13,36 +13,62 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
 };
 
+const isConfigValid = firebaseConfig.apiKey && !firebaseConfig.apiKey.startsWith('YOUR_');
+
 let app: FirebaseApp;
 let auth: Auth;
 let storage: FirebaseStorage;
 let db: Firestore;
 
-const isConfigValid = firebaseConfig.apiKey && !firebaseConfig.apiKey.startsWith('YOUR_');
-
-if (isConfigValid) {
-    try {
-        app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-        auth = getAuth(app);
-        storage = getStorage(app);
-        db = getFirestore(app);
-    } catch (e) {
-        console.error("Failed to initialize Firebase", e);
-        // Ensure services are null if initialization fails
-        app = null as any;
-        auth = null as any;
-        storage = null as any;
-        db = null as any;
-    }
-} else {
+function getFirebaseApp(): FirebaseApp | null {
+  if (!isConfigValid) {
     if (typeof window !== 'undefined') {
-        console.warn("Firebase configuration is missing or incomplete. Please add your credentials to the .env file. Client-side Firebase features will be disabled.");
+      console.warn("Firebase configuration is missing or incomplete. Firebase features will be disabled.");
     }
-    app = null as any;
-    auth = null as any;
-    storage = null as any;
-    db = null as any;
+    return null;
+  }
+  if (!app) {
+    app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+  }
+  return app;
 }
 
+function getFirebaseAuth(): Auth | null {
+  const currentApp = getFirebaseApp();
+  if (!currentApp) return null;
+  if (!auth) {
+    auth = getAuth(currentApp);
+  }
+  return auth;
+}
 
-export { app, auth, storage, db };
+function getFirebaseStorage(): FirebaseStorage | null {
+  const currentApp = getFirebaseApp();
+  if (!currentApp) return null;
+  if (!storage) {
+    storage = getStorage(currentApp);
+  }
+  return storage;
+}
+
+function getFirebaseDb(): Firestore | null {
+  const currentApp = getFirebaseApp();
+  if (!currentApp) return null;
+  if (!db) {
+    db = getFirestore(currentApp);
+  }
+  return db;
+}
+
+// Re-export the initialized services for use throughout the app
+const initializedApp = getFirebaseApp();
+const initializedAuth = getFirebaseAuth();
+const initializedStorage = getFirebaseStorage();
+const initializedDb = getFirebaseDb();
+
+export { 
+  initializedApp as app, 
+  initializedAuth as auth, 
+  initializedStorage as storage, 
+  initializedDb as db 
+};
