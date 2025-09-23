@@ -321,7 +321,6 @@ export default function ProfilePage() {
   };
   
   function onProfileSubmit(values: z.infer<typeof profileFormSchema>) {
-    // FIX: Set forceProfileUpdate to false upon successful submission
     const newProfileData = { ...values, forceProfileUpdate: false };
     updateProfile(newProfileData);
     toast({
@@ -329,7 +328,6 @@ export default function ProfilePage() {
       description: 'Your information has been successfully saved.',
     });
 
-    // FIX: Redirect individual users to their dashboard
     if (profile?.role === 'individual') {
         router.push('/individual-dashboard');
     }
@@ -339,9 +337,13 @@ export default function ProfilePage() {
       setIsSavingPassword(true);
       try {
         await AuthService.updateUserPassword(values.currentPassword, values.newPassword);
+        
+        // After successful password change, also clear the forceProfileUpdate flag
+        await updateProfile({ forceProfileUpdate: false });
+        
         toast({
             title: "Password Changed",
-            description: "Your password has been successfully updated.",
+            description: "Your password has been successfully updated and your account is now fully active.",
         });
         passwordForm.reset();
       } catch (error) {
