@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Creates an invoice with the Square API and saves player data to Firestore.
@@ -82,28 +83,36 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
     const companyName = input.district ? `${input.schoolName} / ${input.district}` : input.schoolName;
     const finalTeamCode = input.teamCode || generateTeamCode({ schoolName: input.schoolName, district: input.district });
     const customerName = input.sponsorName || input.parentName || 'Customer';
+    const phoneNumber = (input.sponsorPhone?.trim() || input.schoolPhone?.trim()) || null;
+
 
     let customerId: string;
     if (searchCustomersResponse.result.customers?.length) {
       const customer = searchCustomersResponse.result.customers[0];
       customerId = customer.id!;
-      await customersApi.updateCustomer(customerId, {
+      const updatePayload: any = {
         companyName,
-        phoneNumber: input.sponsorPhone || input.schoolPhone,
         address: { addressLine1: input.schoolAddress },
-      });
+      };
+      if (phoneNumber && phoneNumber.length >= 10) {
+        updatePayload.phoneNumber = phoneNumber;
+      }
+      await customersApi.updateCustomer(customerId, updatePayload);
     } else {
       const [firstName, ...lastNameParts] = customerName.split(' ');
-      const createCustomerResponse = await customersApi.createCustomer({
+      const createPayload: any = {
         idempotencyKey: randomUUID(),
         givenName: firstName,
         familyName: lastNameParts.join(' '),
         emailAddress: input.sponsorEmail,
         companyName,
-        phoneNumber: input.sponsorPhone || input.schoolPhone,
         address: { addressLine1: input.schoolAddress },
         note: `Team Code: ${finalTeamCode}`,
-      });
+      };
+      if (phoneNumber && phoneNumber.length >= 10) {
+        createPayload.phoneNumber = phoneNumber;
+      }
+      const createCustomerResponse = await customersApi.createCustomer(createPayload);
       customerId = createCustomerResponse.result.customer!.id!;
     }
 

@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Creates an invoice with the Square API and saves player data to Firestore.
@@ -82,7 +83,7 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
     const companyName = input.district ? `${input.schoolName} / ${input.district}` : input.schoolName;
     const finalTeamCode = input.teamCode || generateTeamCode({ schoolName: input.schoolName, district: input.district });
     const customerName = input.sponsorName || input.parentName || 'Customer';
-    const phoneNumber = input.sponsorPhone || input.schoolPhone;
+    const phoneNumber = (input.sponsorPhone?.trim() || input.schoolPhone?.trim()) || null;
 
     let customerId: string;
     if (searchCustomersResponse.result.customers?.length) {
@@ -92,7 +93,7 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
         companyName,
         address: { addressLine1: input.schoolAddress },
       };
-      if (phoneNumber) {
+      if (phoneNumber && phoneNumber.length >= 10) {
         updatePayload.phoneNumber = phoneNumber;
       }
       await customersApi.updateCustomer(customerId, updatePayload);
@@ -107,7 +108,7 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
         address: { addressLine1: input.schoolAddress },
         note: `Team Code: ${finalTeamCode}`,
       };
-      if (phoneNumber) {
+      if (phoneNumber && phoneNumber.length >= 10) {
         createPayload.phoneNumber = phoneNumber;
       }
       const createCustomerResponse = await customersApi.createCustomer(createPayload);
