@@ -17,6 +17,12 @@ import { type CreateInvoiceInput, type CreateInvoiceOutput } from './schemas';
 
 
 export async function createInvoice(input: CreateInvoiceInput): Promise<CreateInvoiceOutput> {
+    // CRITICAL: Ensure Firestore admin is initialized before proceeding.
+    if (!db) {
+      console.error('CRITICAL: Firestore Admin SDK is not initialized in createInvoice flow. Halting execution.');
+      throw new Error('Server configuration error: Database not available.');
+    }
+
     // Step 0: Globally fix all null or undefined fields in players
     const processedPlayers = input.players.map(p => ({
       ...p,
@@ -31,7 +37,7 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
     }));
 
     // Step 1: Save/Update player data in Firestore
-    if (db && processedPlayers.length > 0) {
+    if (processedPlayers.length > 0) {
       console.log(`Processing ${processedPlayers.length} players for Firestore save/update...`);
       for (const player of processedPlayers) {
         const playerId = player.uscfId.toUpperCase() !== 'NEW' ? player.uscfId : `temp_${randomUUID()}`;
