@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { doc, setDoc, collection, getDocs, query, where } from 'firebase/firestore';
+import { doc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,7 @@ interface IndividualRegistrationDialogProps {
     email: string;
     firstName: string;
     lastName: string;
-    phone: string;
+    phone?: string;
     studentIds?: string[];
   };
 }
@@ -196,18 +196,21 @@ export function IndividualRegistrationDialog({
   
       const playersToInvoice = Object.entries(selectedStudents).map(([playerId, details]) => {
         const student = parentStudents.find(p => p.id === playerId);
+        if (!student) throw new Error(`Student with ID ${playerId} not found.`);
         
         return {
-          playerName: `${student?.firstName} ${student?.lastName}`,
-          uscfId: student?.uscfId || '',
+          playerName: `${student.firstName} ${student.lastName}`,
+          uscfId: student.uscfId || '',
           baseRegistrationFee: event.regularFee,
           lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0,
           uscfAction: details.uscfStatus !== 'current',
+          section: details.section,
         };
       });
   
       const result = await createInvoice({
         sponsorName: `${parentProfile.firstName} ${parentProfile.lastName}`,
+        parentName: `${parentProfile.firstName} ${parentProfile.lastName}`, // Explicitly for individual
         sponsorEmail: parentProfile.email,
         sponsorPhone: parentProfile.phone || '',
         schoolName: 'Individual Registration',

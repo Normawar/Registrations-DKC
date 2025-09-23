@@ -2,8 +2,7 @@
 'use server';
 /**
  * @fileOverview Creates an invoice with the Square API and saves player data to Firestore.
- *
- * - createInvoice - A function that handles the invoice creation process.
+ * This flow is now unified to handle both individual and sponsor registrations.
  */
 
 import { randomUUID } from 'crypto';
@@ -90,6 +89,7 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
 
       const companyName = input.district ? `${input.schoolName} / ${input.district}` : input.schoolName;
       const finalTeamCode = input.teamCode || generateTeamCode({ schoolName: input.schoolName, district: input.district });
+      const customerName = input.sponsorName || input.parentName || 'Customer';
 
       let customerId: string;
       if (searchCustomersResponse.result.customers?.length) {
@@ -97,18 +97,18 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
         customerId = customer.id!;
         await customersApi.updateCustomer(customerId, {
           companyName,
-          phoneNumber: input.schoolPhone,
+          phoneNumber: input.sponsorPhone || input.schoolPhone,
           address: { addressLine1: input.schoolAddress },
         });
       } else {
-        const [firstName, ...lastNameParts] = input.sponsorName.split(' ');
+        const [firstName, ...lastNameParts] = customerName.split(' ');
         const createCustomerResponse = await customersApi.createCustomer({
           idempotencyKey: randomUUID(),
           givenName: firstName,
           familyName: lastNameParts.join(' '),
           emailAddress: input.sponsorEmail,
           companyName,
-          phoneNumber: input.schoolPhone,
+          phoneNumber: input.sponsorPhone || input.schoolPhone,
           address: { addressLine1: input.schoolAddress },
           note: `Team Code: ${finalTeamCode}`,
         });

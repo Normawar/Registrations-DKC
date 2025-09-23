@@ -1,3 +1,4 @@
+
 /**
  * @fileOverview Centralized Zod schemas for Genkit flows.
  * This file contains all the Zod schema definitions and their inferred types
@@ -19,9 +20,10 @@ const PlayerInvoiceInfoSchema = z.object({
 });
 
 export const CreateInvoiceInputSchema = z.object({
-    sponsorName: z.string().describe('The name of the sponsor to be invoiced.'),
-    sponsorEmail: z.string().email().describe('The email of the sponsor.'),
-    sponsorPhone: z.string().optional().describe('The phone number of the sponsor.'),
+    sponsorName: z.string().describe('The name of the sponsor or parent to be invoiced.'),
+    parentName: z.string().optional().describe('The name of the parent, if an individual registration.'),
+    sponsorEmail: z.string().email().describe('The email of the sponsor or parent.'),
+    sponsorPhone: z.string().optional().describe('The phone number of the sponsor or parent.'),
     bookkeeperEmail: z.string().email().or(z.literal('')).optional(),
     gtCoordinatorEmail: z.string().email().or(z.literal('')).optional(),
     schoolName: z.string().describe('The name of the school associated with the sponsor.'),
