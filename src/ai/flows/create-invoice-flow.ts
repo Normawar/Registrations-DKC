@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Creates an invoice with the Square API and saves player data to Firestore.
@@ -8,7 +9,7 @@ import { randomUUID } from 'crypto';
 import { ApiError, type OrderLineItem, type InvoiceRecipient, Client, Environment } from 'square';
 import { format } from 'date-fns';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '@/lib/services/firestore-service';
+import { db } from '@/lib/services/firestore-service'; // USING CLIENT SDK
 import { generateTeamCode } from '@/lib/school-utils';
 import { type CreateInvoiceInput, type CreateInvoiceOutput } from './schemas';
 
