@@ -88,7 +88,11 @@ export default function UsersPage() {
     const [emailsToConfirmDelete, setEmailsToConfirmDelete] = useState<string[]>([]);
     
     const uniqueDistricts = useMemo(() => {
-        return ['None', ...dbDistricts].sort();
+        return ['Homeschool', ...dbDistricts.filter(d => d !== 'Homeschool')].sort((a,b) => {
+            if (a === 'Homeschool') return -1;
+            if (b === 'Homeschool') return 1;
+            return a.localeCompare(b);
+        });
     }, [dbDistricts]);
 
     // Replace direct Firestore access with server action
@@ -474,7 +478,7 @@ export default function UsersPage() {
                             rows={4}
                             disabled={isPending}
                         />
-                        <Button onClick={handleForceDelete} disabled={isPending} variant="destructive">
+                        <Button onClick={handleForceDelete} disabled={isPending || !emailsToDelete.trim()} variant="destructive">
                             {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
                             Permanently Delete Users
                         </Button>

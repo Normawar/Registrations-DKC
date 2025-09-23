@@ -207,8 +207,8 @@ export async function forceDeleteUsersAction(emails: string[]): Promise<{
           // User doesn't exist in Auth. This is okay, we'll still try to clean up Firestore.
           console.log(`User ${email} not found in Firebase Auth. Will attempt Firestore cleanup only.`);
         } else {
-          // For other auth errors, we should stop and report it.
-          throw new Error(`Firebase Auth error: ${authError.message}`);
+          // For other auth errors, rethrow to be caught by the outer catch block.
+          throw new Error(`Firebase Auth error: ${authError.message || JSON.stringify(authError)}`);
         }
       }
 
@@ -221,7 +221,8 @@ export async function forceDeleteUsersAction(emails: string[]): Promise<{
           // Log the error but continue, as we still want to try deleting from Firestore.
           console.error(`Failed to delete user from Auth: ${deleteError.message}`);
           failedDeletions.push({ email, reason: `Auth Deletion Failed: ${deleteError.message}` });
-          continue; // Move to next email if Auth deletion fails
+          // If we can't delete the auth user, we probably shouldn't proceed.
+          // But for cleanup, we'll try Firestore anyway.
         }
       }
 
@@ -239,7 +240,7 @@ export async function forceDeleteUsersAction(emails: string[]): Promise<{
       }
       
       // Fallback method: Find by email field if deletion by UID didn't happen.
-      // This cleans up records that might not be keyed by UID.
+      // This cleans up records that might not be keyed by UID or if UID wasn't found.
       if (!firestoreDeleted) {
         const usersQuery = adminDb.collection('users').where('email', '==', email);
         const querySnapshot = await usersQuery.get();
@@ -254,7 +255,7 @@ export async function forceDeleteUsersAction(emails: string[]): Promise<{
       }
 
       // Step 4: Report success
-      // We consider it a success if the user is gone from either Auth or Firestore.
+      // If we could delete from either service, or if the user was not found at all, it's a success for cleanup purposes.
       if (uid || firestoreDeleted) {
         deletedEmails.push(email);
         console.log(`Successfully processed deletion for: ${email}`);
