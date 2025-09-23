@@ -16,14 +16,13 @@ import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import { updateInvoiceTitle } from '@/ai/flows/update-invoice-title-flow';
 import { Label } from './ui/label';
 import { Input } from './ui/input';
-import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { auth, storage } from '@/lib/firebase';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { cn } from '@/lib/utils';
-
+import Image from 'next/image';
 
 interface InvoiceDetailsDialogProps {
   isOpen: boolean;
@@ -117,10 +116,11 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
     handleInputChange('file', file);
   };
 
-  const handleSavePayment = async () => {
+  const handleSavePayment = async (method: PaymentMethod) => {
     if (!confirmation) return;
     setIsUpdatingPayment(true);
-    const { paymentMethod = 'po', file } = paymentInputs;
+    
+    const { file } = paymentInputs;
 
     try {
         let paymentFileName = paymentInputs.paymentFileName;
@@ -140,7 +140,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
         let toastMessage = "Payment information has been saved.";
 
         let updatedData: any = {
-          paymentMethod,
+          paymentMethod: method,
           paymentFileName,
           paymentFileUrl,
           poNumber: paymentInputs.poNumber || null,
@@ -153,7 +153,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
         const invoiceRef = doc(db, 'invoices', confirmation.id);
         await setDoc(invoiceRef, updatedData, { merge: true });
 
-        if (paymentMethod === 'po' && paymentInputs.poNumber && confirmation.invoiceId) {
+        if (method === 'po' && paymentInputs.poNumber && confirmation.invoiceId) {
             newTitle += ` PO: ${paymentInputs.poNumber}`;
             await updateInvoiceTitle({ invoiceId: confirmation.invoiceId, title: newTitle });
             toastMessage = "PO information saved and invoice title updated.";
@@ -163,6 +163,8 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
         setPaymentInputs(prev => ({ ...prev, file: null, paymentFileName: paymentFileName, paymentFileUrl: paymentFileUrl }));
         
         toast({ title: "Success", description: toastMessage });
+        onClose(); // Close dialog on success
+        window.dispatchEvent(new Event('all_invoices_updated')); // Trigger global refresh
 
     } catch (error) {
         console.error("Failed to update payment information:", error);
@@ -190,15 +192,12 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
     return Object.keys(confirmation.selections).map(playerId => {
       const player = allPlayers.find(p => p.id === playerId);
       return {
-        ...player,
+        ...(player || {id: playerId, firstName: 'Unknown', lastName: 'Player'}),
         ...confirmation.selections[playerId]
       } as MasterPlayer & { section: string, uscfStatus: string };
     });
   }, [confirmation, allPlayers]);
   
-  const selectedMethod = paymentInputs.paymentMethod || 'po';
-  const isLoading = isUpdatingPayment || !isAuthReady;
-
   if (!confirmation) return null;
 
   return (
@@ -267,50 +266,42 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
 
             {/* Right side: Payment Options */}
             <div className="space-y-4 border-l md:pl-6">
-                <Accordion type="single" collapsible defaultValue="item-1">
-                  <AccordionItem value="item-1">
-                    <AccordionTrigger className="font-semibold text-lg">Offline Payment Options</AccordionTrigger>
-                    <AccordionContent className="pt-2">
-                      <div className="space-y-4">
-                        <RadioGroup value={selectedMethod} onValueChange={(value) => handleInputChange('paymentMethod', value as PaymentMethod)} className="grid grid-cols-2 gap-4" disabled={isLoading}>
-                            <div><RadioGroupItem value="po" id={`po-${confirmation.id}`} className="peer sr-only" /><Label htmlFor={`po-${confirmation.id}`} className="payment-label">Purchase Order</Label></div>
-                            <div><RadioGroupItem value="check" id={`check-${confirmation.id}`} className="peer sr-only" /><Label htmlFor={`check-${confirmation.id}`} className="payment-label">Check</Label></div>
-                            <div><RadioGroupItem value="cashapp" id={`cashapp-${confirmation.id}`} className="peer sr-only" /><Label htmlFor={`cashapp-${confirmation.id}`} className="payment-label">Cash App</Label></div>
-                            <div><RadioGroupItem value="zelle" id={`zelle-${confirmation.id}`} className="peer sr-only" /><Label htmlFor={`zelle-${confirmation.id}`} className="payment-label">Zelle</Label></div>
-                        </RadioGroup>
-                        
-                        {selectedMethod === 'po' && (
-                            <div className="space-y-4">
-                                <div className="space-y-1"><Label htmlFor={`po-number-${confirmation.id}`}>PO Number</Label><Input id={`po-number-${confirmation.id}`} placeholder="Enter PO Number" value={paymentInputs.poNumber || ''} onChange={(e) => handleInputChange('poNumber', e.target.value)} disabled={isLoading} /></div>
-                                <div className="space-y-1"><Label htmlFor={`po-file-${confirmation.id}`}>Upload PO Document</Label><Input id={`po-file-${confirmation.id}`} type="file" onChange={handleFileChange} disabled={isLoading} /></div>
-                            </div>
-                        )}
-                        {selectedMethod === 'check' && (
+                <h3 className="font-semibold text-lg">Offline Payment Options</h3>
+                <Accordion type="single" collapsible className="w-full">
+                    <AccordionItem value="po">
+                        <AccordionTrigger>Pay with Purchase Order</AccordionTrigger>
+                        <AccordionContent className="space-y-4">
+                            <div className="space-y-1"><Label htmlFor={`po-number-${confirmation.id}`}>PO Number</Label><Input id={`po-number-${confirmation.id}`} placeholder="Enter PO Number" value={paymentInputs.poNumber || ''} onChange={(e) => handleInputChange('poNumber', e.target.value)} /></div>
+                            <div className="space-y-1"><Label htmlFor={`po-file-${confirmation.id}`}>Upload PO Document</Label><Input id={`po-file-${confirmation.id}`} type="file" onChange={handleFileChange} /></div>
+                            <Button onClick={() => handleSavePayment('po')} disabled={isUpdatingPayment}>{isUpdatingPayment ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}Submit PO Info</Button>
+                        </AccordionContent>
+                    </AccordionItem>
+                    <AccordionItem value="check">
+                        <AccordionTrigger>Pay with Check</AccordionTrigger>
+                        <AccordionContent className="space-y-4">
                             <div className="grid sm:grid-cols-2 gap-4">
-                                <div className="space-y-1"><Label htmlFor={`check-number-${confirmation.id}`}>Check #</Label><Input id={`check-number-${confirmation.id}`} placeholder="Enter Check #" value={paymentInputs.checkNumber || ''} onChange={(e) => handleInputChange('checkNumber', e.target.value)} disabled={isLoading} /></div>
+                                <div className="space-y-1"><Label htmlFor={`check-number-${confirmation.id}`}>Check #</Label><Input id={`check-number-${confirmation.id}`} placeholder="Enter Check #" value={paymentInputs.checkNumber || ''} onChange={(e) => handleInputChange('checkNumber', e.target.value)} /></div>
                                 <div className="space-y-1"><Label>Check Date</Label><Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{paymentInputs.checkDate ? format(paymentInputs.checkDate, 'PPP') : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={paymentInputs.checkDate} onSelect={(date) => handleInputChange('checkDate', date)} initialFocus /></PopoverContent></Popover></div>
                             </div>
-                        )}
-                        {(selectedMethod === 'cashapp' || selectedMethod === 'zelle') && (
-                            <div className="space-y-1"><Label htmlFor={`payment-file-${confirmation.id}`}>Upload Confirmation Screenshot</Label><Input id={`payment-file-${confirmation.id}`} type="file" accept="image/*" onChange={handleFileChange} disabled={isLoading} /></div>
-                        )}
-                        
-                        <div className="space-y-1"><Label htmlFor={`amount-paid-${confirmation.id}`}>Amount Paid</Label><Input id={`amount-paid-${confirmation.id}`} type="number" placeholder={(confirmation.totalAmount || 0).toFixed(2)} value={paymentInputs.amountPaid || ''} onChange={(e) => handleInputChange('amountPaid', e.target.value)} disabled={isLoading} /></div>
-
-                        {(paymentInputs.file || paymentInputs.paymentFileUrl) && (
-                        <div className="text-sm text-muted-foreground flex items-center gap-2 pt-1">
-                            {paymentInputs.file ? <FileIcon className="h-4 w-4" /> : <Download className="h-4 w-4" />}
-                            <span>{paymentInputs.file ? `Selected: ${paymentInputs.file.name}` : (<a href={paymentInputs.paymentFileUrl} target="_blank" rel="noopener noreferrer" className="hover:underline">View {paymentInputs.paymentFileName}</a>)}</span>
-                        </div>
-                        )}
-
-                        <Button onClick={handleSavePayment} disabled={isLoading}>
-                            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
-                            {isLoading ? 'Saving...' : 'Submit Payment Information'}
-                        </Button>
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
+                            <Button onClick={() => handleSavePayment('check')} disabled={isUpdatingPayment}>{isUpdatingPayment ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}Submit Check Info</Button>
+                        </AccordionContent>
+                    </AccordionItem>
+                    <AccordionItem value="cashapp">
+                        <AccordionTrigger>Pay with Cash App</AccordionTrigger>
+                        <AccordionContent className="space-y-4">
+                            <div className="flex items-center gap-4 p-3 bg-muted rounded-md"><Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/CashApp%20QR%20Code.jpg?alt=media&token=a30aa7de-0064-4b49-8b0e-c58f715b6cdd" alt="CashApp QR" width={80} height={80} className="rounded-md" data-ai-hint="QR code" /><p className="text-sm">Scan the code or use cashtag <span className="font-bold">$DKChess</span>. Upload a screenshot of the confirmation.</p></div>
+                            <div className="space-y-1"><Label htmlFor={`cashapp-file-${confirmation.id}`}>Upload Confirmation</Label><Input id={`cashapp-file-${confirmation.id}`} type="file" accept="image/*" onChange={handleFileChange} /></div>
+                            <Button onClick={() => handleSavePayment('cashapp')} disabled={isUpdatingPayment}>{isUpdatingPayment ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}Submit Confirmation</Button>
+                        </AccordionContent>
+                    </AccordionItem>
+                    <AccordionItem value="zelle">
+                        <AccordionTrigger>Pay with Zelle</AccordionTrigger>
+                        <AccordionContent className="space-y-4">
+                            <div className="flex items-center gap-4 p-3 bg-muted rounded-md"><Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/Zelle%20QR%20code.jpg?alt=media&token=2b1635bd-180e-457d-8e1e-f91f71bcff89" alt="Zelle QR" width={80} height={80} className="rounded-md" data-ai-hint="QR code" /><p className="text-sm">Scan the code or use phone number <span className="font-bold">956-393-8875</span>. Upload a screenshot of the confirmation.</p></div>
+                            <div className="space-y-1"><Label htmlFor={`zelle-file-${confirmation.id}`}>Upload Confirmation</Label><Input id={`zelle-file-${confirmation.id}`} type="file" accept="image/*" onChange={handleFileChange} /></div>
+                            <Button onClick={() => handleSavePayment('zelle')} disabled={isUpdatingPayment}>{isUpdatingPayment ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}Submit Confirmation</Button>
+                        </AccordionContent>
+                    </AccordionItem>
                 </Accordion>
             </div>
         </div>
@@ -318,18 +309,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
         <DialogFooter>
             <Button type="button" variant="secondary" onClick={onClose}>Close</Button>
         </DialogFooter>
-        <style jsx>{`
-            .payment-label {
-                display: flex; flex-direction: column; align-items: center;
-                justify-content: center; border-radius: 0.375rem; border: 2px solid hsl(var(--muted));
-                background-color: hsl(var(--popover)); padding: 1rem; cursor: pointer; transition: all 0.2s;
-            }
-            .payment-label:hover { background-color: hsl(var(--accent)); color: hsl(var(--accent-foreground)); }
-            .peer[data-state=checked] + .payment-label { border-color: hsl(var(--primary)); }
-        `}</style>
       </DialogContent>
     </Dialog>
   );
 }
-
-    
