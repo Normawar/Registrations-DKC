@@ -1,52 +1,24 @@
 'use server';
 /**
  * @fileOverview Creates an invoice with the Square API and saves player data to Firestore.
- * This flow is now unified to handle both individual and sponsor registrations.
- * It has been refactored to use the client 'firebase' SDK due to persistent admin SDK initialization failures.
+ * Phone numbers removed from Square API calls to avoid validation issues.
  */
 
 import { randomUUID } from 'crypto';
 import { ApiError, type OrderLineItem, type InvoiceRecipient, Client, Environment } from 'square';
 import { format } from 'date-fns';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '@/lib/services/firestore-service'; // USING CLIENT SDK
+import { db } from '@/lib/services/firestore-service';
 import { generateTeamCode } from '@/lib/school-utils';
 import { type CreateInvoiceInput, type CreateInvoiceOutput } from './schemas';
 
-/**
- * Formats a phone number for Square API
- * Square expects phone numbers in E.164 format or a valid regional format
- */
-function formatPhoneForSquare(phone: string | null | undefined): string | null {
-  if (!phone) return null;
-  
-  // Remove all non-numeric characters
-  const cleaned = phone.replace(/\D/g, '');
-  
-  // Check if it's a valid length (10 digits for US numbers, 11 if starts with 1)
-  if (cleaned.length === 10) {
-    // Format as US number with country code
-    return `+1${cleaned}`;
-  } else if (cleaned.length === 11 && cleaned.startsWith('1')) {
-    // Already has US country code
-    return `+${cleaned}`;
-  } else if (cleaned.length > 10 && cleaned.startsWith('1')) {
-    // Might have extra digits, try to extract valid US number
-    return `+${cleaned.substring(0, 11)}`;
-  }
-  
-  // Return null if we can't format it properly
-  return null;
-}
-
-// This function now acts as a standalone Server Action.
 export async function createInvoice(input: CreateInvoiceInput): Promise<CreateInvoiceOutput> {
   
   if (!db) {
     throw new Error('FATAL: Client Firestore DB is not available.');
   }
 
-  // Step 0: Globally fix all null or undefined fields in players
+  // Process players with defaults
   const processedPlayers = input.players.map(p => ({
     ...p,
     playerName: p.playerName ?? 'undefined undefined',
@@ -59,7 +31,7 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
     section: p.section && p.section.trim() !== '' ? p.section.trim() : 'High School K-12',
   }));
 
-  // Step 1: Save/Update player data in Firestore
+  // Save player data to Firestore
   if (processedPlayers.length > 0) {
     for (const player of processedPlayers) {
       const playerId = player.uscfId.toUpperCase() !== 'NEW' ? player.uscfId : `temp_${randomUUID()}`;
@@ -89,7 +61,7 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
     }
   }
 
-  // Using hard-coded Square client
+  // Initialize Square client per project standards
   const squareClient = new Client({
     accessToken: "EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC",
     environment: Environment.Production,
@@ -98,7 +70,7 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
   const { customersApi, ordersApi, invoicesApi } = squareClient;
 
   try {
-    // --- Customer Creation / Lookup ---
+    // Search for existing customer
     const searchCustomersResponse = await customersApi.searchCustomers({
       query: {
         filter: { emailAddress: { exact: input.sponsorEmail } },
@@ -108,47 +80,40 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
     const companyName = input.district ? `${input.schoolName} / ${input.district}` : input.schoolName;
     const finalTeamCode = input.teamCode || generateTeamCode({ schoolName: input.schoolName, district: input.district });
     const customerName = input.sponsorName || input.parentName || 'Customer';
-    
-    // Format phone number properly for Square API
-    const rawPhone = input.sponsorPhone?.trim() || input.schoolPhone?.trim() || null;
-    const phoneNumber = formatPhoneForSquare(rawPhone);
 
     let customerId: string;
+    
     if (searchCustomersResponse.result.customers?.length) {
+      // Update existing customer - WITHOUT phone number
       const customer = searchCustomersResponse.result.customers[0];
       customerId = customer.id!;
-      const updatePayload: any = {
+      
+      await customersApi.updateCustomer(customerId, {
         companyName,
         address: { addressLine1: input.schoolAddress },
-      };
-      // Only add phone number if it's properly formatted
-      if (phoneNumber) {
-        updatePayload.phoneNumber = phoneNumber;
-      }
-      await customersApi.updateCustomer(customerId, updatePayload);
+        // NOTE: Phone number removed to avoid validation issues
+      });
     } else {
+      // Create new customer - WITHOUT phone number
       const [firstName, ...lastNameParts] = customerName.split(' ');
-      const createPayload: any = {
+      
+      const createCustomerResponse = await customersApi.createCustomer({
         idempotencyKey: randomUUID(),
-        givenName: firstName,
-        familyName: lastNameParts.join(' '),
+        givenName: firstName || 'Unknown',
+        familyName: lastNameParts.join(' ') || 'Unknown',
         emailAddress: input.sponsorEmail,
         companyName,
         address: { addressLine1: input.schoolAddress },
         note: `Team Code: ${finalTeamCode}`,
-      };
-      // Only add phone number if it's properly formatted
-      if (phoneNumber) {
-        createPayload.phoneNumber = phoneNumber;
-      }
-      const createCustomerResponse = await customersApi.createCustomer(createPayload);
+        // NOTE: Phone number removed to avoid validation issues
+      });
       customerId = createCustomerResponse.result.customer!.id!;
     }
 
-    // --- Order Line Items ---
+    // Build order line items
     const lineItems: OrderLineItem[] = [];
 
-    // 1. Registration
+    // 1. Registration fees
     if (processedPlayers.length > 0) {
       const registrationFee = processedPlayers[0].baseRegistrationFee;
       const playerNotes = processedPlayers
@@ -163,7 +128,7 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
       });
     }
 
-    // 2. Late Fees
+    // 2. Late fees
     const lateFeePlayers = processedPlayers.filter(p => p.lateFee && p.lateFee > 0 && !p.waiveLateFee);
     if (lateFeePlayers.length > 0) {
       const lateFee = lateFeePlayers[0].lateFee;
@@ -176,45 +141,46 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
       });
     }
 
-    // 3. Substitution Fee
+    // 3. Substitution fee
     if (input.substitutionFee && input.substitutionFee > 0) {
-        lineItems.push({
-            name: 'Substitution Fee',
-            quantity: '1',
-            basePriceMoney: { amount: BigInt(Math.round(input.substitutionFee * 100)), currency: 'USD' },
-            note: 'Fee for substituting a player after registration.',
-        });
+      lineItems.push({
+        name: 'Substitution Fee',
+        quantity: '1',
+        basePriceMoney: { amount: BigInt(Math.round(input.substitutionFee * 100)), currency: 'USD' },
+        note: 'Fee for substituting a player after registration.',
+      });
     }
 
-    // 4. USCF Fee
+    // 4. USCF memberships
     const uscfActionPlayers = processedPlayers.filter(p => p.uscfAction && !(input.district === 'PHARR-SAN JUAN-ALAMO ISD' && p.isGtPlayer));
     if (uscfActionPlayers.length > 0) {
-        const isBulkOrder = uscfActionPlayers.length >= 24;
-        const uscfPrice = isBulkOrder ? (input.uscfFee - 4) : input.uscfFee;
-        const uscfPlayerNotes = uscfActionPlayers.map((p, i) => `${i + 1}. ${p.playerName}`).join('\n');
-        let uscfNote = `Applies to players needing USCF membership.\n${uscfPlayerNotes}`;
-        if (isBulkOrder) {
-            uscfNote += `\n\nBULK PRICING: $${uscfPrice} each. Total savings: $${(4 * uscfActionPlayers.length).toFixed(2)}`;
-        }
-        lineItems.push({
-            name: isBulkOrder ? 'USCF Membership (Bulk Rate - 24+)' : 'USCF Membership (New/Renew)',
-            quantity: String(uscfActionPlayers.length),
-            basePriceMoney: { amount: BigInt(Math.round(uscfPrice * 100)), currency: 'USD' },
-            note: uscfNote,
-        });
+      const isBulkOrder = uscfActionPlayers.length >= 24;
+      const uscfPrice = isBulkOrder ? (input.uscfFee - 4) : input.uscfFee;
+      const uscfPlayerNotes = uscfActionPlayers.map((p, i) => `${i + 1}. ${p.playerName}`).join('\n');
+      let uscfNote = `Applies to players needing USCF membership.\n${uscfPlayerNotes}`;
+      if (isBulkOrder) {
+        uscfNote += `\n\nBULK PRICING: $${uscfPrice} each. Total savings: $${(4 * uscfActionPlayers.length).toFixed(2)}`;
+      }
+      lineItems.push({
+        name: isBulkOrder ? 'USCF Membership (Bulk Rate - 24+)' : 'USCF Membership (New/Renew)',
+        quantity: String(uscfActionPlayers.length),
+        basePriceMoney: { amount: BigInt(Math.round(uscfPrice * 100)), currency: 'USD' },
+        note: uscfNote,
+      });
     }
 
-    // --- Create Order ---
+    // Create order
     const createOrderResponse = await ordersApi.createOrder({
       idempotencyKey: randomUUID(),
       order: { locationId, customerId, lineItems },
     });
     const orderId = createOrderResponse.result.order!.id!;
 
-    // --- Create Invoice ---
+    // Prepare invoice
     const dueDate = new Date();
     dueDate.setDate(dueDate.getDate() + 7);
     const formattedEventDate = format(new Date(input.eventDate), 'MM/dd/yyyy');
+    
     const ccRecipients: InvoiceRecipient[] = [
       ...(input.bookkeeperEmail ? [{ emailAddress: input.bookkeeperEmail }] : []),
       ...(input.gtCoordinatorEmail ? [{ emailAddress: input.gtCoordinatorEmail }] : []),
@@ -222,7 +188,8 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
     
     const description = `${input.description || 'Thank you for your registration.'}${input.revisionMessage ? `\n\n${input.revisionMessage}` : ''}`;
     
-    const invoicePayload = {
+    // Create invoice
+    const createInvoiceResponse = await invoicesApi.createInvoice({
       idempotencyKey: randomUUID(),
       invoice: {
         orderId,
@@ -235,19 +202,25 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
         title: `${finalTeamCode} @ ${formattedEventDate} ${input.eventName}`,
         description,
       },
-    };
+    });
 
-    const createInvoiceResponse = await invoicesApi.createInvoice(invoicePayload);
     const draftInvoice = createInvoiceResponse.result.invoice!;
 
-    await invoicesApi.publishInvoice(draftInvoice.id!, { version: draftInvoice.version!, idempotencyKey: randomUUID() });
+    // Publish invoice
+    await invoicesApi.publishInvoice(draftInvoice.id!, { 
+      version: draftInvoice.version!, 
+      idempotencyKey: randomUUID() 
+    });
     
-    // Wait for propagation before final fetch
+    // Wait for propagation
     await new Promise(r => setTimeout(r, 2000));
     
+    // Get final invoice with public URL
     const { result: { invoice: finalInvoice } } = await invoicesApi.getInvoice(draftInvoice.id!);
 
-    if (!finalInvoice?.publicUrl) throw new Error('Failed to retrieve public URL for the invoice.');
+    if (!finalInvoice?.publicUrl) {
+      throw new Error('Failed to retrieve public URL for the invoice.');
+    }
 
     return {
       invoiceId: finalInvoice.id!,
@@ -258,9 +231,12 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
 
   } catch (error) {
     if (error instanceof ApiError) {
-      const errorDetail = error.result?.errors?.[0]?.detail || error.message;
+      const errors = error.result?.errors;
+      console.error('Square API Error Details:', JSON.stringify(errors, null, 2));
+      const errorDetail = errors?.[0]?.detail || error.message;
       throw new Error(`Square API Error: ${errorDetail}`);
     }
-    throw error;
+    console.error('Unexpected error:', error);
+    throw error instanceof Error ? error : new Error('Unknown error occurred');
   }
 }
