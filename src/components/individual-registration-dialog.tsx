@@ -27,6 +27,7 @@ interface IndividualRegistrationDialogProps {
     firstName: string;
     lastName: string;
     phone: string;
+    studentIds?: string[];
   };
 }
 
@@ -49,20 +50,12 @@ export function IndividualRegistrationDialog({
 
   // Load parent's students
   useEffect(() => {
-    if (parentProfile?.email && database.length > 0 && isOpen) {
-      try {
-        const storedParentStudents = localStorage.getItem(`parent_students_${parentProfile.email}`);
-        if (storedParentStudents) {
-          const studentIds = JSON.parse(storedParentStudents);
-          let students = database.filter(p => studentIds.includes(p.id));
-          if (event?.isPsjaOnly) {
-            students = students.filter(p => p.district === 'PHARR-SAN JUAN-ALAMO ISD');
-          }
-          setParentStudents(students);
-        }
-      } catch (error) {
-        console.error('Failed to load parent students:', error);
+    if (parentProfile?.studentIds && database.length > 0 && isOpen) {
+      let students = database.filter(p => parentProfile.studentIds?.includes(p.id));
+      if (event?.isPsjaOnly) {
+        students = students.filter(p => p.district === 'PHARR-SAN JUAN-ALAMO ISD');
       }
+      setParentStudents(students);
     }
   }, [parentProfile, database, isOpen, event]);
   
@@ -120,6 +113,7 @@ export function IndividualRegistrationDialog({
   };
 
   const updateStudentSelection = (studentId: string, field: 'section' | 'uscfStatus', value: string) => {
+    if (!value || value.trim() === '') return;
     setSelectedStudents(prev => ({
       ...prev,
       [studentId]: {
