@@ -21,7 +21,6 @@ import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage
 import { auth, storage } from '@/lib/firebase';
 import { onAuthStateChanged, signInAnonymously, type User } from 'firebase/auth';
 import { getInvoiceStatus as getInvoiceStatusFlow } from '@/ai/flows/get-invoice-status-flow';
-import { PaymentHistoryDisplay } from '@/components/payment-history-display';
 import { Checkbox } from './ui/checkbox';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from './ui/table';
 import { useEvents } from '@/hooks/use-events';
@@ -294,12 +293,9 @@ const SponsorPaymentComponent = ({ confirmation, onPaymentSubmitted }: { confirm
                         <p className="text-sm text-gray-600">Scan the QR code or use cash app code below and enter the total amount due. Upload a screenshot of the confirmation.</p>
                         <p className="font-bold text-lg mt-1">$DKChess</p>
                     </div>
-                    <div className="text-center">
-                        <a href="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/CashApp%20QR%20Code.jpg?alt=media&token=a30aa7de-0064-4b49-8b0e-c58f715b6cdd" target="_blank" rel="noopener noreferrer">
-                            <Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/CashApp%20QR%20Code.jpg?alt=media&token=a30aa7de-0064-4b49-8b0e-c58f715b6cdd" alt="CashApp QR Code" width={100} height={100} className="rounded-md transition-transform duration-200 ease-in-out hover:scale-125" data-ai-hint="QR code" />
-                        </a>
-                        <p className="text-xs text-muted-foreground mt-1">click image to enlarge</p>
-                    </div>
+                    <a href="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/CashApp%20QR%20Code.jpg?alt=media&token=a30aa7de-0064-4b49-8b0e-c58f715b6cdd" target="_blank" rel="noopener noreferrer">
+                        <Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/CashApp%20QR%20Code.jpg?alt=media&token=a30aa7de-0064-4b49-8b0e-c58f715b6cdd" alt="CashApp QR Code" width={100} height={100} className="rounded-md transition-transform duration-200 ease-in-out hover:scale-125" data-ai-hint="QR code" />
+                    </a>
                 </div>
                 <div><Label htmlFor="cashapp-amount">Payment Amount ($)</Label><Input id="cashapp-amount" type="number" placeholder="0.00" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} step="0.01" min="0" /></div>
             </AccordionContent>
@@ -502,8 +498,6 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
                 </Table>
               </CardContent>
             </Card>
-
-             <PaymentHistoryDisplay confirmation={confirmation} />
 
           </div>
           <div>
