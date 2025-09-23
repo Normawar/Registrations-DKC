@@ -16,7 +16,7 @@ import { type CreateInvoiceInput, type CreateInvoiceOutput } from './schemas';
 
 
 export async function createInvoice(input: CreateInvoiceInput): Promise<CreateInvoiceOutput> {
-    // CRITICAL: Ensure Firestore admin is initialized before proceeding.
+    // CRITICAL: Ensure Firestore Admin SDK is initialized before proceeding.
     if (!db) {
       console.error('CRITICAL: Firestore Admin SDK is not initialized in createInvoice flow. Halting execution.');
       throw new Error('Server configuration error: Database not available.');

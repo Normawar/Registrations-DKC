@@ -7,6 +7,7 @@
 
 import { createInvoice } from './create-invoice-flow';
 import type { CreateInvoiceInput, CreateInvoiceOutput } from './schemas';
+import { db } from '@/lib/firebase-admin';
 
 /**
  * Server action to create an individual invoice.
@@ -14,8 +15,11 @@ import type { CreateInvoiceInput, CreateInvoiceOutput } from './schemas';
  */
 export async function createIndividualInvoice(input: CreateInvoiceInput): Promise<CreateInvoiceOutput> {
   // CRITICAL: Ensure database is initialized before proceeding.
-  // The createInvoice function this calls already has this check, but we add it here
-  // for robustness and to prevent the server action from crashing prematurely.
+  if (!db) {
+    console.error('CRITICAL: Firestore Admin SDK is not initialized in createIndividualInvoice flow. Halting execution.');
+    throw new Error('Server configuration error: Database not available.');
+  }
+  
   try {
     const result = await createInvoice(input);
     return result;
