@@ -14,7 +14,7 @@ import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { Search, PlusCircle, Trash2, Edit, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Check, FilePenLine, History, UserPlus, Download } from 'lucide-react';
@@ -57,8 +57,8 @@ const playerFormSchema = z.object({
       invalid_type_error: "Rating must be a number or UNR."
     }).optional()
   ),
-  grade: z.string().min(1, { message: "Please select a grade." }),
-  section: z.string().min(1, { message: "Please select a section." }),
+  grade: z.string().min(1, { message: "Grade is required." }),
+  section: z.string().min(1, { message: "Section is required." }),
   email: z.string().min(1, { message: "Email is required." }).email({ message: "Please enter a valid email." }),
   zipCode: z.string().min(5, { message: "A valid 5-digit Zip Code is required." }),
   phone: z.string().optional().transform(val => val === '' ? undefined : val),
@@ -685,15 +685,17 @@ function DistrictRostersPageContent() {
             <ScrollArea className="flex-1 overflow-y-auto">
               <div className="p-6 space-y-6">
                 <Form {...form}>
-                  <form id="edit-player-form" onSubmit={form.handleSubmit(onEditSubmit)} className="space-y-6">
+                  <form id="edit-player-form-user" onSubmit={form.handleSubmit(onEditSubmit)} className="space-y-6">
+                    
                     <div className="space-y-4">
                       <h3 className="text-lg font-semibold border-b pb-2">Player Information</h3>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <FormField control={form.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )}/>
-                        <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )}/>
-                        <FormField control={form.control} name="middleName" render={({ field }) => ( <FormItem><FormLabel>Middle Name (Optional)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                        <FormField control={form.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )}/>
+                        <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )}/>
+                        <FormField control={form.control} name="middleName" render={({ field }) => ( <FormItem><FormLabel>Middle Name (Optional)</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )}/>
                       </div>
                     </div>
+
                     <div className="space-y-4">
                       <h3 className="text-lg font-semibold border-b pb-2">School Information</h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -719,6 +721,7 @@ function DistrictRostersPageContent() {
                           </FormItem>
                         )} />
                       </div>
+
                       {editDistrict === 'PHARR-SAN JUAN-ALAMO ISD' && (
                         <FormField control={form.control} name="studentType" render={({ field }) => (
                           <FormItem className="space-y-3">
@@ -731,6 +734,7 @@ function DistrictRostersPageContent() {
                         )}/>
                       )}
                     </div>
+
                     <div className="space-y-4">
                       <h3 className="text-lg font-semibold border-b pb-2">Chess Information</h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -746,6 +750,7 @@ function DistrictRostersPageContent() {
                         <FormField control={form.control} name="section" render={({ field }) => ( <FormItem><FormLabel>Section</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select section" /></SelectTrigger></FormControl><SelectContent position="item-aligned">{sections.map(section => <SelectItem key={section} value={section}>{section}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
                       </div>
                     </div>
+                    
                     <div className="space-y-4">
                       <h3 className="text-lg font-semibold border-b pb-2">Contact Information</h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -756,6 +761,7 @@ function DistrictRostersPageContent() {
                         <FormField control={form.control} name="state" render={({ field }) => ( <FormItem><FormLabel>State</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>)} />
                       </div>
                     </div>
+
                     <Separator className="my-6" />
                     <ChangeHistorySection player={playerToEdit} />
                   </form>
@@ -772,7 +778,7 @@ function DistrictRostersPageContent() {
                 ) : ( <div></div> )}
                 <div className="flex gap-3">
                   <Button type="button" variant="ghost" onClick={() => setIsEditOpen(false)}>Cancel</Button>
-                  <Button type="submit" form="edit-player-form">{playerToEdit ? 'Save Changes' : 'Create Player'}</Button>
+                  <Button type="submit" form="edit-player-form-user">{playerToEdit ? 'Save Changes' : 'Create Player'}</Button>
                 </div>
               </div>
             </div>
@@ -1095,8 +1101,8 @@ function UserRosterPageContent() {
                             <div className="space-y-4">
                               <h3 className="text-lg font-semibold border-b pb-2">Contact Information</h3>
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} value={field.value || ''}/></FormControl><FormMessage /></FormItem>)} />
-                                <FormField control={form.control} name="zipCode" render={({ field }) => ( <FormItem><FormLabel>Zip Code</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>)} />
+                                <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email *</FormLabel><FormControl><Input type="email" {...field} value={field.value || ''}/></FormControl><FormMessage /></FormItem>)} />
+                                <FormField control={form.control} name="zipCode" render={({ field }) => ( <FormItem><FormLabel>Zip Code *</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>)} />
                               </div>
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <FormField control={form.control} name="state" render={({ field }) => ( <FormItem><FormLabel>State</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>)} />
