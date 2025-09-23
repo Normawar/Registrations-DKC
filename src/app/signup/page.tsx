@@ -56,53 +56,9 @@ const sponsorFormSchema = z.object({
     path: ["gtCoordinatorEmail"],
 });
 
-// Helper function to correct organizer account data
-async function correctOrganizerAccountData(email: string, password: string) {
-  console.log('🔧 Attempting to correct organizer account data for:', email);
-  
-  try {
-    // First, try to sign in to get the user's UID
-    const signInResult = await simpleSignIn(email, password);
-    
-    if (signInResult.success && signInResult.user) {
-      const uid = signInResult.user.uid;
-      console.log('✅ Successfully signed in, UID:', uid);
-      
-      // Now update the user's profile in Firestore with correct organizer data
-      const userDocRef = doc(db, 'users', uid);
-      const correctedProfile: Partial<SponsorProfile> & {correctedAt?: string} = {
-        role: 'organizer',
-        isDistrictCoordinator: false, // Organizers are not district coordinators
-        district: 'All Districts', // Organizers can manage all districts
-        school: 'Dark Knight Chess', // Organization name
-        updatedAt: new Date().toISOString(),
-        correctedAt: new Date().toISOString(), // Mark when this correction happened
-      };
-      
-      await updateDoc(userDocRef, correctedProfile);
-      console.log('✅ Profile corrected successfully');
-      
-      // Return the corrected profile
-      const updatedProfile = { ...signInResult.profile, ...correctedProfile };
-      return {
-        success: true,
-        user: signInResult.user,
-        profile: updatedProfile
-      };
-    }
-    
-    throw new Error('Failed to sign in for data correction');
-    
-  } catch (error) {
-    console.error('❌ Data correction failed:', error);
-    throw error;
-  }
-}
-
 const SponsorSignUpForm = () => {
   const router = useRouter();
   const { toast } = useToast();
-  // CORRECTED: Only destructure what's needed, avoid loading the full 'database'
   const { dbDistricts, getSchoolsForDistrict, isDbLoaded, schools } = useMasterDb();
   const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
   const { updateProfile } = useSponsorProfile();
@@ -113,7 +69,7 @@ const SponsorSignUpForm = () => {
     defaultValues: {
       firstName: "",
       lastName: "",
-      district: "None",
+      district: "Homeschool",
       school: "Homeschool",
       email: "",
       phone: "",
@@ -131,7 +87,7 @@ const SponsorSignUpForm = () => {
     setSchoolsForDistrict([...new Set(filteredSchools)]);
 
     if (resetSchool) {
-        if (district === 'None') {
+        if (district === 'Homeschool') {
             form.setValue('school', 'Homeschool');
         } else {
             form.setValue('school', '');
@@ -141,7 +97,6 @@ const SponsorSignUpForm = () => {
 
   useEffect(() => {
     if (isDbLoaded) {
-      // Set initial schools based on the default district value
       const initialSchools = getSchoolsForDistrict(form.getValues('district'));
       setSchoolsForDistrict(initialSchools);
     }
@@ -161,7 +116,7 @@ const SponsorSignUpForm = () => {
         return;
       }
 
-      const isCoordinator = values.school === 'All Schools' && values.district !== 'None';
+      const isCoordinator = values.school === 'All Schools' && values.district !== 'Homeschool';
       const role: SponsorProfile['role'] = isCoordinator ? 'district_coordinator' : 'sponsor';
 
       const { password, email, ...profileValues } = values;
@@ -188,7 +143,6 @@ const SponsorSignUpForm = () => {
             description: `Your ${role} account has been created. Please complete your profile.`,
         });
         
-        // Always redirect to profile on first signup
         router.push('/profile');
       }
     } catch (error) {
@@ -241,71 +195,118 @@ const individualFormSchema = z.object({
   lastName: z.string().min(1, { message: "Last name is required." }),
   email: z.string().email({ message: "Please enter a valid email." }),
   password: z.string().min(8, { message: "Password must be at least 8 characters." }),
+  district: z.string({ required_error: "Please select a district."}).min(1, "District is required."),
+  school: z.string({ required_error: "Please select a school."}).min(1, "School is required."),
 });
+
+// Organizer login logic is now part of this component.
+async function handleOrganizerLogin(email: string, password: string) {
+  try {
+    const signInResult = await simpleSignIn(email, password);
+    if (signInResult.success && signInResult.user) {
+      const userDocRef = doc(db, 'users', signInResult.user.uid);
+      await updateDoc(userDocRef, {
+        role: 'organizer',
+        isDistrictCoordinator: false,
+        district: 'All Districts',
+        school: 'Dark Knight Chess',
+        updatedAt: new Date().toISOString(),
+      });
+      const correctedProfile = {
+        ...signInResult.profile,
+        role: 'organizer',
+        district: 'All Districts',
+        school: 'Dark Knight Chess',
+      } as SponsorProfile;
+
+      return {
+        success: true,
+        user: signInResult.user,
+        profile: correctedProfile,
+      };
+    }
+  } catch (error) {
+    console.warn("Organizer login check failed, proceeding to signup.", error);
+  }
+  return { success: false };
+}
 
 const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) => {
   const router = useRouter();
   const { toast } = useToast();
   const { updateProfile } = useSponsorProfile();
   const [isLoading, setIsLoading] = useState(false);
+  const { dbDistricts, getSchoolsForDistrict, isDbLoaded } = useMasterDb();
+  const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
   
   const form = useForm<z.infer<typeof individualFormSchema>>({
     resolver: zodResolver(individualFormSchema),
-    defaultValues: { firstName: "", lastName: "", email: "", password: "" },
+    defaultValues: { 
+        firstName: "", 
+        lastName: "", 
+        email: "", 
+        password: "",
+        district: "Homeschool",
+        school: "Homeschool",
+    },
   });
+
+  const selectedDistrict = form.watch('district');
+
+  const handleDistrictChange = (district: string) => {
+    form.setValue('district', district);
+    const filteredSchools = getSchoolsForDistrict(district);
+    setSchoolsForDistrict(filteredSchools);
+    if (district === 'Homeschool') {
+        form.setValue('school', 'Homeschool');
+    } else {
+        form.setValue('school', '');
+    }
+  };
+
+  useEffect(() => {
+    if (isDbLoaded) {
+      setSchoolsForDistrict(getSchoolsForDistrict(form.getValues('district')));
+    }
+  }, [isDbLoaded, form, getSchoolsForDistrict]);
 
   async function onSubmit(values: z.infer<typeof individualFormSchema>) {
     setIsLoading(true);
     
     try {
       if (!checkFirebaseConfig()) {
-        toast({
-          variant: 'destructive',
-          title: 'Configuration Error',
-          description: 'Firebase is not properly configured. Please contact support.',
-        });
+        toast({ variant: 'destructive', title: 'Config Error', description: 'Firebase not configured.' });
         setIsLoading(false);
         return;
       }
       
       const isMainOrganizer = values.email.toLowerCase() === 'norma@dkchess.com';
 
-      // If this is the organizer signup tab
       if (role === 'organizer') {
         if (!isMainOrganizer) {
-          form.setError('email', {
-            type: 'manual',
-            message: 'Only the primary organizer can sign up through this form.',
-          });
+          form.setError('email', { type: 'manual', message: 'Only the primary organizer can sign up here.' });
           setIsLoading(false);
           return;
         }
 
-        try {
-          const correctionResult = await correctOrganizerAccountData(values.email, values.password);
-          if (correctionResult.success) {
-              await updateProfile(correctionResult.profile as SponsorProfile, correctionResult.user);
-              toast({
-                  title: "Welcome Back, Norma!",
-                  description: "Your organizer account has been logged in and verified.",
-              });
-              router.push('/manage-events');
-              return;
-          }
-        } catch (correctionError) {
-          console.warn('Organizer account login failed. Proceeding with initial setup.');
+        const loginResult = await handleOrganizerLogin(values.email, values.password);
+        if (loginResult.success) {
+            await updateProfile(loginResult.profile as SponsorProfile, loginResult.user);
+            toast({ title: "Welcome Back, Norma!", description: "Your organizer account has been logged in and verified." });
+            router.push('/manage-events');
+            setIsLoading(false);
+            return;
         }
       }
 
       const userRole: SponsorProfile['role'] = isMainOrganizer ? 'organizer' : 'individual';
-
       const { password, email, ...profileValues } = values;
       
       const profileData: Omit<SponsorProfile, 'uid' | 'email'> = {
           ...profileValues,
           phone: '',
-          district: userRole === 'organizer' ? 'All Districts' : 'None',
-          school: userRole === 'organizer' ? 'Dark Knight Chess' : 'Homeschool',
+          district: userRole === 'organizer' ? 'All Districts' : values.district,
+          school: userRole === 'organizer' ? 'Dark Knight Chess' : values.school,
           gtCoordinatorEmail: '',
           bookkeeperEmail: '',
           schoolAddress: '',
@@ -321,23 +322,11 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
       
       if (result.success) {
         await updateProfile(result.profile as SponsorProfile, result.user);
-        
-        toast({
-            title: "Account Ready!",
-            description: `Your new ${userRole} account has been created. Please complete your profile.`,
-        });
-
-        // Always redirect to profile on first signup
+        toast({ title: "Account Ready!", description: `Your new ${userRole} account created. Please complete your profile.` });
         router.push('/profile');
       }
     } catch (error: any) {
-      console.error('Signup error:', error);
-      
-      toast({
-        variant: 'destructive',
-        title: "Signup Failed",
-        description: error instanceof Error ? error.message : "An unexpected error occurred. Please try again.",
-      });
+      toast({ variant: "destructive", title: "Signup Failed", description: error.message || "An unexpected error occurred." });
     } finally {
       setIsLoading(false);
     }
@@ -351,6 +340,12 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
             <FormField control={form.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input placeholder="Max" {...field} disabled={isLoading} autoComplete="given-name" /></FormControl><FormMessage /></FormItem> )}/>
             <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input placeholder="Robinson" {...field} disabled={isLoading} autoComplete="family-name" /></FormControl><FormMessage /></FormItem> )}/>
           </div>
+          {role === 'individual' && (
+            <>
+              <FormField control={form.control} name="district" render={({ field }) => ( <FormItem> <FormLabel>District</FormLabel> <Select onValueChange={handleDistrictChange} value={field.value} disabled={isLoading}> <FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl> <SelectContent>{dbDistricts.map((district) => (<SelectItem key={district} value={district}>{district}</SelectItem>))}</SelectContent> </Select> <FormMessage /> </FormItem> )}/>
+              <FormField control={form.control} name="school" render={({ field }) => ( <FormItem> <FormLabel>School</FormLabel> <Select onValueChange={field.onChange} value={field.value} disabled={isLoading}><FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl><SelectContent>{schoolsForDistrict.map((school) => (<SelectItem key={school} value={school}>{school}</SelectItem>))}</SelectContent></Select> <FormMessage /> </FormItem> )}/>
+            </>
+          )}
           <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="name@example.com" {...field} disabled={isLoading} autoComplete="email" /></FormControl><FormMessage /></FormItem> )}/>
           <FormField control={form.control} name="password" render={({ field }) => ( <FormItem><FormLabel>Password</FormLabel><FormControl><Input type="password" {...field} disabled={isLoading} autoComplete="new-password" /></FormControl><FormMessage /></FormItem> )}/>
         </CardContent>

@@ -1,3 +1,4 @@
+
 // src/lib/auth.ts - Complete authentication service with React hooks
 import { useState, useEffect } from 'react';
 import { 
