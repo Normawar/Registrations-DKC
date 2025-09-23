@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { useToast } from '@/hooks/use-toast';
-import { MoreHorizontal, Trash2, FilePenLine, ArrowUpDown, ArrowUp, ArrowDown, Download, Loader2 } from 'lucide-react';
+import { MoreHorizontal, Trash2, FilePenLine, ArrowUpDown, ArrowUp, ArrowDown, Download, Loader2, PlusCircle } from 'lucide-react';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -203,6 +203,26 @@ export default function UsersPage() {
         setEditingUser(user);
         setIsDialogOpen(true);
     };
+    
+    const handleCreateUser = () => {
+        setEditingUser(null);
+        form.reset({
+            email: '',
+            isSponsor: true,
+            isDistrictCoordinator: false,
+            isOrganizer: false,
+            isIndividual: false,
+            firstName: '',
+            lastName: '',
+            school: '',
+            district: 'None',
+            phone: '',
+            bookkeeperEmail: '',
+            gtCoordinatorEmail: '',
+        });
+        handleDistrictChange('None');
+        setIsDialogOpen(true);
+    };
 
     // Replace direct Firestore update with server action
     const onSubmit = async (values: UserFormValues) => {
@@ -372,6 +392,9 @@ export default function UsersPage() {
                         <h1 className="text-3xl font-bold font-headline">User Management</h1>
                         <p className="text-muted-foreground">View, edit, and manage all system users.</p>
                     </div>
+                     <Button onClick={handleCreateUser}>
+                        <PlusCircle className="mr-2 h-4 w-4" /> Create New User
+                    </Button>
                 </div>
 
                 <Card>
@@ -484,7 +507,7 @@ export default function UsersPage() {
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col p-0">
                     <DialogHeader className="p-6 pb-4 border-b shrink-0">
-                        <DialogTitle>Edit User</DialogTitle>
+                        <DialogTitle>{editingUser ? 'Edit User' : 'Create New User'}</DialogTitle>
                         <DialogDescription>Modify the user's details below.</DialogDescription>
                     </DialogHeader>
                     <ScrollArea className="flex-1 overflow-y-auto">
@@ -493,7 +516,7 @@ export default function UsersPage() {
                                 <form id="user-edit-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                                     <FormField control={form.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
                                     <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
-                                    <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input disabled {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
+                                    <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input disabled={!!editingUser} {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
                                     <FormField control={form.control} name="phone" render={({ field }) => ( <FormItem><FormLabel>Phone</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
                                     
                                     <FormItem>
@@ -547,7 +570,7 @@ export default function UsersPage() {
                     </ScrollArea>
                     <DialogFooter className="p-6 pt-4 border-t shrink-0">
                         <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
-                        <Button type="submit" form="user-edit-form">Save Changes</Button>
+                        <Button type="submit" form="user-edit-form">{editingUser ? 'Save Changes' : 'Create User'}</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
