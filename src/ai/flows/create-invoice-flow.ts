@@ -37,6 +37,11 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
 
     // Step 1: Save/Update player data in Firestore
     if (processedPlayers.length > 0) {
+      // Re-check Firestore before saving
+      if (!db) {
+        console.error('Firestore became unavailable before player data save.');
+        throw new Error('Database connection lost. Please try again.');
+      }
       console.log(`Processing ${processedPlayers.length} players for Firestore save/update...`);
       for (const player of processedPlayers) {
         const playerId = player.uscfId.toUpperCase() !== 'NEW' ? player.uscfId : `temp_${randomUUID()}`;
