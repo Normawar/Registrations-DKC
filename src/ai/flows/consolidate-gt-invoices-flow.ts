@@ -103,6 +103,7 @@ const consolidateGtInvoicesFlow = ai.defineFlow(
     // Step 3: Create consolidated invoice
     const consolidatedResult = await createInvoice({
       sponsorName: input.gtCoordinatorName,
+      parentName: input.gtCoordinatorName,
       sponsorEmail: input.gtCoordinatorEmail,
       sponsorPhone: input.gtProgramPhone,
       schoolName: 'PHARR-SAN JUAN-ALAMO ISD - GT Program',

@@ -5,7 +5,7 @@
  * This flow is separate from the bulk sponsor invoice creation.
  */
 
-import { db } from '@/lib/services/firestore-service';
+import { getDb } from '@/lib/firebase-admin';
 import { createInvoice } from './create-invoice-flow';
 import type { CreateInvoiceInput, CreateInvoiceOutput } from './schemas';
 
@@ -18,7 +18,7 @@ import type { CreateInvoiceInput, CreateInvoiceOutput } from './schemas';
  */
 export async function createIndividualInvoice(input: CreateInvoiceInput): Promise<CreateInvoiceOutput> {
   // CRITICAL: Check database initialization at the wrapper level
-  // This prevents the error from propagating through the server action
+  const db = getDb();
   if (!db) {
     console.error('Firestore not initialized at individual invoice wrapper level');
     throw new Error('Database connection not available. Please refresh the page and try again.');

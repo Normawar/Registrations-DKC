@@ -7,7 +7,7 @@
  * Updated to only modify Firestore records, not create new Square invoices.
  */
 import { doc, getDoc, writeBatch, getDocs, collection, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/services/firestore-service';
+import { getDb } from '@/lib/firebase-admin';
 import { type ChangeRequest } from '@/lib/data/requests-data';
 import { type MasterPlayer } from '@/lib/data/full-master-player-data';
 import {
@@ -38,6 +38,7 @@ type Event = {
 export async function processBatchedRequests(
   { requestIds, decision, waiveFees, processingUser }: ProcessBatchInput
 ): Promise<ProcessBatchOutput> {
+  const db = getDb();
   console.log('Starting batch processing with:', { requestIds, decision, waiveFees });
 
   if (!db) {

@@ -37,7 +37,7 @@ const importSquareInvoicesFlow = ai.defineFlow(
   },
   async (input) => {
     const db = getDb();
-
+    
     const squareClient = await getSquareClient();
     const locationId = await getSquareLocationId();
     

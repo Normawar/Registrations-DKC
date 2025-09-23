@@ -208,6 +208,7 @@ const extractInvoiceDataFlow = ai.defineFlow(
                   } else {
                       invoiceResult = await createInvoice({
                           invoiceNumber: extracted.invoiceNumber,
+                          parentName: extracted.sponsorName, // Assuming sponsorName is the parent for individual
                           ...extracted,
                           sponsorEmail: extracted.sponsorEmail || '',
                           teamCode,
