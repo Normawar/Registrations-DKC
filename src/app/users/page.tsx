@@ -25,6 +25,7 @@ import { Textarea } from '@/components/ui/textarea';
 
 // Import server actions instead of direct Firestore
 import { fetchUsersAction, updateUserAction, forceDeleteUsersAction } from './actions';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 type User = {
     email: string;
@@ -82,6 +83,8 @@ export default function UsersPage() {
     const [isPending, startTransition] = useTransition();
     const [emailsToDelete, setEmailsToDelete] = useState('');
     const [deleteResults, setDeleteResults] = useState<string[]>([]);
+    const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+    const [emailsToConfirmDelete, setEmailsToConfirmDelete] = useState<string[]>([]);
     
     const uniqueDistricts = useMemo(() => {
         return ['None', ...dbDistricts].sort();
@@ -269,11 +272,14 @@ export default function UsersPage() {
             });
             return;
         }
-    
-        if (!confirm(`Are you sure you want to permanently delete ${emails.length} user(s)? This will remove their authentication record AND Firestore data. This action CANNOT be undone.`)) {
-            return;
-        }
-        
+
+        // Store emails and open confirmation dialog
+        setEmailsToConfirmDelete(emails);
+        setIsDeleteConfirmOpen(true);
+    };
+
+    const handleConfirmedDelete = () => {
+        const emails = emailsToConfirmDelete;
         console.log('Starting deletion for emails:', emails);
         
         startTransition(async () => {
@@ -300,8 +306,9 @@ export default function UsersPage() {
                 });
                 
                 await loadUsers();
+                setEmailsToDelete(''); // Clear the input field
             } catch (error) {
-                console.error('Error in handleForceDelete:', error);
+                console.error('Error in handleConfirmedDelete:', error);
                 toast({
                     variant: 'destructive',
                     title: 'Deletion Failed',
@@ -310,7 +317,11 @@ export default function UsersPage() {
                 setDeleteResults(prev => [...prev, `❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`]);
             }
         });
+        
+        setIsDeleteConfirmOpen(false);
+        setEmailsToConfirmDelete([]);
     };
+
 
     const handleExportPsjaUsers = () => {
         const psjaUsers = users.filter(user => user.email.toLowerCase().endsWith('@psjaisd.us'));
@@ -451,7 +462,7 @@ export default function UsersPage() {
                             rows={4}
                             disabled={isPending}
                         />
-                        <Button onClick={handleForceDelete} disabled={isPending} variant="destructive">
+                        <Button onClick={handleForceDelete} disabled={isPending || !emailsToDelete.trim()} variant="destructive">
                             {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
                             Permanently Delete Users
                         </Button>
@@ -538,6 +549,36 @@ export default function UsersPage() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <AlertDialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Confirm User Deletion</AlertDialogTitle>
+                        <AlertDialogDescription className="space-y-2">
+                            <p>Are you sure you want to permanently delete {emailsToConfirmDelete.length} user(s)?</p>
+                            <p className="font-semibold">This will remove their authentication record AND Firestore data.</p>
+                            <p className="text-destructive font-bold">This action CANNOT be undone.</p>
+                            {emailsToConfirmDelete.length <= 5 && (
+                                <div className="mt-2 p-2 bg-muted rounded text-sm">
+                                    <p className="font-medium mb-1">Users to be deleted:</p>
+                                    {emailsToConfirmDelete.map((email, i) => (
+                                        <p key={i} className="text-muted-foreground">• {email}</p>
+                                    ))}
+                                </div>
+                            )}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction 
+                            onClick={handleConfirmedDelete}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                            Delete Users
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </AppLayout>
     );
 }
