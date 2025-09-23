@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useTransition } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -76,9 +76,9 @@ export default function UsersPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [sortConfig, setSortConfig] = useState<{ key: SortableColumn; direction: 'ascending' | 'descending' } | null>({ key: 'lastName', direction: 'ascending' });
     
-    // State for force delete
+    // State for force delete with useTransition
+    const [isPending, startTransition] = useTransition();
     const [emailsToDelete, setEmailsToDelete] = useState('');
-    const [isDeleting, setIsDeleting] = useState(false);
     const [deleteResults, setDeleteResults] = useState<string[]>([]);
     
     const uniqueDistricts = useMemo(() => {
@@ -229,7 +229,7 @@ export default function UsersPage() {
         }
     };
     
-    const handleForceDelete = async () => {
+    const handleForceDelete = () => {
         const emails = emailsToDelete.split(/[\n,;]+/).map(e => e.trim().toLowerCase()).filter(Boolean);
         if (emails.length === 0) {
             toast({ variant: 'destructive', title: 'No Emails Provided', description: 'Please enter at least one email to delete.' });
@@ -239,23 +239,23 @@ export default function UsersPage() {
         if (!confirm(`Are you sure you want to permanently delete ${emails.length} user(s)? This will remove their authentication record AND Firestore data. This action CANNOT be undone.`)) {
             return;
         }
-    
-        setIsDeleting(true);
-        setDeleteResults([]);
-        const log = (message: string) => setDeleteResults(prev => [...prev, message]);
-    
-        log(`Starting deletion for ${emails.length} user(s)...`);
-    
-        const { deleted, failed } = await forceDeleteUsersAction(emails);
-    
-        deleted.forEach(email => log(`✅ Successfully deleted user: ${email}`));
-        failed.forEach(({ email, reason }) => log(`❌ Failed to delete user: ${email}. Reason: ${reason}`));
-    
-        log(`\n🎉 Deletion process complete.`);
-        toast({ title: 'Deletion Complete', description: `Processed ${emails.length} emails. Check log for details.` });
         
-        await loadUsers(); // Refresh user list
-        setIsDeleting(false);
+        startTransition(async () => {
+            setDeleteResults([]);
+            const log = (message: string) => setDeleteResults(prev => [...prev, message]);
+        
+            log(`Starting deletion for ${emails.length} user(s)...`);
+        
+            const { deleted, failed } = await forceDeleteUsersAction(emails);
+        
+            deleted.forEach(email => log(`✅ Successfully deleted user: ${email}`));
+            failed.forEach(({ email, reason }) => log(`❌ Failed to delete user: ${email}. Reason: ${reason}`));
+        
+            log(`\n🎉 Deletion process complete.`);
+            toast({ title: 'Deletion Complete', description: `Processed ${emails.length} emails. Check log for details.` });
+            
+            await loadUsers(); // Refresh user list
+        });
     };
 
     const handleExportPsjaUsers = () => {
@@ -389,10 +389,10 @@ export default function UsersPage() {
                             value={emailsToDelete}
                             onChange={(e) => setEmailsToDelete(e.target.value)}
                             rows={4}
-                            disabled={isDeleting}
+                            disabled={isPending}
                         />
-                        <Button onClick={handleForceDelete} disabled={isDeleting} variant="destructive">
-                            {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                        <Button onClick={handleForceDelete} disabled={isPending} variant="destructive">
+                            {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
                             Permanently Delete Users
                         </Button>
                     </CardContent>
