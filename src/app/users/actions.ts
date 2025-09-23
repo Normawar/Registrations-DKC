@@ -1,6 +1,9 @@
+
 'use server';
 
 import { adminAuth, db as adminDb } from '@/lib/firebase-admin';
+import { UserRecord } from 'firebase-admin/auth';
+import type { SponsorProfile } from '@/hooks/use-sponsor-profile';
 
 /**
  * Server action to fetch all users from Firestore
@@ -103,6 +106,69 @@ export async function updateUserAction(
       success: false, 
       error: 'Failed to update user in database' 
     };
+  }
+}
+
+
+/**
+ * Server action to create a new user in Firebase Auth and Firestore.
+ */
+export async function createUserAction(
+  userData: {
+    email: string;
+    firstName: string;
+    lastName: string;
+    role: 'sponsor' | 'organizer' | 'individual' | 'district_coordinator';
+    isDistrictCoordinator?: boolean;
+    school?: string;
+    district?: string;
+    phone?: string;
+    bookkeeperEmail?: string;
+    gtCoordinatorEmail?: string;
+  },
+  tempPassword?: string
+): Promise<{ success: boolean; error?: string; tempPassword?: string }> {
+  const { email, ...profileData } = userData;
+
+  if (!email || !tempPassword) {
+    return { success: false, error: 'Email and temporary password are required.' };
+  }
+
+  try {
+    // Create user in Firebase Authentication
+    const userRecord = await adminAuth.createUser({
+      email,
+      password: tempPassword,
+      emailVerified: true, // Mark as verified since an organizer is creating it
+      displayName: `${profileData.firstName} ${profileData.lastName}`,
+    });
+
+    // Prepare profile data for Firestore
+    const newProfile: Omit<SponsorProfile, 'uid'> = {
+      ...profileData,
+      email: userRecord.email,
+      role: profileData.role,
+      isDistrictCoordinator: profileData.isDistrictCoordinator,
+      avatarType: 'icon',
+      avatarValue: 'PawnIcon',
+      forceProfileUpdate: true, // Force user to review their profile and change password
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Create user document in Firestore with their UID as the document ID
+    await adminDb.collection('users').doc(userRecord.uid).set(newProfile);
+
+    return { success: true, tempPassword };
+  } catch (error: any) {
+    console.error('Error creating user:', error);
+    let message = 'Failed to create user.';
+    if (error.code === 'auth/email-already-exists') {
+      message = 'This email address is already in use by an existing account.';
+    } else if (error.code === 'auth/invalid-password') {
+      message = 'The temporary password must be at least 6 characters long.';
+    }
+    return { success: false, error: message };
   }
 }
 

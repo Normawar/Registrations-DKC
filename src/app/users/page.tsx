@@ -26,7 +26,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 
 
 // Import server actions instead of direct Firestore
-import { fetchUsersAction, updateUserAction, forceDeleteUsersAction } from './actions';
+import { fetchUsersAction, updateUserAction, createUserAction, forceDeleteUsersAction } from './actions';
 
 type User = {
     email: string;
@@ -179,24 +179,35 @@ export default function UsersPage() {
     };
     
     useEffect(() => {
-      if (isDialogOpen && editingUser) {
-        const initialDistrict = editingUser.district || 'None';
-        form.reset({
-            email: editingUser.email || '',
-            isSponsor: editingUser.role === 'sponsor',
-            isDistrictCoordinator: editingUser.role === 'district_coordinator' || editingUser.isDistrictCoordinator === true,
-            isOrganizer: editingUser.role === 'organizer',
-            isIndividual: editingUser.role === 'individual',
-            firstName: editingUser.firstName || '',
-            lastName: editingUser.lastName || '',
-            school: editingUser.school || '',
-            district: initialDistrict,
-            phone: editingUser.phone || '',
-            bookkeeperEmail: editingUser.bookkeeperEmail || '',
-            gtCoordinatorEmail: editingUser.gtCoordinatorEmail || '',
-        });
-        handleDistrictChange(initialDistrict);
+      if (isDialogOpen) {
+        if (editingUser) {
+          const initialDistrict = editingUser.district || 'None';
+          form.reset({
+              email: editingUser.email || '',
+              isSponsor: editingUser.role === 'sponsor',
+              isDistrictCoordinator: editingUser.role === 'district_coordinator' || editingUser.isDistrictCoordinator === true,
+              isOrganizer: editingUser.role === 'organizer',
+              isIndividual: editingUser.role === 'individual',
+              firstName: editingUser.firstName || '',
+              lastName: editingUser.lastName || '',
+              school: editingUser.school || '',
+              district: initialDistrict,
+              phone: editingUser.phone || '',
+              bookkeeperEmail: editingUser.bookkeeperEmail || '',
+              gtCoordinatorEmail: editingUser.gtCoordinatorEmail || '',
+          });
+          handleDistrictChange(initialDistrict);
+        } else {
+            // Reset for creating a new user
+            form.reset({
+                email: '', isSponsor: true, isDistrictCoordinator: false, isOrganizer: false,
+                isIndividual: false, firstName: '', lastName: '', school: '',
+                district: 'None', phone: '', bookkeeperEmail: '', gtCoordinatorEmail: '',
+            });
+            handleDistrictChange('None');
+        }
       }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isDialogOpen, editingUser, form, getSchoolsForDistrict]);
 
     const handleEditUser = (user: User) => {
@@ -206,79 +217,55 @@ export default function UsersPage() {
     
     const handleCreateUser = () => {
         setEditingUser(null);
-        form.reset({
-            email: '',
-            isSponsor: true,
-            isDistrictCoordinator: false,
-            isOrganizer: false,
-            isIndividual: false,
-            firstName: '',
-            lastName: '',
-            school: '',
-            district: 'None',
-            phone: '',
-            bookkeeperEmail: '',
-            gtCoordinatorEmail: '',
-        });
-        handleDistrictChange('None');
         setIsDialogOpen(true);
     };
 
-    // Replace direct Firestore update with server action
+    // Combined submit handler for create and update
     const onSubmit = async (values: UserFormValues) => {
-        if (!editingUser) return;
+        let finalRole: User['role'];
+        if (values.isOrganizer) finalRole = 'organizer';
+        else if (values.isDistrictCoordinator) finalRole = 'district_coordinator';
+        else if (values.isSponsor) finalRole = 'sponsor';
+        else finalRole = 'individual';
 
-        try {
-            let finalRole: User['role'];
-            if (values.isOrganizer) {
-                finalRole = 'organizer';
-            } else if (values.isDistrictCoordinator) {
-                finalRole = 'district_coordinator';
-            } else if (values.isSponsor) {
-                finalRole = 'sponsor';
-            } else {
-                finalRole = 'individual'; 
-            }
+        const userData = {
+            email: values.email,
+            firstName: values.firstName,
+            lastName: values.lastName,
+            role: finalRole,
+            isDistrictCoordinator: finalRole === 'district_coordinator' || values.isDistrictCoordinator,
+            school: values.school,
+            district: values.district,
+            phone: values.phone,
+            bookkeeperEmail: values.bookkeeperEmail,
+            gtCoordinatorEmail: values.gtCoordinatorEmail,
+        };
 
-            const userData = {
-                email: values.email,
-                firstName: values.firstName,
-                lastName: values.lastName,
-                role: finalRole,
-                isDistrictCoordinator: finalRole === 'district_coordinator' || values.isDistrictCoordinator,
-                school: values.school,
-                district: values.district,
-                phone: values.phone,
-                bookkeeperEmail: values.bookkeeperEmail,
-                gtCoordinatorEmail: values.gtCoordinatorEmail,
-            };
-
-            console.log('Updating user with data:', userData);
-
+        if (editingUser) {
+            // Update logic
             const result = await updateUserAction(editingUser.email, userData);
-            
             if (result.success) {
                 await loadUsers();
-                toast({ 
-                    title: "User Updated", 
-                    description: `${values.email}'s information has been updated.` 
+                toast({ title: "User Updated" });
+                setIsDialogOpen(false);
+            } else {
+                toast({ variant: 'destructive', title: "Update Failed", description: result.error });
+            }
+        } else {
+            // Create logic
+            const tempPassword = Math.random().toString(36).slice(-8); // Generate temp password
+            const result = await createUserAction(userData, tempPassword);
+            if (result.success) {
+                await loadUsers();
+                toast({
+                    title: "User Created Successfully",
+                    description: `An account for ${userData.email} has been created. Their temporary password is: ${result.tempPassword}`,
+                    duration: 15000,
                 });
                 setIsDialogOpen(false);
-                setEditingUser(null);
             } else {
-                toast({ 
-                    variant: 'destructive', 
-                    title: "Update Failed", 
-                    description: result.error || "Could not update user in the database." 
-                });
+                toast({ variant: 'destructive', title: "Creation Failed", description: result.error });
             }
-        } catch (error) {
-            console.error("Error updating user:", error);
-            toast({ 
-                variant: 'destructive', 
-                title: "Update Failed", 
-                description: "An unexpected error occurred." 
-            });
         }
     };
     
