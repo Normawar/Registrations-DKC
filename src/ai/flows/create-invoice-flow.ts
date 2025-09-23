@@ -11,10 +11,10 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { randomUUID } from 'crypto';
-import { ApiError, type OrderLineItem, type InvoiceRecipient, type Address, type Client } from 'square';
+import { ApiError, type OrderLineItem, type InvoiceRecipient, type Address } from 'square';
 import { format } from 'date-fns';
 import { doc, getDoc, setDoc, writeBatch } from 'firebase/firestore';
-import { db } from '@/lib/services/firestore-service';
+import { db } from '@/lib/firebase-admin';
 import { generateTeamCode } from '@/lib/school-utils';
 import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
 

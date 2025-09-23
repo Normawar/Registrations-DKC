@@ -3,7 +3,8 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import { Payment, ApiError, Client, Environment } from 'square';
+import { Payment, ApiError } from 'square';
+import { getSquareClient } from '@/lib/square-client';
 
 const GetInvoiceStatusInputSchema = z.object({
   invoiceId: z.string().describe('The Square invoice ID to check'),
@@ -55,10 +56,7 @@ export const getInvoiceStatusWithPayments = ai.defineFlow(
     outputSchema: GetInvoiceStatusOutputSchema,
   },
   async (input) => {
-    const squareClient = new Client({
-      accessToken: "EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC",
-      environment: Environment.Production,
-    });
+    const squareClient = await getSquareClient();
     const { invoicesApi, ordersApi, paymentsApi } = squareClient;
 
     try {

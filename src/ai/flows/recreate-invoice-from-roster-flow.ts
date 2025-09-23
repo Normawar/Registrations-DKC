@@ -1,4 +1,5 @@
 
+
 /**
  * @fileOverview Recreates an invoice with an updated player roster.
  * This flow cancels the original invoice and creates a new one with the updated details.
@@ -6,7 +7,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import { ApiError, Client, Environment } from 'square';
+import { ApiError } from 'square';
 import { createInvoice } from './create-invoice-flow';
 import { cancelInvoice } from './cancel-invoice-flow';
 import { createPsjaSplitInvoice } from './create-psja-split-invoice-flow';
@@ -16,6 +17,7 @@ import {
   RecreateInvoiceOutputSchema,
   type RecreateInvoiceOutput,
 } from './schemas';
+import { getSquareClient } from '@/lib/square-client';
 
 
 export async function recreateInvoiceFromRoster(input: RecreateInvoiceInput): Promise<RecreateInvoiceOutput> {
@@ -33,10 +35,7 @@ const recreateInvoiceFromRosterFlow = ai.defineFlow(
         throw new Error('Only organizers can modify existing invoices.');
     }
     
-    const squareClient = new Client({
-      accessToken: "EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC",
-      environment: Environment.Production,
-    });
+    const squareClient = await getSquareClient();
 
     try {
       // Step 1: Get original invoice details to construct the revised invoice number

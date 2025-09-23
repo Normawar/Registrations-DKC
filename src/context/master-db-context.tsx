@@ -302,29 +302,28 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   }, [schools, allSchoolNames]);
 
   const loadDatabase = useCallback(async () => {
-    if (!db) return;
-  
     setIsDbLoaded(false);
     
     try {
-      const playersRef = collection(db, 'players');
-      const schoolsRef = collection(db, 'schools');
-
-      const [playersSnapshot, schoolsSnapshot] = await Promise.all([
-        getDocs(playersRef),
-        getDocs(schoolsRef),
+      const [playersRes, schoolsRes] = await Promise.all([
+        fetch('/api/players'),
+        fetch('/api/schools')
       ]);
-      
-      const players = playersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MasterPlayer));
-      const schoolList = schoolsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as School));
+
+      if (!playersRes.ok || !schoolsRes.ok) {
+        throw new Error('Failed to fetch data from API');
+      }
+
+      const players = await playersRes.json();
+      const schoolList = await schoolsRes.json();
       
       setDatabase(players);
-      setSchools(schoolList);
+      setSchools(schoolList.map((name: string) => ({ schoolName: name, district: '', id: name } as School))); // Simplified for now
       setPlayerCount(players.length);
       setIsDbLoaded(true);
       
     } catch (error: any) {
-      console.error('Failed to load players or schools database:', error);
+      console.error('Failed to load data via API:', error);
       setIsDbLoaded(false);
       setIsDbError(true);
     }

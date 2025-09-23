@@ -3,11 +3,12 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { Client, Environment, type Invoice, type Order, type Customer } from 'square';
+import { type Invoice, type Order, type Customer } from 'square';
 import { collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
-import { db } from '@/lib/services/firestore-service';
+import { db } from '@/lib/firebase-admin';
 import { generateTeamCode } from '@/lib/school-utils';
 import { type MasterPlayer } from '@/lib/data/full-master-player-data';
+import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
 
 
 const ImportSquareInvoicesInputSchema = z.object({
@@ -39,13 +40,8 @@ const importSquareInvoicesFlow = ai.defineFlow(
       return { created: 0, updated: 0, failed: 1, errors: ['Firestore is not initialized.'] };
     }
 
-    console.log('Initializing Square client with hard-coded values...');
-    const squareClient = new Client({
-      accessToken: "EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC",
-      environment: Environment.Production,
-    });
-    const locationId = "CTED7GVSVH5H8";
-    console.log('Square client initialized with hard-coded production credentials');
+    const squareClient = await getSquareClient();
+    const locationId = await getSquareLocationId();
     
     let createdCount = 0;
     let updatedCount = 0;
@@ -54,7 +50,6 @@ const importSquareInvoicesFlow = ai.defineFlow(
     
     try {
         console.log('Fetching all invoices from Square. This might take a moment...');
-        // Fixed: Pass locationId and limit as separate parameters
         const { result: { invoices } } = await squareClient.invoicesApi.listInvoices(locationId, undefined, 200);
 
         if (!invoices) {
@@ -107,7 +102,7 @@ const importSquareInvoicesFlow = ai.defineFlow(
 );
 
 
-async function processSingleInvoice(client: Client, invoice: Invoice, batch: FirebaseFirestore.WriteBatch) {
+async function processSingleInvoice(client: any, invoice: Invoice, batch: FirebaseFirestore.WriteBatch) {
     if (!invoice.orderId || !invoice.primaryRecipient?.customerId) {
         throw new Error(`Invoice #${invoice.invoiceNumber} is missing order or customer ID.`);
     }
@@ -409,5 +404,3 @@ function parsePlayerFromNote(note: string): { firstName: string; lastName: strin
     console.log(`Could not parse player info from note: "${note}"`);
     return null;
 }
-
-    

@@ -1,7 +1,6 @@
 
 import { NextResponse } from 'next/server';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase-admin'; // Admin SDK instance
 
 export async function GET() {
   if (!db) {
@@ -9,10 +8,14 @@ export async function GET() {
   }
 
   try {
-    const playersRef = collection(db, 'players');
+    // Use Admin SDK methods, not client SDK methods
+    const playersRef = db.collection('players');
     const snapshot = await playersRef.get();
     
-    const players = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const players = snapshot.docs.map(doc => ({ 
+      id: doc.id, 
+      ...doc.data() 
+    }));
     
     return NextResponse.json(players);
   } catch (error) {
