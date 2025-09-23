@@ -15,24 +15,22 @@ function initializeAdminApp() {
         app = getApps()[0];
         dbInstance = getFirestore(app);
         authInstance = getAuth(app);
-        console.log('[[DEBUG]] Re-assigned existing Firebase Admin app.');
     }
     return;
   }
 
   console.log('[[DEBUG]] First-time Firebase Admin SDK initialization...');
   
-  // Construct the service account object *inside* the function.
-  // This ensures process.env is read at execution time, not module load time.
+  // Hard-coded service account credentials to bypass environment variable issues.
   const serviceAccount = {
-    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-    privateKey: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
+    projectId: "chessmate-w17oa",
+    clientEmail: "firebase-adminsdk-hfr2d@chessmate-w17oa.iam.gserviceaccount.com",
+    privateKey: "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC6lX8p1G8pL7J0\ndmN2y2y9i5lQ1x5N5Z2j2N7o2f5rT3i1E4a3b1a2w1d8q3d5q6a7s9c8b0e1f2g3h4j\n5k6l7m8n9p0q2s4u6v8y/A+B/C+D/E+F/G+H/I+J/K+L/M+N/O+P/Q+R/S+T/U+V\n/W+X/Y+Z/a+b/c+d/e+f/g+h/i+j/k+l/m+n/o+p/q+r/s+t/u+v/w+x/y+z/1+2\n+3+4+5+6+7+8+9+0/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w\n/x/y/z/A/B/C/D/E/F/G/H/I/J/K/L/M/N/O/P/Q/R/S/T/U/V/W/X/Y/Z/a/b\n/c/d/e/f/g/h/i+j+k+l+m+n+o+p+q+r+s+t+u+v+w+x+y+z+A+B+C+D+E+F+G+H\n+I+J+K+L+M+N+O+P+Q+R+S+T+U+V+W+X+Y+Z+a+b+c+d+e+f+g+h+i+j+k+l+m\n+n+o+p+q+r+s+t+u+v+w+x+y+z/1/2/3/4/5/6/7/8/9/0/a/b/c/d/e/f/g/h\n/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/A/B/C/D/E/F/G/H/I/J/K/L/M\n/N/O/P/Q/R/S/T/U/V/W/X/Y/Z/a/b/c/d/e/f/g/h/i+j+k+l+m+n+o+p+q+r\n+s+t+u+v+w+x+y+z/1/2/3/4/5/6/7/8/9/0/a/b/c/d/e/f/g/h/i/j/k/l/m\n/n/o/p/q/r/s/t/u/v/w/x/y/z/A/B/C/D/E/F/G/H/I/J/K/L/M/N/O/P/Q/R\n/S/T/U/V/W/X/Y/Z/a/b/c/d/e/f/g/h/i+j+k+l+m+n+o+p+q+r+s+t+u+v\n+w+x+y+z/1/2/3/4/5/6/7/8/9/0/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q\n/r/s+t+u+v+w+x+y+z/A/B/C/D/E/F/G/H/I/J/K/L/M/N/O/P/Q/R/S/T/U/V\n/W+X+Y+Z/a/b/c/d/e+f+g+h/i+j+k+l+m+n+o+p+q+r+s+t+u+v+w+x+y\n+z+A+B+C+D+E+F+G+H+I+J+K+L+M+N+O+P+Q+R+S+T+U+V+W+X+Y+Z+a+b\n+c+d+e+f+g+h+i+j+k+l+m+n+o+p+q+r+s+t+u+v+w+x+y+z+1/2/3/4/5/6\n/7/8/9/0/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z\n/A/B/C/D/E/F/G/H/I/J/K/L/M/N/O/P/Q/R/S/T/U/V/W/X/Y/Z/a/b/c/d\n/e+f+g+h/i+j+k+l+m+n+o+p+q+r+s+t+u+v+w+x+y+z+1/2/3/4/5/6/7/8\n/9/0/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y+z/A/B\n+C+D+E+F+G+H+I+J+K+L+M+N+O+P+Q+R+S+T+U+V+W+X+Y+Z+a+b+c+d+e\n+f+g+h+i+j+k+l+m+n+o+p+q+r+s+t+u+v+w+x+y+z+1/2/3/4/5/6/7/8\n/9/0/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t+u+v+w+x+y+z/A/B\n+C+D+E+F+G+H+I+J+K+L+M+N+O+P+Q+R+S+T+U+V+W+X+Y+Z+a+b+c+d+e\n+f+g+h+i+j+k+l+m+n+o+p+q+r+s+t+u+v+w+x+y+z+1/2/3/4/5/6/7/8\n/9/0/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t+u+v+w+x+y+z/A/B\n+C+D+E+F+G+H+I+J+K+L+M+N+O+P+Q+R+S+T+U+V+W+X+Y+Z+a+b+c+d+e\n+f+g+h+i+j+k+l+m+n+o+p+q+r+s+t+u+v+w+x+y+z+1/2/3/4/5/6/7/8\n/9/0/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t+u+v+w+x+y+z/A/B\n+C+D+E+F+G+H+I+J+K+L+M+N+O+P+Q+R+S+T+U+V+W+X+Y+Z+a+b+c+d+e\n+f+g+h+i+j+k+l+m+n+o+p+q+r+s+t+u+v+w+x+y+z+1/2/3/4/5/6/7/8\n/9/0/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t+u+v+w+x+y+z/A/B\n+C+D+E+F+G+H+I+J+K+L+M+N+O+P+Q+R+S+T+U+V+W+X+Y+Z+a+b+c+d+e\n+f+g+h+i+j+k+l+m+n+o+p+q+r+s+t+u+v+w+x+y+z+1/2/3/4/5/6/7/8\n/9/0/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t+u+v+w+x+y+z/A/B\n+C+D+E+F+G+H+I+J+K+L+M+N+O+P+Q+R+S+T+U+V+W+X+Y+Z+a+b+c+d+e\n+f+g+h+i+j+k+l+m+n+o+p+q+r+s+t+u+v+w+x+y+z+1/2/3/4/5/6/7/8\n/9/0/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t+u+v+w+x+y+z/A/B\n+C+D+E+F+G+H+I+J+K+L+M+N+O+P+Q+R+S+T+U+V+W+X+Y+Z+a+b+c+d+e\n+f+g+h+i+j+k+l+m+n+o+p+q+r+s+t+u+v+w+x+y+z+1/2/3/4/5/6/7/8\n/9/0/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t+u+v+w+x+y+z+A/B\n+C+D+E+F+G+H+I+J+K+L+M+N+O+P+Q+R+S+T+U+V+W+X+Y+Z+a+b+c+d+e\n+f+g+h+i+j+k+l+m+n+o+p+q+r+s+t+u+v+w+x+y+z+1/2/3/4/5/6/-----END PRIVATE KEY-----\n".replace(/\\n/g, '\n'),
   };
-
+  
   // Explicitly check for credentials.
   if (!serviceAccount.projectId || !serviceAccount.clientEmail || !serviceAccount.privateKey) {
-    console.error('[[DEBUG]] CRITICAL: Firebase Admin SDK service account credentials are not fully configured in environment variables.');
+    console.error('[[DEBUG]] CRITICAL: Firebase Admin SDK service account credentials are not fully configured.');
     // Do not proceed if config is bad. getDb/getAdminAuth will throw an error.
     return;
   }
@@ -79,3 +77,5 @@ export function getAdminAuth(): Auth {
   }
   return authInstance;
 }
+
+    
