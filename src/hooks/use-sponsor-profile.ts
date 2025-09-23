@@ -70,8 +70,19 @@ export function useSponsorProfile() {
       return;
     }
 
-    // Merge new data with existing profile
-    const updatedProfile = { ...(profile || {}), ...newProfileData, email: userToUpdate.email, uid: userToUpdate.uid } as SponsorProfile;
+    // Create a new, fully-formed profile object to ensure React state updates correctly.
+    // This is more robust than just merging with the previous state.
+    const updatedProfile: SponsorProfile = {
+        // Start with the existing profile as a base
+        ...(profile as SponsorProfile),
+        // Overwrite with the new data
+        ...newProfileData,
+        // Ensure critical fields are always present and correct
+        email: userToUpdate.email!,
+        uid: userToUpdate.uid,
+        updatedAt: new Date().toISOString(), // Always update the timestamp
+    };
+
 
     try {
         // Update Firestore
