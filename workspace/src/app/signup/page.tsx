@@ -1,15 +1,11 @@
 
-// src/app/signup/page.tsx - Updated with Data Correction for Organizer Account
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useRouter } from 'next/navigation';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -33,7 +29,7 @@ import {
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useSponsorProfile, type SponsorProfile } from '@/hooks/use-sponsor-profile';
 import { useToast } from '@/hooks/use-toast';
-import { simpleSignUp, simpleSignIn, checkFirebaseConfig } from '@/lib/simple-auth';
+import { simpleSignUp, checkFirebaseConfig } from '@/lib/simple-auth';
 import { useMasterDb } from '@/context/master-db-context';
 
 const sponsorFormSchema = z.object({
@@ -56,53 +52,9 @@ const sponsorFormSchema = z.object({
     path: ["gtCoordinatorEmail"],
 });
 
-// Helper function to correct organizer account data
-async function correctOrganizerAccountData(email: string, password: string) {
-  console.log('🔧 Attempting to correct organizer account data for:', email);
-  
-  try {
-    // First, try to sign in to get the user's UID
-    const signInResult = await simpleSignIn(email, password);
-    
-    if (signInResult.success && signInResult.user) {
-      const uid = signInResult.user.uid;
-      console.log('✅ Successfully signed in, UID:', uid);
-      
-      // Now update the user's profile in Firestore with correct organizer data
-      const userDocRef = doc(db, 'users', uid);
-      const correctedProfile: Partial<SponsorProfile> & {correctedAt?: string} = {
-        role: 'organizer',
-        isDistrictCoordinator: false, // Organizers are not district coordinators
-        district: 'All Districts', // Organizers can manage all districts
-        school: 'Dark Knight Chess', // Organization name
-        updatedAt: new Date().toISOString(),
-        correctedAt: new Date().toISOString(), // Mark when this correction happened
-      };
-      
-      await updateDoc(userDocRef, correctedProfile);
-      console.log('✅ Profile corrected successfully');
-      
-      // Return the corrected profile
-      const updatedProfile = { ...signInResult.profile, ...correctedProfile };
-      return {
-        success: true,
-        user: signInResult.user,
-        profile: updatedProfile
-      };
-    }
-    
-    throw new Error('Failed to sign in for data correction');
-    
-  } catch (error) {
-    console.error('❌ Data correction failed:', error);
-    throw error;
-  }
-}
-
 const SponsorSignUpForm = () => {
   const router = useRouter();
   const { toast } = useToast();
-  // CORRECTED: Only destructure what's needed, avoid loading the full 'database'
   const { dbDistricts, getSchoolsForDistrict, isDbLoaded, schools } = useMasterDb();
   const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
   const { updateProfile } = useSponsorProfile();
@@ -141,7 +93,6 @@ const SponsorSignUpForm = () => {
 
   useEffect(() => {
     if (isDbLoaded) {
-      // Set initial schools based on the default district value
       const initialSchools = getSchoolsForDistrict(form.getValues('district'));
       setSchoolsForDistrict(initialSchools);
     }
@@ -151,7 +102,7 @@ const SponsorSignUpForm = () => {
     setIsLoading(true);
     
     try {
-      if (!checkFirebaseConfig() || !db) {
+      if (!checkFirebaseConfig()) {
         toast({
           variant: 'destructive',
           title: 'Configuration Error',
@@ -188,7 +139,6 @@ const SponsorSignUpForm = () => {
             description: `Your ${role} account has been created. Please complete your profile.`,
         });
         
-        // Always redirect to profile on first signup
         router.push('/profile');
       }
     } catch (error) {
@@ -300,31 +250,13 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
       
       const isMainOrganizer = values.email.toLowerCase() === 'norma@dkchess.com';
 
-      // If this is the organizer signup tab
-      if (role === 'organizer') {
-        if (!isMainOrganizer) {
+      if (role === 'organizer' && !isMainOrganizer) {
           form.setError('email', {
             type: 'manual',
             message: 'Only the primary organizer can sign up through this form.',
           });
           setIsLoading(false);
           return;
-        }
-
-        try {
-          const correctionResult = await correctOrganizerAccountData(values.email, values.password);
-          if (correctionResult.success) {
-              await updateProfile(correctionResult.profile as SponsorProfile, correctionResult.user);
-              toast({
-                  title: "Welcome Back, Norma!",
-                  description: "Your organizer account has been logged in and verified.",
-              });
-              router.push('/manage-events');
-              return;
-          }
-        } catch (correctionError) {
-          console.warn('Organizer account login failed. Proceeding with initial setup.');
-        }
       }
 
       const userRole: SponsorProfile['role'] = isMainOrganizer ? 'organizer' : 'individual';
@@ -357,7 +289,6 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
             description: `Your new ${userRole} account has been created. Please complete your profile.`,
         });
 
-        // Always redirect to profile on first signup
         router.push('/profile');
       }
     } catch (error: any) {

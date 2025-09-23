@@ -4,8 +4,6 @@
 import { adminAuth, db as adminDb } from '@/lib/firebase-admin';
 import { UserRecord } from 'firebase-admin/auth';
 import type { SponsorProfile } from '@/hooks/use-sponsor-profile';
-// Corrected import to use the centralized simpleSignUp
-import { simpleSignUp } from '@/lib/simple-auth';
 
 /**
  * Server action to fetch all users from Firestore
@@ -108,7 +106,7 @@ export async function updateUserAction(
 
 /**
  * Server action to create a new user in Firebase Auth and Firestore.
- * This now uses the centralized client-side sign-up function.
+ * This now uses the Admin SDK as required for server-side operations.
  */
 export async function createUserAction(
   userData: {
@@ -131,8 +129,6 @@ export async function createUserAction(
     return { success: false, error: 'Email and temporary password are required.' };
   }
 
-  // This function can no longer be implemented on the server using `simpleSignUp`
-  // because `simpleSignUp` now uses the client SDK. We must call `adminAuth.createUser` here.
   try {
     if (!adminAuth || !adminDb) {
       throw new Error('Firebase Admin SDK not initialized.');
@@ -246,22 +242,28 @@ export async function forceDeleteUsersAction(emails: string[]): Promise<{
       }
 
       if (uid || firestoreDeleted) {
-        deletedEmails.push(email);
+        if(!deletedEmails.includes(email)){
+          deletedEmails.push(email);
+        }
         console.log(`Successfully processed deletion for: ${email}`);
       } else {
-        failedDeletions.push({ 
-          email, 
-          reason: 'User not found in Auth or Firestore.' 
-        });
+        if (!failedDeletions.some(f => f.email === email)) {
+          failedDeletions.push({ 
+            email, 
+            reason: 'User not found in Auth or Firestore.' 
+          });
+        }
         console.log(`Failed to find/delete: ${email}`);
       }
       
     } catch (error: any) {
       console.error(`Unexpected error deleting ${email}:`, error);
-      failedDeletions.push({ 
-        email, 
-        reason: error.message || 'Unknown error' 
-      });
+      if (!failedDeletions.some(f => f.email === email)) {
+        failedDeletions.push({ 
+          email, 
+          reason: error.message || 'Unknown error' 
+        });
+      }
     }
   }
 
