@@ -1,5 +1,4 @@
-
-'use 'use server';
+'use server';
 /**
  * @fileOverview Records a payment against a Square invoice using the Square API.
  */
