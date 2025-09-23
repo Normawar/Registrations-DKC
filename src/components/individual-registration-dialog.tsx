@@ -17,6 +17,7 @@ import { format, differenceInHours, isSameDay, startOfDay } from "date-fns";
 import { createIndividualInvoice } from '@/ai/flows/create-individual-invoice-flow';
 import { InvoiceDetailsDialog } from '@/components/invoice-details-dialog';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
+import { generateTeamCode } from '@/lib/school-utils';
 
 interface IndividualRegistrationDialogProps {
   isOpen: boolean;
@@ -41,6 +42,7 @@ export function IndividualRegistrationDialog({
   const { database } = useMasterDb();
   
   const [parentStudents, setParentStudents] = useState<MasterPlayer[]>([]);
+  const [isLoadingPlayers, setIsLoadingPlayers] = useState(true);
   const [selectedStudents, setSelectedStudents] = useState<Record<string, { section: string; uscfStatus: string }>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [registrations, setRegistrations] = useState<any[]>([]);
@@ -50,13 +52,18 @@ export function IndividualRegistrationDialog({
 
   // Load parent's students
   useEffect(() => {
-    if (parentProfile?.studentIds && database.length > 0 && isOpen) {
-      let students = database.filter(p => parentProfile.studentIds?.includes(p.id));
-      if (event?.isPsjaOnly) {
-        students = students.filter(p => p.district === 'PHARR-SAN JUAN-ALAMO ISD');
-      }
-      setParentStudents(students);
+    if (!parentProfile?.studentIds || database.length === 0 || !isOpen) {
+        setIsLoadingPlayers(false);
+        return;
     }
+    setIsLoadingPlayers(true);
+    let students = database.filter(p => parentProfile.studentIds?.includes(p.id));
+    if (event?.isPsjaOnly) {
+      students = students.filter(p => p.district === 'PHARR-SAN JUAN-ALAMO ISD');
+    }
+    setParentStudents(students);
+    setIsLoadingPlayers(false);
+
   }, [parentProfile, database, isOpen, event]);
   
     useEffect(() => {
@@ -76,7 +83,8 @@ export function IndividualRegistrationDialog({
   const getStudentRegistrationStatus = (student: MasterPlayer) => {
     const existingReg = registrations.find((confirmation: any) => 
       confirmation.selections && 
-      confirmation.selections[student.id]
+      confirmation.selections[student.id] && 
+      confirmation.status !== 'CANCELED'
     );
     
     if (existingReg) {
@@ -172,11 +180,7 @@ export function IndividualRegistrationDialog({
 
   const handleSubmit = async () => {
     if (Object.keys(selectedStudents).length === 0) {
-      toast({
-        variant: 'destructive',
-        title: 'No Students Selected',
-        description: 'Please select at least one student to register.'
-      });
+      toast({ variant: 'destructive', title: 'No Students Selected', description: 'Please select at least one student to register.' });
       return;
     }
   
@@ -185,6 +189,7 @@ export function IndividualRegistrationDialog({
     try {
       const { fee: currentFee } = getFeeForEvent();
       const lateFeeAmount = currentFee - event.regularFee;
+      const teamCode = generateTeamCode({ schoolName: 'Individual', district: 'Individual' });
   
       const playersToInvoice = Object.entries(selectedStudents).map(([playerId, details]) => {
         const student = parentStudents.find(p => p.id === playerId);
@@ -203,16 +208,16 @@ export function IndividualRegistrationDialog({
 
       const result = await createIndividualInvoice({
         sponsorName: `${parentProfile.firstName} ${parentProfile.lastName}`,
-        parentName: `${parentProfile.firstName} ${parentProfile.lastName}`, // Explicitly for individual
+        parentName: `${parentProfile.firstName} ${parentProfile.lastName}`,
         sponsorEmail: parentProfile.email,
         sponsorPhone: parentProfile.phone || '',
         schoolName: 'Individual Registration',
-        teamCode: generateTeamCode({ schoolName: 'Individual', district: 'Individual' }),
+        district: 'Individual',
+        teamCode: teamCode,
         eventName: event.name,
         eventDate: event.date,
         uscfFee: 24,
         players: playersToInvoice,
-        district: 'Individual',
       });
   
       const newConfirmation = {
@@ -227,8 +232,8 @@ export function IndividualRegistrationDialog({
         parentName: `${parentProfile.firstName} ${parentProfile.lastName}`,
         schoolName: 'Individual Registration',
         district: 'Individual',
-        teamCode: generateTeamCode({ schoolName: 'Individual', district: 'Individual' }),
-        invoiceTitle: `${generateTeamCode({ schoolName: 'Individual', district: 'Individual' })} @ ${format(new Date(event.date), 'MM/dd/yyyy')} ${event.name}`,
+        teamCode: teamCode,
+        invoiceTitle: `${teamCode} @ ${format(new Date(event.date), 'MM/dd/yyyy')} ${event.name}`,
         selections: Object.fromEntries(Object.entries(selectedStudents).map(([playerId, details]) => [ playerId, { ...details, status: 'active' } ])),
         totalInvoiced: feeBreakdown.total,
         totalAmount: feeBreakdown.total,
@@ -296,7 +301,12 @@ export function IndividualRegistrationDialog({
           {isPsjaRestricted && (
             <Alert><AlertTitle>PSJA-Only Event</AlertTitle><AlertDescription>This event is restricted to students from the PHARR-SAN JUAN-ALAMO ISD. Only eligible students from your list are shown.</AlertDescription></Alert>
           )}
-          {parentStudents.length === 0 ? (
+          {isLoadingPlayers ? (
+            <div className="text-center p-8 text-muted-foreground">
+                <Loader2 className="h-8 w-8 mx-auto mb-4 animate-spin" />
+                <p>Loading your student list...</p>
+            </div>
+          ) : parentStudents.length === 0 ? (
             <div className="text-center p-8 text-muted-foreground">
               <User className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p className="text-lg font-medium">No Eligible Students Found</p>
