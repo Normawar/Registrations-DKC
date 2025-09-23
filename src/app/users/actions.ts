@@ -1,7 +1,7 @@
 
 'use server';
 
-import { adminAuth, db as adminDb } from '@/lib/firebase-admin';
+import { getAdminAuth, getDb } from '@/lib/firebase-admin';
 import { UserRecord } from 'firebase-admin/auth';
 import type { SponsorProfile } from '@/hooks/use-sponsor-profile';
 import { simpleSignUp } from '@/lib/simple-auth';
@@ -27,9 +27,7 @@ export async function fetchUsersAction(): Promise<{
   error?: string;
 }> {
   try {
-    if (!adminDb) {
-      throw new Error("Firestore Admin SDK is not initialized.");
-    }
+    const adminDb = getDb();
     const usersRef = adminDb.collection('users');
     const snapshot = await usersRef.get();
     
@@ -80,9 +78,8 @@ export async function updateUserAction(
   }
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    if (!adminDb || !adminAuth) {
-      throw new Error("Firebase Admin SDK is not initialized.");
-    }
+    const adminDb = getDb();
+    const adminAuth = getAdminAuth();
     const userRecord = await adminAuth.getUserByEmail(originalEmail);
     const docRef = adminDb.collection('users').doc(userRecord.uid);
     
@@ -164,15 +161,14 @@ export async function forceDeleteUsersAction(emails: string[]): Promise<{
     return { deleted: [], failed: [] };
   }
   
+  const adminDb = getDb();
+  const adminAuth = getAdminAuth();
   const deletedEmails: string[] = [];
   const failedDeletions: { email: string, reason: string }[] = [];
 
   for (const email of emails) {
     let uid: string | null = null;
     try {
-      if (!adminAuth || !adminDb) {
-        throw new Error("Firebase Admin SDK is not initialized.");
-      }
       console.log(`Processing deletion for: ${email}`);
       
       try {

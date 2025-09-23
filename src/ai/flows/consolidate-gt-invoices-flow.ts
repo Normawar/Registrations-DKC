@@ -4,7 +4,7 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { collection, query, where, getDocs, doc, updateDoc, writeBatch } from 'firebase/firestore';
-import { db } from '@/lib/firebase-admin';
+import { getDb } from '@/lib/firebase-admin';
 import { createInvoice } from './create-invoice-flow';
 import { getSquareClient } from '@/lib/square-client';
 
@@ -41,7 +41,7 @@ const consolidateGtInvoicesFlow = ai.defineFlow(
     outputSchema: ConsolidateGtInvoicesOutputSchema,
   },
   async (input) => {
-    if (!db) throw new Error('Firestore not available');
+    const db = getDb();
 
     // Step 1: Find all GT invoices for this event
     const invoicesQuery = query(
@@ -162,8 +162,8 @@ export async function canConsolidateGtInvoices(eventId: string): Promise<{
   gtInvoiceCount: number;
   totalGtStudents: number;
 }> {
-  if (!db) throw new Error('Firestore not available');
-
+  const db = getDb();
+  
   const invoicesQuery = query(
     collection(db, 'invoices'),
     where('eventId', '==', eventId),

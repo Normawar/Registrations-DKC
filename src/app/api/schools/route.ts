@@ -1,9 +1,11 @@
+
 // src/app/api/schools/route.ts
 import { NextResponse } from 'next/server';
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/firebase-admin';
+import { getDb } from '@/lib/firebase-admin';
 
 export async function GET(request: NextRequest) {
+  const db = getDb();
   if (!db) {
     return NextResponse.json({ error: 'Firestore is not configured' }, { status: 500 });
   }

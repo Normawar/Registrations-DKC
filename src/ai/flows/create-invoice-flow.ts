@@ -9,14 +9,14 @@ import { randomUUID } from 'crypto';
 import { ApiError, type OrderLineItem, type InvoiceRecipient, type Address } from 'square';
 import { format } from 'date-fns';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase-admin';
+import { getDb } from '@/lib/firebase-admin';
 import { generateTeamCode } from '@/lib/school-utils';
 import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
 import { type CreateInvoiceInput, type CreateInvoiceOutput } from './schemas';
 
 
 export async function createInvoice(input: CreateInvoiceInput): Promise<CreateInvoiceOutput> {
-    // CRITICAL: Ensure Firestore Admin SDK is initialized before proceeding.
+    const db = getDb();
     if (!db) {
       console.error('CRITICAL: Firestore Admin SDK is not initialized in createInvoice flow. Halting execution.');
       throw new Error('Server configuration error: Database not available.');
@@ -37,11 +37,6 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
 
     // Step 1: Save/Update player data in Firestore
     if (processedPlayers.length > 0) {
-      // Re-check Firestore before saving
-      if (!db) {
-        console.error('Firestore became unavailable before player data save.');
-        throw new Error('Database connection lost. Please try again.');
-      }
       console.log(`Processing ${processedPlayers.length} players for Firestore save/update...`);
       for (const player of processedPlayers) {
         const playerId = player.uscfId.toUpperCase() !== 'NEW' ? player.uscfId : `temp_${randomUUID()}`;

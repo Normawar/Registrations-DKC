@@ -1,18 +1,18 @@
+
 // src/lib/firebase-admin.ts
 import { initializeApp, getApps, cert, type App } from 'firebase-admin/app';
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';
 import { getAuth, type Auth } from 'firebase-admin/auth';
 
 let app: App | undefined;
-let db: Firestore | undefined;
-let authAdmin: Auth | undefined;
+let dbInstance: Firestore | undefined;
+let authInstance: Auth | undefined;
 
 function initializeAdminApp() {
   if (app) {
     return;
   }
 
-  // Check if all required service account fields are present
   const serviceAccount = {
     projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
     clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
@@ -20,34 +20,58 @@ function initializeAdminApp() {
   };
 
   if (!serviceAccount.projectId || !serviceAccount.clientEmail || !serviceAccount.privateKey) {
-    console.error('CRITICAL: Firebase Admin SDK service account credentials are not fully configured in environment variables.');
-    return; // Do not initialize if config is missing
+    console.error('CRITICAL: Firebase Admin SDK service account credentials are not fully configured.');
+    return;
   }
 
   try {
-    if (!getApps().length) {
+    const apps = getApps();
+    if (apps.length === 0) {
       app = initializeApp({
         credential: cert(serviceAccount),
       });
       console.log('Firebase Admin SDK initialized successfully.');
     } else {
-      app = getApps()[0];
+      app = apps[0];
     }
   
-    db = getFirestore(app);
-    authAdmin = getAuth(app);
+    dbInstance = getFirestore(app);
+    authInstance = getAuth(app);
   
   } catch (error: any) {
     console.error('CRITICAL: Firebase Admin SDK initialization failed.', error.message);
-    // Ensure these are undefined if initialization fails
     app = undefined;
-    db = undefined;
-    authAdmin = undefined;
+    dbInstance = undefined;
+    authInstance = undefined;
   }
 }
 
-// Ensure the app is initialized on the first import of this module
+// Initialize on first load
 initializeAdminApp();
 
-// Export getters that return the initialized services
-export { db, authAdmin as adminAuth };
+// Export getter functions that ensure initialization
+export function getDb(): Firestore {
+  if (!dbInstance) {
+    console.warn("Firestore Admin db not initialized on first call, re-initializing...");
+    initializeAdminApp();
+    if (!dbInstance) {
+      throw new Error("Failed to initialize Firestore Admin SDK after retry.");
+    }
+  }
+  return dbInstance;
+}
+
+export function getAdminAuth(): Auth {
+  if (!authInstance) {
+    console.warn("Firestore Admin auth not initialized on first call, re-initializing...");
+    initializeAdminApp();
+     if (!authInstance) {
+      throw new Error("Failed to initialize Firebase Admin Auth SDK after retry.");
+    }
+  }
+  return authInstance;
+}
+
+// For simplicity in other files, we can export the getters with the old names.
+export const db = getDb();
+export const adminAuth = getAdminAuth();

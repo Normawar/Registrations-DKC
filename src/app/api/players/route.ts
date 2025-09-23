@@ -1,8 +1,10 @@
 
+
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase-admin'; // Admin SDK instance
+import { getDb } from '@/lib/firebase-admin'; // Admin SDK instance
 
 export async function GET() {
+  const db = getDb();
   if (!db) {
     return NextResponse.json({ error: 'Firestore is not configured' }, { status: 500 });
   }

@@ -5,7 +5,7 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { type Invoice, type Order, type Customer } from 'square';
 import { collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
-import { db } from '@/lib/firebase-admin';
+import { getDb } from '@/lib/firebase-admin';
 import { generateTeamCode } from '@/lib/school-utils';
 import { type MasterPlayer } from '@/lib/data/full-master-player-data';
 import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
@@ -36,9 +36,7 @@ const importSquareInvoicesFlow = ai.defineFlow(
     outputSchema: ImportSquareInvoicesOutputSchema,
   },
   async (input) => {
-    if (!db) {
-      return { created: 0, updated: 0, failed: 1, errors: ['Firestore is not initialized.'] };
-    }
+    const db = getDb();
 
     const squareClient = await getSquareClient();
     const locationId = await getSquareLocationId();
@@ -50,7 +48,7 @@ const importSquareInvoicesFlow = ai.defineFlow(
     
     try {
         console.log('Fetching all invoices from Square. This might take a moment...');
-        const { result: { invoices } } = await squareClient.invoicesApi.listInvoices(locationId, undefined, 200);
+        const { result: { invoices } } = await squareClient.invoicesApi.listInvoices({ locationId, limit: 200 });
 
         if (!invoices) {
             return { created: 0, updated: 0, failed: 0, errors: ['No invoices found in Square for this location.'] };
@@ -107,6 +105,7 @@ async function processSingleInvoice(client: any, invoice: Invoice, batch: Fireba
         throw new Error(`Invoice #${invoice.invoiceNumber} is missing order or customer ID.`);
     }
 
+    const db = getDb();
     const { result: { order } } = await client.ordersApi.retrieveOrder(invoice.orderId);
     const { result: { customer } } = await client.customersApi.retrieveCustomer(invoice.primaryRecipient.customerId);
     
@@ -132,7 +131,7 @@ async function processSingleInvoice(client: any, invoice: Invoice, batch: Fireba
     
     console.log(`Extracted school: "${schoolName}", district: "${district}"`);
     
-    const { selections, baseRegistrationFee } = await parseSelectionsFromOrder(order, schoolName, district, batch);
+    const { selections, baseRegistrationFee } = await parseSelectionsFromOrder(order, schoolName, district, batch, db);
 
     if (Object.keys(selections).length === 0) {
         console.warn(`No players parsed for Invoice #${invoice.invoiceNumber}. Skipping player data creation.`);
@@ -183,7 +182,7 @@ async function processSingleInvoice(client: any, invoice: Invoice, batch: Fireba
     return finalData;
 }
 
-async function parseSelectionsFromOrder(order: Order, schoolName: string, district: string, batch: FirebaseFirestore.WriteBatch) {
+async function parseSelectionsFromOrder(order: Order, schoolName: string, district: string, batch: FirebaseFirestore.WriteBatch, db: FirebaseFirestore.Firestore) {
     const selections: Record<string, any> = {};
     let baseRegistrationFee = 0;
 
