@@ -46,7 +46,6 @@ export async function simpleSignUp(email: string, password: string, userData: Om
 
     const authInstance = getAuth();
     let user: User;
-    let isExistingUser = false;
 
     // Handle special accounts FIRST to avoid complex nested logic
     const specialAccountProfile = await handleSpecialAccounts(normalizedEmail, trimmedPassword, authInstance);
@@ -55,28 +54,17 @@ export async function simpleSignUp(email: string, password: string, userData: Om
     }
 
     // Regular user signup logic
-    try {
-      const userCredential = await createUserWithEmailAndPassword(authInstance, normalizedEmail, trimmedPassword);
-      user = userCredential.user;
-      console.log('✅ New user created with UID:', user.uid);
-    } catch (error: any) {
-      if (error.code === 'auth/email-already-in-use') {
-        // Instead of recursion, just sign them in and update profile
-        const userCredential = await signInWithEmailAndPassword(authInstance, normalizedEmail, trimmedPassword);
-        user = userCredential.user;
-        isExistingUser = true;
-        console.log('✅ Existing user signed in with UID:', user.uid);
-      } else {
-        throw error;
-      }
-    }
+    // FIXED: Removed the incorrect sign-in fallback. If email is in use, it will now correctly throw an error.
+    const userCredential = await createUserWithEmailAndPassword(authInstance, normalizedEmail, trimmedPassword);
+    user = userCredential.user;
+    console.log('✅ New user created with UID:', user.uid);
 
     // Create/update profile
     const userProfile: SponsorProfile = {
       ...userData,
       email: normalizedEmail,
       uid: user.uid,
-      ...(isExistingUser ? {} : { createdAt: new Date().toISOString() }),
+      createdAt: new Date().toISOString(), // Always set createdAt for a new user
       updatedAt: new Date().toISOString(),
     };
 
