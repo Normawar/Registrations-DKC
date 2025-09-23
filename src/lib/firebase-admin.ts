@@ -3,41 +3,30 @@
 import { initializeApp, getApps, cert, type App } from 'firebase-admin/app';
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';
 import { getAuth, type Auth } from 'firebase-admin/auth';
+import 'dotenv/config'; // Make sure environment variables are loaded
 
 let app: App | undefined;
 let dbInstance: Firestore | undefined;
 let authInstance: Auth | undefined;
 
 function initializeAdminApp() {
-  // This function should only ever be called once.
   if (app) {
     return;
   }
   
   console.log('[[DEBUG]] Attempting first-time Firebase Admin SDK initialization...');
 
-  // Hard-coded service account credentials with properly escaped private key.
-  const serviceAccount = {
-    projectId: "chessmate-w17oa",
-    clientEmail: "firebase-adminsdk-hfr2d@chessmate-w17oa.iam.gserviceaccount.com",
-    privateKey: "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC6lX8p1G8pL7J0\ndmN2y2y9i5lQ1x5N5Z2j2N7o2f5rT3i1E4a3b1a2w1d8q3d5q6a7s9c8b0e1f2g3h4j\n5k6l7m8n9p0q2s4u6v8y/A+B/C+D/E+F/G+H/I+J/K+L/M+N/O+P/Q+R/S+T/U+V\n/W+X/Y+Z/a+b/c+d/e+f/g+h/i+j/k+l/m+n/o+p/q+r/s+t/u+v/w+x/y+z/1+2\n+3+4+5+6+7+8+9+0/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w\n/x/y/z/A/B/C/D/E/F/G/H/I/J/K/L/M/N/O/P/Q/R/S/T/U/V/W/X/Y/Z/a/b\n/c/d/e/f/g/h/i+j+k+l+m+n+o+p+q+r+s+t+u+v+w+x+y+z+A+B+C+D+E+F+G+H\n+I+J+K+L+M+N+O+P+Q+R+S+T+U+V+W+X+Y+Z+a+b+c+d+e+f+g+h+i+j+k+l+m\n+n+o+p+q+r+s+t+u+v+w+x+y+z/1/2/3/4/5/6/7/8/9/0/a/b/c/d/e/f/g/h\n/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/A/B/C/D/E/F/G/H/I/J/K/L/M\n/N/O/P/Q/R/S/T/U/V/W/X/Y/Z/a/b/c/d/e/f/g/h/i+j+k+l+m+n+o+p+q+r\n+s+t+u+v+w+x+y+z/1/2/3/4/5/6/7/8/9/0/a/b/c/d/e/f/g/h/i/j/k/l/m\n/n/o/p/q/r/s/t/u/v/w/x/y/z/A/B/C/D/E/F/G/H/I/J/K/L/M/N/O/P/Q/R\n/S/T/U/V/W/X/Y/Z/a/b/c/d/e/f/g/h/i+j+k+l+m+n+o+p+q+r+s+t+u+v\n+w+x+y+z/1/2/3/4/5/6/7/8/9/0/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q\n/r/s+t+u+v+w+x+y+z/A/B/C/D/E/F/G/H/I/J/K/L/M/N/O/P/Q/R/S/T/U/V\n/W+X+Y+Z/a/b/c/d/e+f+g+h/i+j+k+l+m+n+o+p+q+r+s+t+u+v+w+x+y\n+z+A+B+C+D+E+F+G+H+I+J+K+L+M+N+O+P+Q+R+S+T+U+V+W+X+Y+Z+a+b\n+c+d+e+f+g+h+i+j+k+l+m+n+o+p+q+r+s+t+u+v+w+x+y+z+1/2/3/4/5/6\n/7/8/9/0/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z\n/A/B/C/D/E/F/G/H/I/J/K/L/M/N/O/P/Q/R/S/T/U/V/W/X/Y/Z/a/b/c/d\n/e+f+g+h/i+j+k+l+m+n+o+p+q+r+s+t+u+v+w+x+y+z+1/2/3/4/5/6/7/8\n/9/0/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y+z/A/B\n+C+D+E+F+G+H+I+J+K+L+M+N+O+P+Q+R+S+T+U+V+W+X+Y+Z+a+b+c+d+e\n+f+g+h+i+j+k+l+m+n+o+p+q+r+s+t+u+v+w+x+y+z+1/2/3/4/5/6/7/8\n/9/0/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t+u+v+w+x+y+z/A/B\n+C+D+E+F+G+H+I+J+K+L+M+N+O+P+Q+R+S+T+U+V+W+X+Y+Z+a+b+c+d+e\n+f+g+h+i+j+k+l+m+n+o+p+q+r+s+t+u+v+w+x+y+z+1/2/3/4/5/6/7/8\n/9/0/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t+u+v+w+x+y+z/A/B\n+C+D+E+F+G+H+I+J+K+L+M+N+O+P+Q+R+S+T+U+V+W+X+Y+Z+a+b+c+d+e\n+f+g+h+i+j+k+l+m+n+o+p+q+r+s+t+u+v+w+x+y+z+1/2/3/4/5/6/7/8\n/9/0/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t+u+v+w+x+y+z/A/B\n+C+D+E+F+G+H+I+J+K+L+M+N+O+P+Q+R+S+T+U+V+W+X+Y+Z+a/b+c+d+e\n+f+g+h+i+j+k+l+m+n+o+p+q+r+s+t+u+v+w+x+y+z+1/2/3/4/5/6/7/8\n/9/0/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t+u+v+w+x+y+z/A/B\n+C+D+E+F+G+H+I+J+K+L+M+N+O+P+Q+R+S+T+U+V+W+X+Y+Z+a+b+c+d+e\n+f+g+h+i+j+k+l+m+n+o+p+q+r+s+t+u+v+w+x+y+z+1/2/3/4/5/6/7/8\n/9/0/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t+u+v+w+x+y+z/A/B\n+C+D+E+F+G+H+I+J+K+L+M+N+O+P+Q+R+S+T+U+V+W+X+Y+Z+a+b+c+d+e\n+f+g+h+i+j+k+l+m+n+o+p+q+r+s+t+u+v+w+x+y+z+1/2/3/4/5/6/7/8\n/9/0/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t+u+v+w+x+y+z+A/B\n+C+D+E+F+G+H+I+J+K+L+M+N+O+P+Q+R+S+T+U+V+W+X+Y+Z+a+b+c+d+e\n+f+g+h+i+j+k+l+m+n+o+p+q+r+s+t+u+v+w+x+y+z+1/2/3/4/5/6\\n-----END PRIVATE KEY-----\n",
-  };
-  
-  // Explicitly check for credentials.
-  if (!serviceAccount.projectId || !serviceAccount.clientEmail || !serviceAccount.privateKey.includes('-----BEGIN PRIVATE KEY-----')) {
-    console.error('[[DEBUG]] CRITICAL: Firebase Admin SDK service account credentials are not fully configured.');
-    return;
-  }
-  
-  console.log('[[DEBUG]] Service account credentials appear to be present.');
-
   try {
-    // Only initialize if no apps exist.
+    // This is the standard, robust way. The SDK will automatically find
+    // and parse the GOOGLE_APPLICATION_CREDENTIALS environment variable.
     if (getApps().length === 0) {
-      app = initializeApp({
-        credential: cert(serviceAccount),
-      });
-      console.log('[[DEBUG]] Firebase Admin SDK initialized successfully.');
+      // Check if the environment variable is present
+      if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+        throw new Error('CRITICAL: GOOGLE_APPLICATION_CREDENTIALS environment variable is not set.');
+      }
+      
+      app = initializeApp();
+      console.log('[[DEBUG]] Firebase Admin SDK initialized successfully using environment credentials.');
     } else {
       app = getApps()[0];
       console.log('[[DEBUG]] Using existing Firebase Admin app instance.');
@@ -48,18 +37,26 @@ function initializeAdminApp() {
 
   } catch (error: any) {
     console.error('[[DEBUG]] CRITICAL: Firebase Admin SDK initializeApp failed.', error.message);
+    // Log the problematic env var content for debugging, but be careful with this in production logs
+    if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+      console.error('[[DEBUG]] Contents of GOOGLE_APPLICATION_CREDENTIALS (check for formatting errors):', process.env.GOOGLE_APPLICATION_CREDENTIALS.substring(0, 100) + '...');
+    } else {
+      console.error('[[DEBUG]] GOOGLE_APPLICATION_CREDENTIALS was not found in process.env.');
+    }
+    
     app = undefined;
     dbInstance = undefined;
     authInstance = undefined;
   }
 }
 
+// Ensure initialization is attempted when the module is loaded.
+initializeAdminApp();
+
 // Export getter functions that ensure initialization and throw if it failed.
 export function getDb(): Firestore {
   if (!dbInstance) {
-    initializeAdminApp();
-  }
-  if (!dbInstance) {
+    // If it's still not available, throw a clear error.
     throw new Error("Failed to initialize Firestore Admin SDK. Check server logs for credential errors.");
   }
   return dbInstance;
@@ -67,9 +64,7 @@ export function getDb(): Firestore {
 
 export function getAdminAuth(): Auth {
   if (!authInstance) {
-    initializeAdminApp();
-  }
-  if (!authInstance) {
+    // If it's still not available, throw a clear error.
     throw new Error("Failed to initialize Firebase Admin Auth SDK. Check server logs for credential errors.");
   }
   return authInstance;
