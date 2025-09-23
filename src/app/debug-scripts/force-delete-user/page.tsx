@@ -12,6 +12,17 @@ import { Loader2, Trash2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import Link from 'next/link';
 import { forceDeleteUsersAction } from '@/app/users/actions';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 function ForceDeleteUserPage() {
   const { toast } = useToast();
@@ -23,10 +34,6 @@ function ForceDeleteUserPage() {
     const emails = emailsToDelete.split(/[\n,;]+/).map(e => e.trim().toLowerCase()).filter(Boolean);
     if (emails.length === 0) {
       toast({ variant: 'destructive', title: 'No Emails Provided', description: 'Please enter at least one email to delete.' });
-      return;
-    }
-
-    if (!confirm(`Are you sure you want to permanently delete ${emails.length} user(s)? This will remove their authentication record and Firestore data. This action CANNOT be undone.`)) {
       return;
     }
 
@@ -70,10 +77,28 @@ function ForceDeleteUserPage() {
               rows={6}
               disabled={isPending}
             />
-            <Button onClick={handleForceDelete} disabled={isPending} variant="destructive">
-              {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-              Permanently Delete Users
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button disabled={isPending || !emailsToDelete.trim()} variant="destructive">
+                  {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                  Permanently Delete Users
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently delete the specified user accounts from both authentication and the database. This action CANNOT be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleForceDelete} className="bg-destructive hover:bg-destructive/90">
+                    Yes, Delete Users
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </CardContent>
         </Card>
 
