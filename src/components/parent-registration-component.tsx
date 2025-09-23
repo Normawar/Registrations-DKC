@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -21,6 +20,7 @@ interface ParentRegistrationProps {
     firstName: string;
     lastName: string;
     phone: string;
+    studentIds?: string[];
   };
 }
 
@@ -31,19 +31,7 @@ export function ParentRegistrationComponent({ parentProfile }: ParentRegistratio
   
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [isRegistrationDialogOpen, setIsRegistrationDialogOpen] = useState(false);
-  const [parentStudents, setParentStudents] = useState<MasterPlayer[]>([]);
   const [registrations, setRegistrations] = useState<any[]>([]);
-
-  // Get upcoming events and filter out test events
-  const upcomingEvents = useMemo(() => {
-    return events
-      .filter(event => {
-        const isUpcoming = new Date(event.date) >= new Date();
-        const isTestEvent = event.name.toLowerCase().startsWith('test');
-        return isUpcoming && !event.isClosed && !isTestEvent;
-      })
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [events]);
 
   // Load existing registrations from Firestore
   useEffect(() => {
@@ -61,26 +49,23 @@ export function ParentRegistrationComponent({ parentProfile }: ParentRegistratio
 
     loadRegistrations();
   }, [parentProfile?.email]);
+  
+  const parentStudents = useMemo(() => {
+    if (!parentProfile.studentIds) return [];
+    return database.filter(p => parentProfile.studentIds?.includes(p.id));
+  }, [database, parentProfile.studentIds]);
 
-  // Load parent's students
-  useEffect(() => {
-    const loadParentStudents = () => {
-      try {
-        const storedParentStudents = localStorage.getItem(`parent_students_${parentProfile.email}`);
-        if (storedParentStudents) {
-          const studentIds = JSON.parse(storedParentStudents);
-          const students = database.filter(p => studentIds.includes(p.id));
-          setParentStudents(students);
-        }
-      } catch (error) {
-        console.error('Failed to load parent students:', error);
-      }
-    };
+  // Get upcoming events and filter out test events
+  const upcomingEvents = useMemo(() => {
+    return events
+      .filter(event => {
+        const isUpcoming = new Date(event.date) >= new Date();
+        const isTestEvent = event.name.toLowerCase().startsWith('test');
+        return isUpcoming && !event.isClosed && !isTestEvent;
+      })
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }, [events]);
 
-    if (database.length > 0) {
-      loadParentStudents();
-    }
-  }, [database, parentProfile.email]);
 
   const getStudentRegistrationStatus = (student: MasterPlayer, event: any) => {
     if (!event?.id) {
@@ -114,6 +99,14 @@ export function ParentRegistrationComponent({ parentProfile }: ParentRegistratio
   };
 
   const handleRegisterForEvent = (event: any) => {
+    if (parentStudents.length === 0) {
+      toast({
+        title: 'No Students Found',
+        description: 'Please add students to your profile before registering for events.',
+        variant: 'destructive',
+      });
+      return;
+    }
     setSelectedEvent(event);
     setIsRegistrationDialogOpen(true);
   };
@@ -146,13 +139,7 @@ export function ParentRegistrationComponent({ parentProfile }: ParentRegistratio
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {parentStudents.length === 0 ? (
-            <div className="text-center p-6 text-muted-foreground">
-              <User className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p className="text-lg font-medium">No Students Found</p>
-              <p>Add students to your profile to begin registering for events.</p>
-            </div>
-          ) : upcomingEvents.length === 0 ? (
+          {upcomingEvents.length === 0 ? (
             <div className="text-center p-6 text-muted-foreground">
               <p>No upcoming events available for registration.</p>
             </div>
@@ -182,12 +169,14 @@ export function ParentRegistrationComponent({ parentProfile }: ParentRegistratio
                       <div className="text-right">
                         <Button 
                           onClick={() => handleRegisterForEvent(event)}
-                          disabled={summary.availableCount === 0}
+                          disabled={parentStudents.length > 0 && summary.availableCount === 0}
                           size="sm"
                         >
-                          {summary.availableCount > 0 
-                            ? `Register Students (${summary.availableCount} available)`
-                            : 'All Students Registered'
+                          {parentStudents.length === 0
+                            ? 'Add Students First'
+                            : summary.availableCount > 0 
+                              ? `Register Students (${summary.availableCount} available)`
+                              : 'All Students Registered'
                           }
                         </Button>
                       </div>
