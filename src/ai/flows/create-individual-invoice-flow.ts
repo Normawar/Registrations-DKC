@@ -20,12 +20,14 @@ import type { CreateInvoiceInput, CreateInvoiceOutput } from './schemas';
 export async function createIndividualInvoice(input: CreateInvoiceInput): Promise<CreateInvoiceOutput> {
   // CRITICAL: Check database initialization at the wrapper level
   console.log('[[DEBUG]] createIndividualInvoice: Entered server action.');
-  const db = getDb();
-  if (!db) {
-    console.error('[[DEBUG]] Firestore not initialized at individual invoice wrapper level');
-    throw new Error('Database connection not available. Please refresh the page and try again.');
+  try {
+    const db = getDb(); // This will throw if not initialized
+    console.log('[[DEBUG]] createIndividualInvoice: DB check passed.');
+  } catch (error) {
+    console.error('[[DEBUG]] createIndividualInvoice: DB check failed in wrapper!', error);
+    throw new Error('Database connection is not available. Please contact support.');
   }
-  console.log('[[DEBUG]] createIndividualInvoice: DB check passed.');
+
 
   try {
     // Add validation specific to individual registrations
@@ -54,7 +56,7 @@ export async function createIndividualInvoice(input: CreateInvoiceInput): Promis
     // Re-throw with more context for individual registrations
     if (error instanceof Error) {
       // Check for specific Firestore error
-      if (error.message.includes('Expected first argument to collection()')) {
+      if (error.message.includes('Expected first argument to collection()') || error.message.includes('Firestore')) {
         throw new Error('Database connection lost during invoice creation. Please refresh the page and try again.');
       }
       throw error;

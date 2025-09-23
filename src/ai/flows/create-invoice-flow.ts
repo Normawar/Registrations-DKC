@@ -18,12 +18,13 @@ import { type CreateInvoiceInput, CreateInvoiceInputSchema, type CreateInvoiceOu
 
 export async function createInvoice(input: CreateInvoiceInput): Promise<CreateInvoiceOutput> {
   console.log('[[DEBUG]] createInvoice: Entered wrapper function.');
-  const db = getDb();
-  if (!db) {
-    console.error('[[DEBUG]] createInvoice wrapper: Firestore Admin SDK is not initialized. Halting execution.');
-    throw new Error('Server configuration error: Database not available.');
+  try {
+    const db = getDb();
+    console.log('[[DEBUG]] createInvoice wrapper: DB check passed.');
+  } catch (error) {
+     console.error('[[DEBUG]] createInvoice wrapper: DB check failed!', error);
+     throw new Error('Server configuration error: Database not available.');
   }
-  console.log('[[DEBUG]] createInvoice wrapper: DB check passed.');
   
   return createInvoiceFlow(input);
 }
@@ -37,12 +38,14 @@ const createInvoiceFlow = ai.defineFlow(
   },
   async (input) => {
     console.log('[[DEBUG]] createInvoiceFlow: Genkit flow started.');
-    const db = getDb();
-    if (!db) {
-      console.error('[[DEBUG]] CRITICAL: Firestore Admin SDK is not initialized in createInvoice flow. Halting execution.');
-      throw new Error('Server configuration error: Database not available.');
+    let db;
+    try {
+      db = getDb();
+      console.log('[[DEBUG]] createInvoiceFlow: DB check passed inside flow.');
+    } catch (error) {
+       console.error('[[DEBUG]] CRITICAL: DB check failed inside flow!', error);
+       throw new Error('Server configuration error: Database not available.');
     }
-     console.log('[[DEBUG]] createInvoiceFlow: DB check passed inside flow.');
 
 
     // Step 0: Globally fix all null or undefined fields in players
