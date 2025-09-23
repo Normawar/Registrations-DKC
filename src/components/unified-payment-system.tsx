@@ -1,7 +1,7 @@
 'use client';
 
 import { format } from "date-fns";
-import { getInvoiceStatusWithPayments } from "@/ai/flows/get-invoice-status-flow";
+import { getInvoiceStatus } from '@/ai/flows/get-invoice-status-flow';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -21,7 +21,7 @@ const handleRefreshStatusWithPaymentSync = async (
   setIsRefreshing(true);
   try {
     // Get comprehensive invoice status including payment history
-    const result = await getInvoiceStatusWithPayments({ invoiceId: confirmation.invoiceId });
+    const result = await getInvoiceStatus({ invoiceId: confirmation.invoiceId });
     
     // Merge Square payment history with local payment history
     const localPayments = confirmation.paymentHistory || [];
@@ -48,7 +48,7 @@ const handleRefreshStatusWithPaymentSync = async (
     }
     
     // Sort by date
-    unifiedPaymentHistory.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    unifiedPaymentHistory.sort((a:any, b:any) => new Date(a.date).getTime() - new Date(b.date).getTime());
     
     // Calculate totals
     const totalPaidFromHistory = unifiedPaymentHistory.reduce((sum, payment) => sum + payment.amount, 0);
@@ -65,19 +65,6 @@ const handleRefreshStatusWithPaymentSync = async (
       paymentHistory: unifiedPaymentHistory,
       lastSquareSync: new Date().toISOString(),
     };
-    
-    // Update localStorage
-    const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
-    const updatedAllInvoices = allInvoices.map((inv: any) => 
-      inv.id === confirmation.id ? updatedConfirmation : inv
-    );
-    localStorage.setItem('all_invoices', JSON.stringify(updatedAllInvoices));
-    
-    const confirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
-    const updatedConfirmations = confirmations.map((conf: any) =>
-      conf.id === confirmation.id ? updatedConfirmation : conf
-    );
-    localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
     
     setConfirmation(updatedConfirmation);
 
@@ -153,7 +140,7 @@ const PaymentHistoryDisplay = ({ confirmation }: { confirmation: any }) => {
                       {getPaymentMethodLabel(payment)}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {payment.date ? format(new Date(payment.date), 'MMM dd, yyyy \'at\' h:mm a') : 'Unknown date'}
+                      {payment.date ? format(new Date(payment.date), 'MMM dd, yyyy \\'at\\' h:mm a') : 'Unknown date'}
                     </p>
                     {payment.note && (
                       <p className="text-xs text-muted-foreground italic">
@@ -215,7 +202,7 @@ const handleInvoiceWebhook = async (webhookData: any) => {
     if (invoiceId) {
       try {
         // Get updated invoice data
-        const result = await getInvoiceStatusWithPayments({ invoiceId });
+        const result = await getInvoiceStatus({ invoiceId });
         
         // Find and update the local invoice
         const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
@@ -264,4 +251,4 @@ const handleInvoiceWebhook = async (webhookData: any) => {
   }
 };
 
-export { getInvoiceStatusWithPayments, handleRefreshStatusWithPaymentSync, PaymentHistoryDisplay, handleInvoiceWebhook };
+export { getInvoiceStatus, handleRefreshStatusWithPaymentSync, PaymentHistoryDisplay, handleInvoiceWebhook };
