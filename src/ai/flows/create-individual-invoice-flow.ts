@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -18,11 +19,13 @@ import type { CreateInvoiceInput, CreateInvoiceOutput } from './schemas';
  */
 export async function createIndividualInvoice(input: CreateInvoiceInput): Promise<CreateInvoiceOutput> {
   // CRITICAL: Check database initialization at the wrapper level
+  console.log('[[DEBUG]] createIndividualInvoice: Entered server action.');
   const db = getDb();
   if (!db) {
-    console.error('Firestore not initialized at individual invoice wrapper level');
+    console.error('[[DEBUG]] Firestore not initialized at individual invoice wrapper level');
     throw new Error('Database connection not available. Please refresh the page and try again.');
   }
+  console.log('[[DEBUG]] createIndividualInvoice: DB check passed.');
 
   try {
     // Add validation specific to individual registrations
@@ -31,7 +34,7 @@ export async function createIndividualInvoice(input: CreateInvoiceInput): Promis
     }
 
     // Log for debugging
-    console.log('Creating individual invoice for:', {
+    console.log('[[DEBUG]] createIndividualInvoice: Calling main createInvoice flow with input:', {
       parentEmail: input.sponsorEmail,
       eventName: input.eventName,
       playerCount: input.players.length,
@@ -42,10 +45,11 @@ export async function createIndividualInvoice(input: CreateInvoiceInput): Promis
 
     // Call the main invoice creation flow
     const result = await createInvoice(input);
+    console.log('[[DEBUG]] createIndividualInvoice: Main flow returned result:', result);
     
     return result;
   } catch (error) {
-    console.error('Error in createIndividualInvoice wrapper:', error);
+    console.error('[[DEBUG]] Error in createIndividualInvoice wrapper:', error);
     
     // Re-throw with more context for individual registrations
     if (error instanceof Error) {

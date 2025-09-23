@@ -9,7 +9,11 @@ let dbInstance: Firestore | undefined;
 let authInstance: Auth | undefined;
 
 function initializeAdminApp() {
+  console.log('[[DEBUG]] initializeAdminApp called.');
+
+  // Prevent re-initialization
   if (app) {
+    console.log('[[DEBUG]] Admin app already initialized.');
     return;
   }
 
@@ -18,6 +22,10 @@ function initializeAdminApp() {
     clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
     privateKey: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
   };
+  
+  console.log(`[[DEBUG]] Service Account Project ID: ${serviceAccount.projectId ? 'OK' : 'MISSING'}`);
+  console.log(`[[DEBUG]] Service Account Client Email: ${serviceAccount.clientEmail ? 'OK' : 'MISSING'}`);
+  console.log(`[[DEBUG]] Service Account Private Key: ${serviceAccount.privateKey ? 'OK' : 'MISSING'}`);
 
   if (!serviceAccount.projectId || !serviceAccount.clientEmail || !serviceAccount.privateKey) {
     console.error('CRITICAL: Firebase Admin SDK service account credentials are not fully configured.');
@@ -30,13 +38,15 @@ function initializeAdminApp() {
       app = initializeApp({
         credential: cert(serviceAccount),
       });
-      console.log('Firebase Admin SDK initialized successfully.');
+      console.log('[[DEBUG]] Firebase Admin SDK initialized successfully.');
     } else {
       app = apps[0];
+      console.log('[[DEBUG]] Reusing existing Firebase Admin app.');
     }
   
     dbInstance = getFirestore(app);
     authInstance = getAuth(app);
+    console.log('[[DEBUG]] Firestore and Auth instances created.');
   
   } catch (error: any) {
     console.error('CRITICAL: Firebase Admin SDK initialization failed.', error.message);
@@ -51,10 +61,12 @@ initializeAdminApp();
 
 // Export getter functions that ensure initialization
 export function getDb(): Firestore {
+  console.log('[[DEBUG]] getDb() called.');
   if (!dbInstance) {
-    console.warn("Firestore Admin db not initialized on first call, re-initializing...");
+    console.warn("[[DEBUG]] Firestore Admin db not initialized on first call, re-initializing...");
     initializeAdminApp();
     if (!dbInstance) {
+      console.error("[[DEBUG]] FAILED to initialize Firestore Admin SDK after retry.");
       throw new Error("Failed to initialize Firestore Admin SDK after retry.");
     }
   }
@@ -62,16 +74,14 @@ export function getDb(): Firestore {
 }
 
 export function getAdminAuth(): Auth {
+  console.log('[[DEBUG]] getAdminAuth() called.');
   if (!authInstance) {
-    console.warn("Firestore Admin auth not initialized on first call, re-initializing...");
+    console.warn("[[DEBUG]] Firestore Admin auth not initialized on first call, re-initializing...");
     initializeAdminApp();
      if (!authInstance) {
+      console.error("[[DEBUG]] FAILED to initialize Firebase Admin Auth SDK after retry.");
       throw new Error("Failed to initialize Firebase Admin Auth SDK after retry.");
     }
   }
   return authInstance;
 }
-
-// For simplicity in other files, we can export the getters with the old names.
-export const db = getDb();
-export const adminAuth = getAdminAuth();

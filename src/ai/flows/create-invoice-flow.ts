@@ -5,6 +5,7 @@
  * This flow is now unified to handle both individual and sponsor registrations.
  */
 
+import { ai } from '@/ai/genkit';
 import { randomUUID } from 'crypto';
 import { ApiError, type OrderLineItem, type InvoiceRecipient, type Address } from 'square';
 import { format } from 'date-fns';
@@ -12,15 +13,37 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { getDb } from '@/lib/firebase-admin';
 import { generateTeamCode } from '@/lib/school-utils';
 import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
-import { type CreateInvoiceInput, type CreateInvoiceOutput } from './schemas';
+import { type CreateInvoiceInput, CreateInvoiceInputSchema, type CreateInvoiceOutput, CreateInvoiceOutputSchema } from './schemas';
 
 
 export async function createInvoice(input: CreateInvoiceInput): Promise<CreateInvoiceOutput> {
+  console.log('[[DEBUG]] createInvoice: Entered wrapper function.');
+  const db = getDb();
+  if (!db) {
+    console.error('[[DEBUG]] createInvoice wrapper: Firestore Admin SDK is not initialized. Halting execution.');
+    throw new Error('Server configuration error: Database not available.');
+  }
+  console.log('[[DEBUG]] createInvoice wrapper: DB check passed.');
+  
+  return createInvoiceFlow(input);
+}
+
+
+const createInvoiceFlow = ai.defineFlow(
+  {
+    name: 'createInvoiceFlow',
+    inputSchema: CreateInvoiceInputSchema,
+    outputSchema: CreateInvoiceOutputSchema,
+  },
+  async (input) => {
+    console.log('[[DEBUG]] createInvoiceFlow: Genkit flow started.');
     const db = getDb();
     if (!db) {
-      console.error('CRITICAL: Firestore Admin SDK is not initialized in createInvoice flow. Halting execution.');
+      console.error('[[DEBUG]] CRITICAL: Firestore Admin SDK is not initialized in createInvoice flow. Halting execution.');
       throw new Error('Server configuration error: Database not available.');
     }
+     console.log('[[DEBUG]] createInvoiceFlow: DB check passed inside flow.');
+
 
     // Step 0: Globally fix all null or undefined fields in players
     const processedPlayers = input.players.map(p => ({
@@ -37,7 +60,7 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
 
     // Step 1: Save/Update player data in Firestore
     if (processedPlayers.length > 0) {
-      console.log(`Processing ${processedPlayers.length} players for Firestore save/update...`);
+      console.log(`[[DEBUG]] Processing ${processedPlayers.length} players for Firestore save/update...`);
       for (const player of processedPlayers) {
         const playerId = player.uscfId.toUpperCase() !== 'NEW' ? player.uscfId : `temp_${randomUUID()}`;
         const playerRef = doc(db, 'players', playerId);
@@ -60,17 +83,17 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
 
         Object.keys(playerData).forEach(key => {
           if (playerData[key as keyof typeof playerData] === undefined) {
-            console.error(`Undefined value found for key ${key} in player data:`, playerData);
+            console.error(`[[DEBUG]] Undefined value found for key ${key} in player data:`, playerData);
             throw new Error(`Invalid player data: ${key} is undefined`);
           }
         });
 
         if (playerDoc.exists()) {
           await setDoc(playerRef, playerData, { merge: true });
-          console.log(`Updated player ${player.playerName} (ID: ${playerId}) in Firestore.`);
+          console.log(`[[DEBUG]] Updated player ${player.playerName} (ID: ${playerId}) in Firestore.`);
         } else {
           await setDoc(playerRef, { ...playerData, createdAt: new Date().toISOString() }, { merge: true });
-          console.log(`Created new player ${player.playerName} (ID: ${playerId}) in Firestore.`);
+          console.log(`[[DEBUG]] Created new player ${player.playerName} (ID: ${playerId}) in Firestore.`);
         }
       }
     }
@@ -78,6 +101,7 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
     const squareClient = await getSquareClient();
     const locationId = await getSquareLocationId();
     const { customersApi, ordersApi, invoicesApi } = squareClient;
+    console.log('[[DEBUG]] createInvoiceFlow: Square client and location obtained.');
 
     try {
       // --- Customer Creation / Lookup ---
@@ -114,6 +138,8 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
         });
         customerId = createCustomerResponse.result.customer!.id!;
       }
+      console.log(`[[DEBUG]] createInvoiceFlow: Customer processed. ID: ${customerId}`);
+
 
       // --- Order Line Items ---
       const lineItems: OrderLineItem[] = [];
@@ -187,6 +213,8 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
           note: uscfNote,
         });
       }
+      console.log(`[[DEBUG]] createInvoiceFlow: ${lineItems.length} line items created.`);
+
 
       // --- Create Order ---
       const createOrderResponse = await ordersApi.createOrder({
@@ -194,6 +222,8 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
         order: { locationId, customerId, lineItems },
       });
       const orderId = createOrderResponse.result.order!.id!;
+      console.log(`[[DEBUG]] createInvoiceFlow: Order created. ID: ${orderId}`);
+
 
       // --- Create Invoice ---
       const dueDate = new Date();
@@ -224,11 +254,15 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
       };
 
       const createInvoiceResponse = await invoicesApi.createInvoice(invoicePayload);
+      console.log('[[DEBUG]] createInvoiceFlow: Draft invoice created.');
+
 
       const draftInvoice = createInvoiceResponse.result.invoice!;
       await invoicesApi.publishInvoice(draftInvoice.id!, { version: draftInvoice.version!, idempotencyKey: randomUUID() });
       await new Promise(r => setTimeout(r, 2000));
       const { result: { invoice: finalInvoice } } = await invoicesApi.getInvoice(draftInvoice.id!);
+      console.log('[[DEBUG]] createInvoiceFlow: Invoice published.');
+
 
       if (!finalInvoice?.publicUrl) throw new Error('Failed to retrieve public URL for the invoice.');
 
@@ -238,8 +272,11 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
       if (error instanceof ApiError) {
         const errors = Array.isArray(error.result?.errors) ? error.result!.errors : [];
         const errorMessage = errors.length ? errors.map(e => `[${e.category}/${e.code}]: ${e.detail}`).join(', ') : JSON.stringify(error.result);
+        console.error('[[DEBUG]] Square Error in createInvoiceFlow:', errorMessage);
         throw new Error(`Square Error: ${errorMessage}`);
       }
+      console.error('[[DEBUG]] Unexpected error in createInvoiceFlow:', error);
       throw error instanceof Error ? new Error(error.message) : new Error('Unexpected error during invoice creation.');
     }
-}
+  }
+);
