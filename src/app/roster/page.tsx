@@ -32,7 +32,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { generateTeamCode } from '@/lib/school-utils';
 import { Separator } from '@/components/ui/separator';
 import Papa from 'papaparse';
@@ -681,6 +681,8 @@ function UserRosterPageContent() {
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [playerToEdit, setPlayerToEdit] = useState<MasterPlayer | null>(null);
+    const [playerToDelete, setPlayerToDelete] = useState<MasterPlayer | null>(null);
+    const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
     const { toast } = useToast();
     const [schoolsForEditDistrict, setSchoolsForEditDistrict] = useState<string[]>([]);
     
@@ -794,9 +796,6 @@ function UserRosterPageContent() {
         await updateProfile({ studentIds: updatedStudentIds });
         toast({ title: "Player Added to Your Roster" });
       } else if(profile.role === 'sponsor' && !roster.some(p => p.id === playerToSave.id)) {
-          // Sponsor adding a player who might be from another school in their district, but should be on their roster.
-          // The updatePlayer/addPlayer logic already handles setting the school/district if it's new.
-          // We just need to refresh the roster view.
           toast({ title: "Player Added to Roster" });
       }
 
@@ -804,16 +803,23 @@ function UserRosterPageContent() {
       setIsEditOpen(false);
     };
 
-    const handleDeletePlayer = async (player: MasterPlayer) => {
-        if (window.confirm(`Are you sure you want to remove ${player.firstName} ${player.lastName} from your roster?`)) {
-            if (profile?.role === 'individual') {
-                const updatedStudentIds = profile.studentIds?.filter(id => id !== player.id);
-                await updateProfile({ studentIds: updatedStudentIds });
-                toast({ title: 'Student Removed', description: `${player.firstName} has been removed from your list.` });
-            } else {
-                toast({ title: 'Action Not Supported', description: 'Sponsors cannot remove players directly, only organizers can delete records from the master database.' });
-            }
+    const handleDeletePlayer = (player: MasterPlayer) => {
+        if (profile?.role === 'individual') {
+            setPlayerToDelete(player);
+            setIsDeleteAlertOpen(true);
+        } else {
+            toast({ title: 'Action Not Supported', description: 'Sponsors cannot remove players directly, only organizers can delete records from the master database.' });
         }
+    };
+    
+    const confirmDeletePlayer = async () => {
+        if (playerToDelete && profile?.role === 'individual') {
+            const updatedStudentIds = profile.studentIds?.filter(id => id !== playerToDelete.id);
+            await updateProfile({ studentIds: updatedStudentIds });
+            toast({ title: 'Student Removed', description: `${playerToDelete.firstName} ${playerToDelete.lastName} has been removed from your list.` });
+        }
+        setIsDeleteAlertOpen(false);
+        setPlayerToDelete(null);
     };
 
     return (
@@ -858,9 +864,29 @@ function UserRosterPageContent() {
                                             <Edit className="h-4 w-4" />
                                         </Button>
                                          {profile?.role === 'individual' && (
-                                            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeletePlayer(player)}>
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
+                                            <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                    <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                    <AlertDialogHeader>
+                                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                        <AlertDialogDescription>This will remove {player.firstName} {player.lastName} from your student list. This action does not delete them from the master database.</AlertDialogDescription>
+                                                    </AlertDialogHeader>
+                                                    <AlertDialogFooter>
+                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                        <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={() => {
+                                                            const updatedStudentIds = profile.studentIds?.filter(id => id !== player.id);
+                                                            updateProfile({ studentIds: updatedStudentIds });
+                                                            toast({ title: 'Student Removed', description: `${player.firstName} has been removed from your list.` });
+                                                        }}>
+                                                            Remove Student
+                                                        </AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
                                          )}
                                     </TableCell>
                                 </TableRow>
@@ -1081,17 +1107,33 @@ function UserRosterPageContent() {
                     <div className="p-6 pt-4 border-t bg-muted/30 shrink-0">
                       <div className="flex justify-between">
                         {playerToEdit && profile?.role === 'individual' ? (
-                          <Button 
-                            type="button" 
-                            variant="destructive" 
-                            onClick={() => {
-                              handleDeletePlayer(playerToEdit);
-                              setIsEditOpen(false);
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Remove From My List
-                          </Button>
+                          <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                  <Button type="button" variant="destructive">
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      Remove From My List
+                                  </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                          This will remove {playerToEdit.firstName} from your student list. It does not delete them from the database.
+                                      </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={async () => {
+                                          const updatedStudentIds = profile.studentIds?.filter(id => id !== playerToEdit.id);
+                                          await updateProfile({ studentIds: updatedStudentIds });
+                                          toast({ title: "Student Removed" });
+                                          setIsEditOpen(false);
+                                      }}>
+                                          Confirm Removal
+                                      </AlertDialogAction>
+                                  </AlertDialogFooter>
+                              </AlertDialogContent>
+                          </AlertDialog>
                         ) : (
                           <div></div>
                         )}
