@@ -14,7 +14,7 @@ import { useMemo, useState, useEffect, useCallback } from 'react';
 import { format } from 'date-fns';
 import { Calendar, MapPin, DollarSign, Users, CheckCircle, Clock, Lock } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { schoolData } from '@/lib/data/school-data';
 
@@ -46,18 +46,26 @@ export default function EventsPage() {
   const loadRegistrations = useCallback(async () => {
     if (!db) return;
     try {
-      const invoicesCol = collection(db, 'invoices');
-      const invoiceSnapshot = await getDocs(invoicesCol);
+      let invoicesQuery = collection(db, 'invoices');
+      if (profile?.role === 'individual') {
+        invoicesQuery = query(invoicesQuery, where('parentEmail', '==', profile.email));
+      } else if (profile?.role === 'sponsor' || profile?.role === 'district_coordinator') {
+        invoicesQuery = query(invoicesQuery, where('schoolName', '==', profile.school), where('district', '==', profile.district));
+      }
+      
+      const invoiceSnapshot = await getDocs(invoicesQuery);
       const allConfirmations = invoiceSnapshot.docs.map(doc => doc.data());
       setRegistrations(allConfirmations);
     } catch (error) {
       console.error('Failed to load registrations from Firestore:', error);
     }
-  }, []);
+  }, [profile]);
 
   useEffect(() => {
-    loadRegistrations();
-  }, [loadRegistrations]);
+    if (profile) {
+      loadRegistrations();
+    }
+  }, [loadRegistrations, profile]);
 
   // Get upcoming events and filter based on user type (test/real)
   const upcomingEvents = useMemo(() => {
@@ -227,7 +235,7 @@ export default function EventsPage() {
                         <div className="flex items-center gap-4">
                           <div className="flex items-center gap-1">
                             <Clock className="h-4 w-4 text-muted-foreground" />
-                            <span>Registration Deadline: {format(new Date(event.registrationDeadline || event.date), 'PPP')}</span>
+                            <span>Registration Deadline: {format(new Date(event.regularDeadline || event.date), 'PPP')}</span>
                           </div>
                           {event.maxParticipants && (
                             <div className="flex items-center gap-1">

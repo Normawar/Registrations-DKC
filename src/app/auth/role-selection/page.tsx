@@ -52,7 +52,10 @@ export default function RoleSelectionPage() {
   // Load users from Firestore (replace mock data)
   useEffect(() => {
     const loadUsers = async () => {
-      if (!db) return;
+      if (!db) {
+        console.error("Firestore not initialized, cannot load users.");
+        return;
+      };
       
       setLoading(true);
       try {
@@ -182,7 +185,7 @@ export default function RoleSelectionPage() {
                 key={user.id}
                 onClick={() => handleUserImpersonation(user)}
                 className={`cursor-pointer hover:shadow-md hover:border-primary transition-all duration-200 ${
-                  user.isTestAccount ? 'border-orange-200 bg-orange-50' : ''
+                  (user as any).isTestAccount ? 'border-orange-200 bg-orange-50' : ''
                 }`}
               >
                 <CardContent className="flex items-center justify-between p-4">
@@ -194,7 +197,7 @@ export default function RoleSelectionPage() {
                     <div>
                       <h3 className="font-semibold">
                         {user.firstName} {user.lastName}
-                        {user.isTestAccount && <Badge className="ml-2" variant="outline">Test Account</Badge>}
+                        {(user as any).isTestAccount && <Badge className="ml-2" variant="outline">Test Account</Badge>}
                       </h3>
                       <p className="text-sm text-muted-foreground">{user.email}</p>
                       <p className="text-sm">{user.school} • {user.district}</p>

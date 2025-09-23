@@ -34,7 +34,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { SponsorRegistrationDialog } from "@/components/sponsor-registration-dialog";
 import { SponsorGuard } from "@/components/auth-guard";
 import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/services/firestore-service';
 import { MasterPlayer } from "@/lib/data/full-master-player-data";
 
 function DashboardContent() {
@@ -116,7 +116,7 @@ function DashboardContent() {
   const playersWithMissingInfo = useMemo(() => {
     return rosterPlayers.filter(player => {
         if (!player || typeof player !== 'object') return false;
-        if (player.firstName === 'test1' && player.lastName === 'test') {
+        if ((player.firstName === 'test1' && player.lastName === 'test') || (player.firstName === 'test2' && player.lastName === 'test')) {
             return false;
         }
         return !player.uscfId || !player.grade || !player.section || !player.email || !player.dob || !player.zipCode;
