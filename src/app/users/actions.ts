@@ -2,8 +2,8 @@
 'use server';
 
 import { getAuth } from 'firebase-admin/auth';
-import { db } from '@/lib/firebase-admin';
-import { collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
+import { getFirestore } from 'firebase-admin/firestore';
+import { db as adminDb } from '@/lib/firebase-admin';
 
 /**
  * Server action to permanently delete users from both Firestore and Firebase Authentication.
@@ -27,14 +27,14 @@ export async function forceDeleteUsersAction(emails: string[]): Promise<{ delete
       await getAuth().deleteUser(uid);
       
       // Delete from Firestore
-      const userDocRef = doc(db, 'users', uid);
-      await deleteDoc(userDocRef);
+      const userDocRef = adminDb.collection('users').doc(uid);
+      await userDocRef.delete();
       
-      // Also try to find and delete any records where the doc ID was the email
-      const oldDocRef = doc(db, 'users', email);
-      const oldDocSnap = await getDoc(oldDocRef);
-      if (oldDocSnap.exists()) {
-        await deleteDoc(oldDocRef);
+      // Also try to find and delete any records where the doc ID was the email (legacy)
+      const oldDocRef = adminDb.collection('users').doc(email);
+      const oldDocSnap = await oldDocRef.get();
+      if (oldDocSnap.exists) {
+        await oldDocRef.delete();
       }
 
       deletedEmails.push(email);
@@ -44,8 +44,8 @@ export async function forceDeleteUsersAction(emails: string[]): Promise<{ delete
       if (error.code === 'auth/user-not-found') {
         // User not in Auth, try deleting from Firestore by email as ID
         try {
-          const oldDocRef = doc(db, 'users', email);
-          await deleteDoc(oldDocRef);
+          const oldDocRef = adminDb.collection('users').doc(email);
+          await oldDocRef.delete();
           deletedEmails.push(`${email} (Firestore only)`);
         } catch (dbError) {
           failedDeletions.push({ email, reason: `Not in Auth, and failed to delete from Firestore.` });

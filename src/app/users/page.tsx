@@ -230,7 +230,7 @@ export default function UsersPage() {
     };
     
     const handleForceDelete = async () => {
-        const emails = emailsToDelete.split(/[\n,;]+/).map(e => e.trim().toLowerCase()).filter(Boolean);
+        const emails = emailsToDelete.split(/[\\n,;]+/).map(e => e.trim().toLowerCase()).filter(Boolean);
         if (emails.length === 0) {
             toast({ variant: 'destructive', title: 'No Emails Provided', description: 'Please enter at least one email to delete.' });
             return;
@@ -479,3 +479,5 @@ export default function UsersPage() {
                 </DialogContent>
             </Dialog>
         </AppLayout>
+    );
+}
