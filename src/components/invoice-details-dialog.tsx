@@ -4,15 +4,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { ExternalLink, RefreshCw, Loader2, DollarSign, Calendar, Building, User } from 'lucide-react';
+import { ExternalLink, RefreshCw, Loader2, DollarSign, Calendar, Building, User, History } from 'lucide-react';
 import { format } from "date-fns";
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { getInvoiceStatus as getInvoiceStatusFlow } from '@/ai/flows/get-invoice-status-flow';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 
 interface InvoiceDetailsDialogProps {
   isOpen: boolean;
@@ -59,6 +59,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
         invoiceStatus: result.status,
         totalPaid: result.totalPaid,
         totalAmount: result.totalAmount,
+        paymentHistory: result.paymentHistory,
       };
       setConfirmation(updatedConfirmation);
       toast({ title: 'Status Updated', description: `Invoice status is now: ${result.status}` });
@@ -77,6 +78,16 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
     };
     const className = s === 'PAID' || s === 'COMPED' ? 'bg-green-600 text-white' : '';
     return <Badge variant={variants[s] || 'secondary'} className={className}>{s.replace(/_/g, ' ')}</Badge>;
+  };
+
+  const getPaymentMethodLabel = (method: string) => {
+    switch (method) {
+      case 'credit_card': return 'Credit Card';
+      case 'cash': return 'Cash';
+      case 'external': return 'External';
+      case 'bank_transfer': return 'Bank Transfer';
+      default: return method;
+    }
   };
 
   if (!confirmation) return null;
@@ -112,6 +123,30 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
                 <span className="text-muted-foreground flex items-center gap-2"><DollarSign className="h-5 w-5"/>Total Amount</span>
                 <span>${(confirmation.totalAmount || 0).toFixed(2)}</span>
             </div>
+
+            {confirmation.paymentHistory && confirmation.paymentHistory.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="font-semibold flex items-center gap-2 text-sm"><History className="h-4 w-4" />Payment History</h4>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Method</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {confirmation.paymentHistory.map((payment: any) => (
+                      <TableRow key={payment.id}>
+                        <TableCell>{format(new Date(payment.date), 'PP')}</TableCell>
+                        <TableCell>${payment.amount.toFixed(2)}</TableCell>
+                        <TableCell>{getPaymentMethodLabel(payment.method)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
         </div>
         
         <DialogFooter className="sm:justify-between">

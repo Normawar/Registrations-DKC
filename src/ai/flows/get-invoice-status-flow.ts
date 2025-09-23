@@ -1,6 +1,7 @@
 
 'use server';
 
+import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { Payment, ApiError, Client, Environment } from 'square';
 
