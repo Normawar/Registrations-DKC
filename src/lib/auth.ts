@@ -5,6 +5,9 @@ import {
   signInWithEmailAndPassword, 
   signOut, 
   onAuthStateChanged,
+  updatePassword,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
   User,
   AuthError 
 } from 'firebase/auth';
@@ -114,6 +117,39 @@ export class AuthService {
       }
     });
   }
+
+  static async updateUserPassword(currentPassword: string, newPassword: string): Promise<void> {
+    const user = auth.currentUser;
+    if (!user || !user.email) {
+      throw new Error("No user is currently signed in.");
+    }
+    
+    try {
+      // Create a credential with the user's email and current password
+      const credential = EmailAuthProvider.credential(user.email, currentPassword);
+      
+      // Re-authenticate the user to confirm their identity
+      await reauthenticateWithCredential(user, credential);
+      
+      // If re-authentication is successful, update the password
+      await updatePassword(user, newPassword);
+      
+    } catch (error: any) {
+      // Handle specific errors for re-authentication and password update
+      if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        throw new Error("The current password you entered is incorrect.");
+      }
+      if (error.code === 'auth/weak-password') {
+        throw new Error("The new password is too weak. It must be at least 6 characters long.");
+      }
+      if (error.code === 'auth/requires-recent-login') {
+          throw new Error("This operation is sensitive and requires recent authentication. Please sign out and sign in again before changing your password.");
+      }
+      console.error("Error updating password:", error);
+      throw new Error("An unexpected error occurred while updating the password.");
+    }
+  }
+
 
   // Handle Firebase Auth errors
   private static handleAuthError(error: AuthError): Error {

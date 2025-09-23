@@ -35,6 +35,7 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { KingIcon, QueenIcon, RookIcon, BishopIcon, KnightIcon, PawnIcon } from '@/components/icons/chess-icons';
 import { useSponsorProfile, type SponsorProfile } from '@/hooks/use-sponsor-profile';
 import { auth, storage } from '@/lib/firebase';
+import { AuthService } from '@/lib/auth';
 import { Loader2, Building, User, Info } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -143,6 +144,7 @@ export default function ProfilePage() {
   const [selectedIconName, setSelectedIconName] = useState<string>('KingIcon');
   const [activeTab, setActiveTab] = useState<'icon' | 'upload'>('icon');
   const [isSavingPicture, setIsSavingPicture] = useState(false);
+  const [isSavingPassword, setIsSavingPassword] = useState(false);
 
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
@@ -331,13 +333,25 @@ export default function ProfilePage() {
     }
   }
   
-  function onPasswordSubmit(values: z.infer<typeof passwordFormSchema>) {
-      console.log("Password change requested:", values);
-      toast({
-          title: "Password Changed",
-          description: "Your password has been successfully updated.",
-      });
-      passwordForm.reset();
+  async function onPasswordSubmit(values: z.infer<typeof passwordFormSchema>) {
+      setIsSavingPassword(true);
+      try {
+        await AuthService.updateUserPassword(values.currentPassword, values.newPassword);
+        toast({
+            title: "Password Changed",
+            description: "Your password has been successfully updated.",
+        });
+        passwordForm.reset();
+      } catch (error) {
+          const message = error instanceof Error ? error.message : "An unknown error occurred.";
+          toast({
+              variant: "destructive",
+              title: "Password Change Failed",
+              description: message,
+          });
+      } finally {
+          setIsSavingPassword(false);
+      }
   }
 
   const selectedDistrict = profileForm.watch('district');
@@ -570,7 +584,10 @@ export default function ProfilePage() {
                 </div>
               </CardContent>
               <CardFooter className="border-t px-6 py-4">
-                <Button type="submit">Update Password</Button>
+                <Button type="submit" disabled={isSavingPassword}>
+                    {isSavingPassword && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Update Password
+                </Button>
               </CardFooter>
             </form>
           </Form>
