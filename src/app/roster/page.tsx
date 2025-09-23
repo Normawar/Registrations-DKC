@@ -100,42 +100,49 @@ const DateInput = React.forwardRef<HTMLInputElement, {
   const [displayValue, setDisplayValue] = useState('');
   
   useEffect(() => {
-    const newDisplayValue = (value instanceof Date && !isNaN(value.getTime())) 
-      ? format(value, 'yyyy-MM-dd') 
-      : '';
-    setDisplayValue(newDisplayValue);
+    if (value && isValid(value)) {
+      setDisplayValue(format(value, 'MM/dd/yyyy'));
+    } else {
+      setDisplayValue('');
+    }
   }, [value]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
     const inputValue = e.target.value;
-    setDisplayValue(inputValue);
-
     if (inputValue === '') {
       onChange?.(undefined);
       return;
     }
-
-    const dateRegex = /^(\d{4})-(\d{2})-(\d{2})$/;
-    const match = inputValue.match(dateRegex);
-
-    if (match) {
-        const [, year, month, day] = match.map(Number);
-        if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-            const date = new Date(year, month - 1, day);
-            if (isValid(date)) {
-                onChange?.(date);
-            }
-        }
+    
+    // Attempt to parse various common date formats
+    const parsedDate = parse(inputValue, 'MM/dd/yyyy', new Date());
+    
+    if (isValid(parsedDate)) {
+      onChange?.(parsedDate);
+      setDisplayValue(format(parsedDate, 'MM/dd/yyyy'));
+    } else {
+      // If parsing fails, revert to the last valid value or empty
+      if (value && isValid(value)) {
+        setDisplayValue(format(value, 'MM/dd/yyyy'));
+      } else {
+        setDisplayValue('');
+        onChange?.(undefined);
+      }
     }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setDisplayValue(e.target.value);
   };
 
   return (
     <Input
       ref={ref}
-      type="date"
+      type="text"
       value={displayValue}
       onChange={handleChange}
-      placeholder={placeholder}
+      onBlur={handleBlur}
+      placeholder={placeholder || 'MM/DD/YYYY'}
       className={className}
     />
   );
@@ -864,9 +871,12 @@ function UserRosterPageContent() {
                                             <Edit className="h-4 w-4" />
                                         </Button>
                                          {profile?.role === 'individual' && (
-                                            <AlertDialog>
+                                            <AlertDialog open={isDeleteAlertOpen && playerToDelete?.id === player.id} onOpenChange={(open) => {
+                                                if (!open) setPlayerToDelete(null);
+                                                setIsDeleteAlertOpen(open);
+                                            }}>
                                                 <AlertDialogTrigger asChild>
-                                                    <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+                                                    <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setPlayerToDelete(player)}>
                                                         <Trash2 className="h-4 w-4" />
                                                     </Button>
                                                 </AlertDialogTrigger>
@@ -876,12 +886,8 @@ function UserRosterPageContent() {
                                                         <AlertDialogDescription>This will remove {player.firstName} {player.lastName} from your student list. This action does not delete them from the master database.</AlertDialogDescription>
                                                     </AlertDialogHeader>
                                                     <AlertDialogFooter>
-                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                        <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={() => {
-                                                            const updatedStudentIds = profile.studentIds?.filter(id => id !== player.id);
-                                                            updateProfile({ studentIds: updatedStudentIds });
-                                                            toast({ title: 'Student Removed', description: `${player.firstName} has been removed from your list.` });
-                                                        }}>
+                                                        <AlertDialogCancel onClick={() => setPlayerToDelete(null)}>Cancel</AlertDialogCancel>
+                                                        <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={confirmDeletePlayer}>
                                                             Remove Student
                                                         </AlertDialogAction>
                                                     </AlertDialogFooter>
@@ -1049,8 +1055,8 @@ function UserRosterPageContent() {
                               </div>
 
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                               <FormField control={form.control} name="dob" render={({ field }) => (<FormItem><FormLabel>Date of Birth</FormLabel><FormControl><DateInput value={field.value} onChange={field.onChange} placeholder="YYYY-MM-DD" /></FormControl><FormMessage /></FormItem>)} />
-                               <FormField control={form.control} name="uscfExpiration" render={({ field }) => (<FormItem><FormLabel>USCF Expiration</FormLabel><FormControl><DateInput value={field.value} onChange={field.onChange} placeholder="YYYY-MM-DD"/></FormControl><FormMessage /></FormItem>)} />
+                               <FormField control={form.control} name="dob" render={({ field }) => (<FormItem><FormLabel>Date of Birth</FormLabel><FormControl><DateInput value={field.value} onChange={field.onChange} placeholder="MM/DD/YYYY" /></FormControl><FormMessage /></FormItem>)} />
+                               <FormField control={form.control} name="uscfExpiration" render={({ field }) => (<FormItem><FormLabel>USCF Expiration</FormLabel><FormControl><DateInput value={field.value} onChange={field.onChange} placeholder="MM/DD/YYYY"/></FormControl><FormMessage /></FormItem>)} />
                               </div>
 
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1107,33 +1113,33 @@ function UserRosterPageContent() {
                     <div className="p-6 pt-4 border-t bg-muted/30 shrink-0">
                       <div className="flex justify-between">
                         {playerToEdit && profile?.role === 'individual' ? (
-                          <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                  <Button type="button" variant="destructive">
-                                      <Trash2 className="h-4 w-4 mr-2" />
-                                      Remove From My List
-                                  </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                          This will remove {playerToEdit.firstName} from your student list. It does not delete them from the database.
-                                      </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                      <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={async () => {
-                                          const updatedStudentIds = profile.studentIds?.filter(id => id !== playerToEdit.id);
-                                          await updateProfile({ studentIds: updatedStudentIds });
-                                          toast({ title: "Student Removed" });
-                                          setIsEditOpen(false);
-                                      }}>
-                                          Confirm Removal
-                                      </AlertDialogAction>
-                                  </AlertDialogFooter>
-                              </AlertDialogContent>
-                          </AlertDialog>
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button type="button" variant="destructive">
+                                        <Trash2 className="h-4 w-4 mr-2" />
+                                        Remove From My List
+                                    </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            This will remove {playerToEdit.firstName} from your student list. It does not delete them from the database.
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={async () => {
+                                            const updatedStudentIds = profile.studentIds?.filter(id => id !== playerToEdit.id);
+                                            await updateProfile({ studentIds: updatedStudentIds });
+                                            toast({ title: "Student Removed" });
+                                            setIsEditOpen(false);
+                                        }}>
+                                            Confirm Removal
+                                        </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
                         ) : (
                           <div></div>
                         )}
