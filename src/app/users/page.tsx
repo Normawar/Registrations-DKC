@@ -22,7 +22,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useMasterDb } from '@/context/master-db-context';
 import { Textarea } from '@/components/ui/textarea';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 
 // Import server actions instead of direct Firestore
@@ -273,12 +273,12 @@ export default function UsersPage() {
             });
             return;
         }
-    
+
         // Store emails and open confirmation dialog
         setEmailsToConfirmDelete(emails);
         setIsDeleteConfirmOpen(true);
     };
-    
+
     // Add this new function to handle the confirmed deletion:
     const handleConfirmedDelete = () => {
         const emails = emailsToConfirmDelete;
@@ -553,35 +553,35 @@ export default function UsersPage() {
             </Dialog>
 
             <AlertDialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Confirm User Deletion</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            <div className="space-y-2">
-                                <span>Are you sure you want to permanently delete {emailsToConfirmDelete.length} user(s)?</span>
-                                <span className="block font-semibold">This will remove their authentication record AND Firestore data.</span>
-                                <span className="block text-destructive font-bold">This action CANNOT be undone.</span>
-                                {emailsToConfirmDelete.length <= 5 && (
-                                    <div className="mt-2 p-2 bg-muted rounded text-sm">
-                                        <span className="block font-medium mb-1">Users to be deleted:</span>
-                                        {emailsToConfirmDelete.map((email, i) => (
-                                            <span key={i} className="block text-muted-foreground">• {email}</span>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction 
-                            onClick={handleConfirmedDelete}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        >
-                            Delete Users
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
+              <AlertDialogContent>
+                  <AlertDialogHeader>
+                      <AlertDialogTitle>Confirm User Deletion</AlertDialogTitle>
+                      <div className="text-sm text-muted-foreground">
+                        <div className="space-y-2">
+                          <span>Are you sure you want to permanently delete {emailsToConfirmDelete.length} user(s)?</span>
+                          <span className="block font-semibold">This will remove their authentication record AND Firestore data.</span>
+                          <span className="block text-destructive font-bold">This action CANNOT be undone.</span>
+                          {emailsToConfirmDelete.length <= 5 && (
+                              <div className="mt-2 p-2 bg-muted rounded text-sm">
+                                  <span className="block font-medium mb-1">Users to be deleted:</span>
+                                  {emailsToConfirmDelete.map((email, i) => (
+                                      <span key={i} className="block text-muted-foreground">• {email}</span>
+                                  ))}
+                              </div>
+                          )}
+                        </div>
+                      </div>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction 
+                          onClick={handleConfirmedDelete}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                          Delete Users
+                      </AlertDialogAction>
+                  </AlertDialogFooter>
+              </AlertDialogContent>
             </AlertDialog>
         </AppLayout>
     );
