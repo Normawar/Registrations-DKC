@@ -1,4 +1,3 @@
-
 // src/lib/firebase-admin.ts
 import { initializeApp, getApps, cert, type App } from 'firebase-admin/app';
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';
@@ -17,16 +16,21 @@ function initializeAdminApp() {
   console.log('[[DEBUG]] Attempting first-time Firebase Admin SDK initialization...');
 
   try {
-    // This is the standard, robust way. The SDK will automatically find
-    // and parse the GOOGLE_APPLICATION_CREDENTIALS environment variable.
+    const serviceAccount = {
+      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
+    };
+    
+    if (!serviceAccount.projectId || !serviceAccount.clientEmail || !serviceAccount.privateKey || serviceAccount.privateKey.length < 10) {
+      throw new Error('CRITICAL: Firebase Admin SDK service account credentials are not fully configured in environment variables.');
+    }
+
     if (getApps().length === 0) {
-      // Check if the environment variable is present
-      if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-        throw new Error('CRITICAL: GOOGLE_APPLICATION_CREDENTIALS environment variable is not set.');
-      }
-      
-      app = initializeApp();
-      console.log('[[DEBUG]] Firebase Admin SDK initialized successfully using environment credentials.');
+      app = initializeApp({
+        credential: cert(serviceAccount),
+      });
+      console.log('[[DEBUG]] Firebase Admin SDK initialized successfully.');
     } else {
       app = getApps()[0];
       console.log('[[DEBUG]] Using existing Firebase Admin app instance.');
@@ -37,13 +41,6 @@ function initializeAdminApp() {
 
   } catch (error: any) {
     console.error('[[DEBUG]] CRITICAL: Firebase Admin SDK initializeApp failed.', error.message);
-    // Log the problematic env var content for debugging, but be careful with this in production logs
-    if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-      console.error('[[DEBUG]] Contents of GOOGLE_APPLICATION_CREDENTIALS (check for formatting errors):', process.env.GOOGLE_APPLICATION_CREDENTIALS.substring(0, 100) + '...');
-    } else {
-      console.error('[[DEBUG]] GOOGLE_APPLICATION_CREDENTIALS was not found in process.env.');
-    }
-    
     app = undefined;
     dbInstance = undefined;
     authInstance = undefined;
@@ -56,7 +53,6 @@ initializeAdminApp();
 // Export getter functions that ensure initialization and throw if it failed.
 export function getDb(): Firestore {
   if (!dbInstance) {
-    // If it's still not available, throw a clear error.
     throw new Error("Failed to initialize Firestore Admin SDK. Check server logs for credential errors.");
   }
   return dbInstance;
@@ -64,7 +60,6 @@ export function getDb(): Firestore {
 
 export function getAdminAuth(): Auth {
   if (!authInstance) {
-    // If it's still not available, throw a clear error.
     throw new Error("Failed to initialize Firebase Admin Auth SDK. Check server logs for credential errors.");
   }
   return authInstance;

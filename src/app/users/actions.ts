@@ -1,10 +1,7 @@
-
 'use server';
 
 import { getAdminAuth, getDb } from '@/lib/firebase-admin';
-import { UserRecord } from 'firebase-admin/auth';
 import type { SponsorProfile } from '@/hooks/use-sponsor-profile';
-import { simpleSignUp } from '@/lib/simple-auth';
 
 /**
  * Server action to fetch all users from Firestore

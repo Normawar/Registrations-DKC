@@ -1,7 +1,5 @@
-
 'use server';
 
-import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { type Invoice, type Order, type Customer, Client, Environment } from 'square';
 import { collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
@@ -24,16 +22,6 @@ const ImportSquareInvoicesOutputSchema = z.object({
 export type ImportSquareInvoicesOutput = z.infer<typeof ImportSquareInvoicesOutputSchema>;
 
 export async function importSquareInvoices(input: ImportSquareInvoicesInput): Promise<ImportSquareInvoicesOutput> {
-  return importSquareInvoicesFlow(input);
-}
-
-const importSquareInvoicesFlow = ai.defineFlow(
-  {
-    name: 'importSquareInvoicesFlow',
-    inputSchema: ImportSquareInvoicesInputSchema,
-    outputSchema: ImportSquareInvoicesOutputSchema,
-  },
-  async (input) => {
     const db = getDb();
     
     const squareClient = new Client({
@@ -97,8 +85,7 @@ const importSquareInvoicesFlow = ai.defineFlow(
     }
     
     return { created: createdCount, updated: updatedCount, failed: failedCount, errors };
-  }
-);
+}
 
 
 async function processSingleInvoice(client: Client, invoice: Invoice, batch: FirebaseFirestore.WriteBatch) {

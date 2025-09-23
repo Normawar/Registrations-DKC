@@ -21,7 +21,7 @@ export async function createIndividualInvoice(input: CreateInvoiceInput): Promis
   // This prevents the error from propagating through the server action
   if (!db) {
     console.error('Firestore not initialized at individual invoice wrapper level');
-    throw new Error('Database connection not available. Please refresh the page and try again.');
+    throw new Error('Database connection not available. Please contact support.');
   }
 
   try {

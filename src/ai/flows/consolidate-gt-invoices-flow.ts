@@ -1,12 +1,10 @@
-
 'use server';
 
-import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { collection, query, where, getDocs, doc, updateDoc, writeBatch } from 'firebase/firestore';
-import { getDb } from '@/lib/firebase-admin';
+import { collection, query, where, getDocs, doc, writeBatch } from 'firebase/firestore';
 import { createInvoice } from './create-invoice-flow';
 import { Client, Environment } from 'square';
+import { getDb } from '@/lib/firebase-admin';
 
 const ConsolidateGtInvoicesInputSchema = z.object({
   eventId: z.string().describe('The event ID to consolidate GT invoices for'),
@@ -31,134 +29,123 @@ export type ConsolidateGtInvoicesInput = z.infer<typeof ConsolidateGtInvoicesInp
 export type ConsolidateGtInvoicesOutput = z.infer<typeof ConsolidateGtInvoicesOutputSchema>;
 
 export async function consolidateGtInvoices(input: ConsolidateGtInvoicesInput): Promise<ConsolidateGtInvoicesOutput> {
-  return consolidateGtInvoicesFlow(input);
-}
+  const db = getDb();
 
-const consolidateGtInvoicesFlow = ai.defineFlow(
-  {
-    name: 'consolidateGtInvoicesFlow',
-    inputSchema: ConsolidateGtInvoicesInputSchema,
-    outputSchema: ConsolidateGtInvoicesOutputSchema,
-  },
-  async (input) => {
-    const db = getDb();
+  // Step 1: Find all GT invoices for this event
+  const invoicesQuery = query(
+    collection(db, 'invoices'),
+    where('eventId', '==', input.eventId),
+    where('district', '==', 'PHARR-SAN JUAN-ALAMO ISD'),
+    where('status', '==', 'UNPAID')
+  );
 
-    // Step 1: Find all GT invoices for this event
-    const invoicesQuery = query(
-      collection(db, 'invoices'),
-      where('eventId', '==', input.eventId),
-      where('district', '==', 'PHARR-SAN JUAN-ALAMO ISD'),
-      where('status', '==', 'UNPAID')
-    );
+  const invoiceSnapshot = await getDocs(invoicesQuery);
+  const allInvoices = invoiceSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-    const invoiceSnapshot = await getDocs(invoicesQuery);
-    const allInvoices = invoiceSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  const gtInvoices = allInvoices.filter(invoice => 
+    invoice.eventName?.includes('GT') || 
+    invoice.invoiceTitle?.includes('GT') ||
+    invoice.eventName?.includes('- GT')
+  );
 
-    const gtInvoices = allInvoices.filter(invoice => 
-      invoice.eventName?.includes('GT') || 
-      invoice.invoiceTitle?.includes('GT') ||
-      invoice.eventName?.includes('- GT')
-    );
-
-    if (gtInvoices.length === 0) {
-      throw new Error('No unpaid GT invoices found for this event to consolidate.');
-    }
-
-    console.log(`Found ${gtInvoices.length} GT invoices to consolidate`);
-
-    // Step 2: Collect all GT players from all invoices
-    const allGtPlayers: any[] = [];
-    const schoolsIncluded: string[] = [];
-    const invoiceIdsToCancel: string[] = [];
-    let totalRegistrationFees = 0;
-
-    for (const invoice of gtInvoices) {
-      invoiceIdsToCancel.push(invoice.invoiceId);
-      
-      if (!schoolsIncluded.includes(invoice.schoolName)) {
-        schoolsIncluded.push(invoice.schoolName);
-      }
-
-      if (invoice.selections) {
-        for (const [playerId, details] of Object.entries(invoice.selections as Record<string, any>)) {
-          const playerData = {
-            playerName: `GT Student ${playerId}`, 
-            uscfId: playerId,
-            baseRegistrationFee: invoice.baseRegistrationFee || invoice.totalInvoiced / Object.keys(invoice.selections).length || 0,
-            lateFee: 0,
-            uscfAction: false,
-            isGtPlayer: true,
-            section: details.section || 'High School K-12',
-            school: invoice.schoolName,
-          };
-          
-          allGtPlayers.push(playerData);
-          totalRegistrationFees += playerData.baseRegistrationFee;
-        }
-      }
-    }
-
-    console.log(`Consolidating ${allGtPlayers.length} GT students from ${schoolsIncluded.length} schools`);
-
-    // Step 3: Create consolidated invoice
-    const consolidatedResult = await createInvoice({
-      sponsorName: input.gtCoordinatorName,
-      parentName: input.gtCoordinatorName,
-      sponsorEmail: input.gtCoordinatorEmail,
-      sponsorPhone: input.gtProgramPhone,
-      schoolName: 'PHARR-SAN JUAN-ALAMO ISD - GT Program',
-      schoolAddress: input.gtProgramAddress,
-      district: 'PHARR-SAN JUAN-ALAMO ISD',
-      teamCode: 'PSJA-GT-CON',
-      eventName: `${input.eventName} - GT Program Consolidated`,
-      eventDate: input.eventDate,
-      uscfFee: 24,
-      players: allGtPlayers,
-      description: `Consolidated invoice for GT students from ${schoolsIncluded.length} schools: ${schoolsIncluded.join(', ')}. USCF memberships covered under district's bulk plan.`,
-    });
-
-    // Step 4: Cancel individual GT invoices
-    const squareClient = new Client({
-        accessToken: "EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC",
-        environment: Environment.Production,
-    });
-    const { invoicesApi } = squareClient;
-    const batch = writeBatch(db);
-
-    for (const invoice of gtInvoices) {
-      try {
-        if (invoice.invoiceId && invoice.version) {
-          await invoicesApi.cancelInvoice(invoice.invoiceId, { version: invoice.version });
-          const invoiceRef = doc(db, 'invoices', invoice.id);
-          batch.update(invoiceRef, { status: 'CANCELED', invoiceStatus: 'CANCELED', cancelReason: 'Consolidated' });
-          console.log(`Canceled invoice ${invoice.invoiceId}`);
-        } else {
-           console.warn(`Invoice ${invoice.id} is missing invoiceId or version, marking as canceled locally.`);
-           const invoiceRef = doc(db, 'invoices', invoice.id);
-           batch.update(invoiceRef, { status: 'CANCELED', invoiceStatus: 'CANCELED', cancelReason: 'Consolidated - Missing Square ID/Version' });
-        }
-      } catch (error: any) {
-        if (error.statusCode === 404 || (error.body && error.body.includes('not found'))) {
-          console.warn(`Invoice ${invoice.invoiceId} not found in Square, marking as canceled locally.`);
-          const invoiceRef = doc(db, 'invoices', invoice.id);
-          batch.update(invoiceRef, { status: 'CANCELED', invoiceStatus: 'CANCELED', cancelReason: 'Consolidated - Not found in Square' });
-        } else {
-          console.error(`Failed to cancel invoice ${invoice.invoiceId}:`, error);
-        }
-      }
-    }
-    await batch.commit();
-
-    return {
-      consolidatedInvoiceId: consolidatedResult.invoiceId,
-      consolidatedInvoiceNumber: consolidatedResult.invoiceNumber,
-      totalGtStudents: allGtPlayers.length,
-      totalAmount: totalRegistrationFees,
-      canceledInvoiceIds: invoiceIdsToCancel,
-      schoolsIncluded,
-    };
+  if (gtInvoices.length === 0) {
+    throw new Error('No unpaid GT invoices found for this event to consolidate.');
   }
-);
+
+  console.log(`Found ${gtInvoices.length} GT invoices to consolidate`);
+
+  // Step 2: Collect all GT players from all invoices
+  const allGtPlayers: any[] = [];
+  const schoolsIncluded: string[] = [];
+  const invoiceIdsToCancel: string[] = [];
+  let totalRegistrationFees = 0;
+
+  for (const invoice of gtInvoices) {
+    if(invoice.invoiceId) invoiceIdsToCancel.push(invoice.invoiceId);
+    
+    if (invoice.schoolName && !schoolsIncluded.includes(invoice.schoolName)) {
+      schoolsIncluded.push(invoice.schoolName);
+    }
+
+    if (invoice.selections) {
+      for (const [playerId, details] of Object.entries(invoice.selections as Record<string, any>)) {
+        const playerData = {
+          playerName: `GT Student ${playerId}`, 
+          uscfId: playerId,
+          baseRegistrationFee: (invoice.baseRegistrationFee || invoice.totalInvoiced / Object.keys(invoice.selections).length) || 0,
+          lateFee: 0,
+          uscfAction: false,
+          isGtPlayer: true,
+          section: (details as any).section || 'High School K-12',
+          school: invoice.schoolName,
+        };
+        
+        allGtPlayers.push(playerData);
+        totalRegistrationFees += playerData.baseRegistrationFee;
+      }
+    }
+  }
+
+  console.log(`Consolidating ${allGtPlayers.length} GT students from ${schoolsIncluded.length} schools`);
+
+  // Step 3: Create consolidated invoice
+  const consolidatedResult = await createInvoice({
+    sponsorName: input.gtCoordinatorName,
+    parentName: input.gtCoordinatorName,
+    sponsorEmail: input.gtCoordinatorEmail,
+    sponsorPhone: input.gtProgramPhone,
+    schoolName: 'PHARR-SAN JUAN-ALAMO ISD - GT Program',
+    schoolAddress: input.gtProgramAddress,
+    district: 'PHARR-SAN JUAN-ALAMO ISD',
+    teamCode: 'PSJA-GT-CON',
+    eventName: `${input.eventName} - GT Program Consolidated`,
+    eventDate: input.eventDate,
+    uscfFee: 24,
+    players: allGtPlayers,
+    description: `Consolidated invoice for GT students from ${schoolsIncluded.length} schools: ${schoolsIncluded.join(', ')}. USCF memberships covered under district's bulk plan.`,
+  });
+
+  // Step 4: Cancel individual GT invoices
+  const squareClient = new Client({
+      accessToken: "EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC",
+      environment: Environment.Production,
+  });
+  const { invoicesApi } = squareClient;
+  const batch = writeBatch(db);
+
+  for (const invoice of gtInvoices) {
+    try {
+      if (invoice.invoiceId && invoice.version) {
+        await invoicesApi.cancelInvoice(invoice.invoiceId, { version: invoice.version });
+        const invoiceRef = doc(db, 'invoices', invoice.id);
+        batch.update(invoiceRef, { status: 'CANCELED', invoiceStatus: 'CANCELED', cancelReason: 'Consolidated' });
+        console.log(`Canceled invoice ${invoice.invoiceId}`);
+      } else {
+         console.warn(`Invoice ${invoice.id} is missing invoiceId or version, marking as canceled locally.`);
+         const invoiceRef = doc(db, 'invoices', invoice.id);
+         batch.update(invoiceRef, { status: 'CANCELED', invoiceStatus: 'CANCELED', cancelReason: 'Consolidated - Missing Square ID/Version' });
+      }
+    } catch (error: any) {
+      if (error.statusCode === 404 || (error.body && error.body.includes('not found'))) {
+        console.warn(`Invoice ${invoice.invoiceId} not found in Square, marking as canceled locally.`);
+        const invoiceRef = doc(db, 'invoices', invoice.id);
+        batch.update(invoiceRef, { status: 'CANCELED', invoiceStatus: 'CANCELED', cancelReason: 'Consolidated - Not found in Square' });
+      } else {
+        console.error(`Failed to cancel invoice ${invoice.invoiceId}:`, error);
+      }
+    }
+  }
+  await batch.commit();
+
+  return {
+    consolidatedInvoiceId: consolidatedResult.invoiceId,
+    consolidatedInvoiceNumber: consolidatedResult.invoiceNumber,
+    totalGtStudents: allGtPlayers.length,
+    totalAmount: totalRegistrationFees,
+    canceledInvoiceIds: invoiceIdsToCancel,
+    schoolsIncluded,
+  };
+}
 
 // Helper function to check if GT consolidation is available for an event
 export async function canConsolidateGtInvoices(eventId: string): Promise<{

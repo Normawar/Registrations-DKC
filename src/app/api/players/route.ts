@@ -1,5 +1,3 @@
-
-
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/firebase-admin'; // Admin SDK instance
 
