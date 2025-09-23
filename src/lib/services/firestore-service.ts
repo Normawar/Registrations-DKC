@@ -1,3 +1,9 @@
-// This file is intentionally left blank.
-// Client-side components should import `db` from `@/lib/firebase`.
-// Server-side components (Genkit flows, API routes) should import `db` from `@/lib/firebase-admin`.
+
+import { db as clientDb } from '@/lib/firebase';
+
+// This service now ONLY exports the client-side database instance.
+// Server-side files should import the admin db directly from 'firebase-admin.ts'
+// All client-side data fetching should be done via API routes, not directly using this instance.
+const db = clientDb;
+
+export { db };

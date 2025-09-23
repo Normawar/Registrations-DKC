@@ -10,9 +10,8 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import { ApiError, type Client } from 'square';
+import { ApiError, Client, Environment } from 'square';
 import { randomUUID } from 'crypto';
-import { getSquareClient } from '@/lib/square-client';
 
 const UpdateInvoiceTitleInputSchema = z.object({
   invoiceId: z.string().describe('The ID of the invoice to update.'),
@@ -38,7 +37,10 @@ const updateInvoiceTitleFlow = ai.defineFlow(
     outputSchema: UpdateInvoiceTitleOutputSchema,
   },
   async (input) => {
-    const squareClient = await getSquareClient();
+    const squareClient = new Client({
+      accessToken: "EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC",
+      environment: Environment.Production,
+    });
     const { invoicesApi } = squareClient;
       
     try {

@@ -6,9 +6,8 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import { ApiError, CreatePaymentRequest, Money, type Client } from 'square';
+import { ApiError, Client, Environment } from 'square';
 import { randomUUID } from 'crypto';
-import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
 
 const RecordPaymentInputSchema = z.object({
   invoiceId: z.string().describe('The ID of the invoice to record a payment for.'),
@@ -45,7 +44,10 @@ const recordPaymentFlow = ai.defineFlow(
         throw new Error('Only organizers can record payments.');
     }
     
-    const squareClient = await getSquareClient();
+    const squareClient = new Client({
+      accessToken: "EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC",
+      environment: Environment.Production,
+    });
     const { paymentsApi, invoicesApi } = squareClient;
 
     try {
