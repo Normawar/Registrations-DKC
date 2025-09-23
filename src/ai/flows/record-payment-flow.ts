@@ -6,8 +6,9 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import { ApiError, CreatePaymentRequest, Money, Client, Environment } from 'square';
+import { ApiError, CreatePaymentRequest, Money, type Client } from 'square';
 import { randomUUID } from 'crypto';
+import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
 
 const RecordPaymentInputSchema = z.object({
   invoiceId: z.string().describe('The ID of the invoice to record a payment for.'),
@@ -44,15 +45,7 @@ const recordPaymentFlow = ai.defineFlow(
         throw new Error('Only organizers can record payments.');
     }
     
-    // Hard-coded Square client initialization - same as create invoice
-    console.log('Initializing Square client with hard-coded values...');
-    const squareClient = new Client({
-      accessToken: "EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC",
-      environment: Environment.Production,
-    });
-    const locationId = "CTED7GVSVH5H8"; // Same locationId as create invoice
-    console.log('Square client initialized with hard-coded production credentials');
-    
+    const squareClient = await getSquareClient();
     const { paymentsApi, invoicesApi } = squareClient;
 
     try {

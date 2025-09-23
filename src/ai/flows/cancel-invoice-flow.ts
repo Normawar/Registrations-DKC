@@ -10,7 +10,8 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import { ApiError, Client, Environment } from 'square';
+import { ApiError, type Client } from 'square';
+import { getSquareClient } from '@/lib/square-client';
 
 const CancelInvoiceInputSchema = z.object({
   invoiceId: z.string().describe('The ID of the invoice to cancel.'),
@@ -39,13 +40,7 @@ const cancelInvoiceFlow = ai.defineFlow(
         throw new Error('Only organizers can cancel invoices.');
     }
     
-    // Hard-coded Square client initialization - same as create-invoice-flow
-    console.log('Using hard-coded Square configuration for cancel flow');
-    const squareClient = new Client({
-      accessToken: "EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC",
-      environment: Environment.Production,
-    });
-
+    const squareClient = await getSquareClient();
     const { invoicesApi } = squareClient;
       
     try {

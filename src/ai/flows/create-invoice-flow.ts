@@ -11,11 +11,12 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { randomUUID } from 'crypto';
-import { ApiError, type OrderLineItem, type InvoiceRecipient, type Address, Client, Environment } from 'square';
+import { ApiError, type OrderLineItem, type InvoiceRecipient, type Address, type Client } from 'square';
 import { format } from 'date-fns';
 import { doc, getDoc, setDoc, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { generateTeamCode } from '@/lib/school-utils';
+import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
 
 const PlayerInvoiceInfoSchema = z.object({
   playerName: z.string().describe('The full name of the player.'),
@@ -79,7 +80,6 @@ const createInvoiceFlow = ai.defineFlow(
       uscfAction: p.uscfAction ?? false,
       isGtPlayer: p.isGtPlayer ?? false,
       waiveLateFee: p.waiveLateFee ?? false,
-      // FIXED: Ensure section is never undefined
       section: p.section && p.section.trim() !== '' ? p.section.trim() : 'High School K-12',
     }));
 
@@ -94,7 +94,6 @@ const createInvoiceFlow = ai.defineFlow(
         const [firstName, ...lastNameParts] = player.playerName.split(' ');
         const lastName = lastNameParts.join(' ');
 
-        // FIXED: Validate all fields before saving to Firestore
         const playerData = {
           id: playerId,
           uscfId: player.uscfId,
@@ -103,11 +102,10 @@ const createInvoiceFlow = ai.defineFlow(
           school: input.schoolName || 'Unknown School',
           district: input.district || 'Unknown District',
           studentType: player.isGtPlayer ? 'gt' : 'independent',
-          section: player.section, // Now guaranteed to be a valid string
+          section: player.section,
           updatedAt: new Date().toISOString(),
         };
 
-        // Additional validation to ensure no undefined values
         Object.keys(playerData).forEach(key => {
           if (playerData[key as keyof typeof playerData] === undefined) {
             console.error(`Undefined value found for key ${key} in player data:`, playerData);
@@ -125,18 +123,8 @@ const createInvoiceFlow = ai.defineFlow(
       }
     }
     
-    // Hard-coded Square client initialization - bypass configuration issues
-    console.log('Initializing Square client with hard-coded values...');
-
-    const squareClient = new Client({
-      accessToken: "EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC",
-      environment: Environment.Production,
-    });
-
-    const locationId = "CTED7GVSVH5H8";
-
-    console.log('Square client initialized with hard-coded production credentials');
-
+    const squareClient = await getSquareClient();
+    const locationId = await getSquareLocationId();
     const { customersApi, ordersApi, invoicesApi } = squareClient;
 
     try {
@@ -223,28 +211,18 @@ const createInvoiceFlow = ai.defineFlow(
       });
 
       if (uscfActionPlayers.length > 0) {
-        // Bulk discount: $4 off per membership for 24+ memberships
         const isBulkOrder = uscfActionPlayers.length >= 24;
         const bulkDiscount = 4; // $4 discount per membership
         const uscfPrice = isBulkOrder ? (input.uscfFee - bulkDiscount) : input.uscfFee;
         const totalSavings = isBulkOrder ? bulkDiscount * uscfActionPlayers.length : 0;
         
         const uscfPlayerNotes = uscfActionPlayers.map((p, i) => `${i + 1}. ${p.playerName}`).join('\n');
+        const uscfLineItemName = isBulkOrder ? 'USCF Membership (Bulk Rate - 24+)' : 'USCF Membership (New/Renew)';
         
-        // Build the line item name
-        const uscfLineItemName = isBulkOrder 
-          ? 'USCF Membership (Bulk Rate - 24+)' 
-          : 'USCF Membership (New/Renew)';
+        let uscfNote = input.district === 'PHARR-SAN JUAN-ALAMO ISD'
+          ? `Applies to non-GT players needing USCF membership.\n${uscfPlayerNotes}`
+          : `Applies to players needing USCF membership.\n${uscfPlayerNotes}`;
         
-        // Build the note with bulk pricing details
-        let uscfNote = '';
-        if (input.district === 'PHARR-SAN JUAN-ALAMO ISD') {
-          uscfNote = `Applies to non-GT players needing USCF membership.\n${uscfPlayerNotes}`;
-        } else {
-          uscfNote = `Applies to players needing USCF membership.\n${uscfPlayerNotes}`;
-        }
-        
-        // Add bulk pricing information to the note
         if (isBulkOrder) {
           uscfNote += `\n\nBULK PRICING: $${uscfPrice} each (${uscfActionPlayers.length} memberships)\nTotal savings: $${totalSavings.toFixed(2)}`;
         }
@@ -313,5 +291,3 @@ const createInvoiceFlow = ai.defineFlow(
     }
   }
 );
-
-    

@@ -11,7 +11,8 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { randomUUID } from 'crypto';
-import { ApiError, type InvoiceRecipient, type Address, Client, Environment } from 'square';
+import { ApiError, type InvoiceRecipient, type Address, type Client } from 'square';
+import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
 
 const LineItemSchema = z.object({
   name: z.string().describe('The name or description of the line item.'),
@@ -30,6 +31,7 @@ const CreateOrganizerInvoiceInputSchema = z.object({
     district: z.string().optional().describe('The school district.'),
     invoiceTitle: z.string().describe('The main title for the invoice.'),
     lineItems: z.array(LineItemSchema).min(1).describe('An array of items to be included in the invoice.'),
+    invoiceNumber: z.string().optional(),
 });
 export type CreateOrganizerInvoiceInput = z.infer<typeof CreateOrganizerInvoiceInputSchema>;
 
@@ -52,12 +54,8 @@ const createOrganizerInvoiceFlow = ai.defineFlow(
     outputSchema: CreateOrganizerInvoiceOutputSchema,
   },
   async (input) => {
-    // Hard-coded Square client initialization
-    const squareClient = new Client({
-      accessToken: "EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC",
-      environment: Environment.Production,
-    });
-    const locationId = "CTED7GVSVH5H8";
+    const squareClient = await getSquareClient();
+    const locationId = await getSquareLocationId();
     const { customersApi, ordersApi, invoicesApi } = squareClient;
     
     console.log("Starting Square organizer invoice creation with input:", input);
@@ -172,6 +170,7 @@ const createOrganizerInvoiceFlow = ai.defineFlow(
           },
           title: input.invoiceTitle,
           description: `Invoice for ${input.schoolName}. Thank you for your business.`,
+          invoiceNumber: input.invoiceNumber,
         }
       });
       

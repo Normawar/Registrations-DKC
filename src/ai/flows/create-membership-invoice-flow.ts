@@ -11,8 +11,9 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { randomUUID } from 'crypto';
-import { ApiError, type InvoiceRecipient, type Address, Client, Environment } from 'square';
+import { ApiError, type InvoiceRecipient, type Address, type Client } from 'square';
 import { format } from 'date-fns';
+import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
 
 const PlayerInfoSchema = z.object({
   firstName: z.string().describe('The first name of the player.'),
@@ -62,12 +63,8 @@ const createMembershipInvoiceFlow = ai.defineFlow(
         throw new Error(`Invalid membership type provided: "${input.membershipType}". Please return to the previous page and get a valid membership suggestion.`);
     }
     
-    // Hard-coded Square client initialization
-    const squareClient = new Client({
-      accessToken: "EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC",
-      environment: Environment.Production,
-    });
-    const locationId = "CTED7GVSVH5H8";
+    const squareClient = await getSquareClient();
+    const locationId = await getSquareLocationId();
     const { customersApi, ordersApi, invoicesApi } = squareClient;
 
     console.log("Starting Square membership invoice creation with input:", input);
