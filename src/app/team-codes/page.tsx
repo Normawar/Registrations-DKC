@@ -53,7 +53,11 @@ function TeamCodesPageContent() {
   const [rosterFilter, setRosterFilter] = useState('all'); // 'all' or 'withRoster'
 
   const loadSchools = useCallback(async () => {
-    if (!db) return;
+    if (!db) {
+      console.error("Firestore not initialized.");
+      setIsDataLoaded(true);
+      return;
+    }
     setIsDataLoaded(false);
     try {
       const schoolsCol = collection(db, 'schools');

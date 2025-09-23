@@ -36,18 +36,28 @@ export default function PreviousEventsPage() {
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
 
     const loadData = useCallback(async () => {
-        if (!db || !profile) return;
-
-        let q = query(collection(db, 'invoices'));
-        if(profile.role === 'sponsor'){
-            q = query(q, where('sponsorEmail', '==', profile.email));
-        } else if (profile.role === 'individual'){
-            q = query(q, where('parentEmail', '==', profile.email));
+        if (!db || !profile) {
+            console.error("Cannot load previous events data: Firestore not initialized or profile not available.");
+            return;
         }
 
-        const invoiceSnapshot = await getDocs(q);
-        const allConfirmations = invoiceSnapshot.docs.map(doc => doc.data());
-        setConfirmations(allConfirmations);
+        try {
+            const invoicesCol = collection(db, 'invoices');
+            let q;
+            if(profile.role === 'sponsor'){
+                q = query(invoicesCol, where('sponsorEmail', '==', profile.email));
+            } else if (profile.role === 'individual'){
+                q = query(invoicesCol, where('parentEmail', '==', profile.email));
+            } else {
+                q = query(invoicesCol); // Organizers see all
+            }
+
+            const invoiceSnapshot = await getDocs(q);
+            const allConfirmations = invoiceSnapshot.docs.map(doc => doc.data());
+            setConfirmations(allConfirmations);
+        } catch (error) {
+            console.error("Failed to load confirmations from Firestore:", error);
+        }
     }, [profile]);
     
     useEffect(() => {

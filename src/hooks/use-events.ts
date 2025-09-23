@@ -55,44 +55,79 @@ export function useEvents() {
   }, [loadEvents]);
 
   const addEvent = useCallback(async (event: Event) => {
-    if (!db) return;
-    const eventRef = doc(db, 'events', event.id);
-    await setDoc(eventRef, event);
-    await loadEvents();
+    if (!db) {
+      console.error("Firestore not initialized, cannot add event.");
+      return;
+    }
+    try {
+      const eventRef = doc(db, 'events', event.id);
+      await setDoc(eventRef, event);
+      await loadEvents();
+    } catch (error) {
+      console.error("Failed to add event:", error);
+    }
   }, [loadEvents]);
 
   const addBulkEvents = useCallback(async (eventsToAdd: Event[]) => {
-    if (!db) return;
-    const batch = writeBatch(db);
-    eventsToAdd.forEach(event => {
-        const docRef = doc(db, 'events', event.id);
-        batch.set(docRef, event);
-    });
-    await batch.commit();
-    await loadEvents();
+    if (!db) {
+      console.error("Firestore not initialized, cannot add bulk events.");
+      return;
+    }
+    try {
+      const batch = writeBatch(db);
+      eventsToAdd.forEach(event => {
+          const docRef = doc(db, 'events', event.id);
+          batch.set(docRef, event);
+      });
+      await batch.commit();
+      await loadEvents();
+    } catch (error) {
+      console.error("Failed to add bulk events:", error);
+    }
   }, [loadEvents]);
 
   const updateEvent = useCallback(async (updatedEvent: Event) => {
-    if (!db) return;
-    const eventRef = doc(db, 'events', updatedEvent.id);
-    await setDoc(eventRef, updatedEvent, { merge: true });
-    await loadEvents();
+    if (!db) {
+      console.error("Firestore not initialized, cannot update event.");
+      return;
+    }
+    try {
+      const eventRef = doc(db, 'events', updatedEvent.id);
+      await setDoc(eventRef, updatedEvent, { merge: true });
+      await loadEvents();
+    } catch (error) {
+      console.error("Failed to update event:", error);
+    }
   }, [loadEvents]);
 
   const deleteEvent = useCallback(async (eventId: string) => {
-    if (!db) return;
-    await deleteDoc(doc(db, 'events', eventId));
-    await loadEvents();
+    if (!db) {
+      console.error("Firestore not initialized, cannot delete event.");
+      return;
+    }
+    try {
+      await deleteDoc(doc(db, 'events', eventId));
+      await loadEvents();
+    } catch (error) {
+      console.error("Failed to delete event:", error);
+    }
   }, [loadEvents]);
   
   const clearAllEvents = useCallback(async () => {
-    if (!db) return;
-    const eventsCol = collection(db, 'events');
-    const eventSnapshot = await getDocs(eventsCol);
-    const batch = writeBatch(db);
-    eventSnapshot.docs.forEach(d => batch.delete(d.ref));
-    await batch.commit();
-    await loadEvents();
+    if (!db) {
+      console.error("Firestore not initialized, cannot clear events.");
+      return;
+    }
+    try {
+      const eventsCol = collection(db, 'events');
+      const eventSnapshot = await getDocs(eventsCol);
+      const batch = writeBatch(db);
+      eventSnapshot.docs.forEach(d => batch.delete(d.ref));
+      await batch.commit();
+      await loadEvents();
+    } catch (error) {
+      console.error("Failed to clear all events:", error);
+    }
   }, [loadEvents]);
 
   return { events, addEvent, addBulkEvents, updateEvent, deleteEvent, clearAllEvents, isLoaded };

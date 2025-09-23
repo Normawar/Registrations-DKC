@@ -78,7 +78,10 @@ function PaymentAuthorizationPageContent() {
 
 
   const loadPendingPayments = useCallback(async () => {
-    if (!db) return;
+    if (!db) {
+        console.error("Firestore not initialized.");
+        return;
+    }
     try {
       const invoicesCol = collection(db, 'invoices');
       const q = query(invoicesCol, where('paymentStatus', '==', 'pending-po'));

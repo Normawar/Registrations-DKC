@@ -44,13 +44,20 @@ export default function EventsPage() {
 
   // Load registrations from Firestore
   const loadRegistrations = useCallback(async () => {
-    if (!db) return;
+    if (!db || !profile) {
+      console.error("Cannot load registrations: Firestore not initialized or profile not loaded.");
+      return;
+    }
     try {
-      let invoicesQuery = collection(db, 'invoices');
-      if (profile?.role === 'individual') {
-        invoicesQuery = query(invoicesQuery, where('parentEmail', '==', profile.email));
-      } else if (profile?.role === 'sponsor' || profile?.role === 'district_coordinator') {
-        invoicesQuery = query(invoicesQuery, where('schoolName', '==', profile.school), where('district', '==', profile.district));
+      const invoicesCol = collection(db, 'invoices');
+      let invoicesQuery;
+      
+      if (profile.role === 'individual') {
+        invoicesQuery = query(invoicesCol, where('parentEmail', '==', profile.email));
+      } else if (profile.role === 'sponsor' || profile.role === 'district_coordinator') {
+        invoicesQuery = query(invoicesCol, where('schoolName', '==', profile.school), where('district', '==', profile.district));
+      } else {
+        invoicesQuery = query(invoicesCol); // Fallback for organizer or other roles
       }
       
       const invoiceSnapshot = await getDocs(invoicesQuery);
