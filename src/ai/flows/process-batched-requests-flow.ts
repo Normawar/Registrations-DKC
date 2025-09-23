@@ -11,8 +11,6 @@ import { db } from '@/lib/services/firestore-service';
 import { type ChangeRequest } from '@/lib/data/requests-data';
 import { type MasterPlayer } from '@/lib/data/full-master-player-data';
 import {
-  BatchedRequestInputSchema,
-  ProcessBatchOutputSchema,
   type ProcessBatchInput,
   type ProcessBatchOutput,
 } from './schemas';

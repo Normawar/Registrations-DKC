@@ -1,6 +1,7 @@
+
 'use server';
 
-import { processBatchedRequestsFlow } from '@/ai/flows/process-batched-requests-flow';
+import { processBatchedRequests as processBatchedRequestsFlow } from '@/ai/flows/process-batched-requests-flow';
 import { recreateInvoiceFromRoster as recreateInvoiceFromRosterFlow } from '@/ai/flows/recreate-invoice-from-roster-flow';
 import type { ProcessBatchInput, ProcessBatchOutput, RecreateInvoiceInput, RecreateInvoiceOutput } from '@/ai/flows/schemas';
 

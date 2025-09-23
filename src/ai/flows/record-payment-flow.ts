@@ -1,32 +1,13 @@
 
-'use server';
+'use 'use server';
 /**
  * @fileOverview Records a payment against a Square invoice using the Square API.
  */
 
-import {z} from 'genkit';
 import { ApiError } from 'square';
 import { randomUUID } from 'crypto';
 import { getSquareClient } from '@/lib/square-client';
-
-export const RecordPaymentInputSchema = z.object({
-  invoiceId: z.string().describe('The ID of the invoice to record a payment for.'),
-  amount: z.number().describe('The payment amount in dollars.'),
-  note: z.string().optional().describe('A note for the payment, e.g., check number or transaction ID.'),
-  paymentDate: z.string().optional().describe('The date of the payment in YYYY-MM-DD format.'),
-  paymentMethod: z.string().optional().describe('The method of payment (e.g., Check, Cash App).'),
-  externalPaymentId: z.string().optional().describe('A unique ID for the payment from the local system.'),
-  requestingUserRole: z.string().describe('Role of user recording the payment'),
-});
-export type RecordPaymentInput = z.infer<typeof RecordPaymentInputSchema>;
-
-export const RecordPaymentOutputSchema = z.object({
-  paymentId: z.string(),
-  status: z.string(),
-  totalPaid: z.number(),
-  totalInvoiced: z.number(),
-});
-export type RecordPaymentOutput = z.infer<typeof RecordPaymentOutputSchema>;
+import { type RecordPaymentInput, type RecordPaymentOutput } from './schemas';
 
 export async function recordPayment(input: RecordPaymentInput): Promise<RecordPaymentOutput> {
     if (input.requestingUserRole !== 'organizer') {

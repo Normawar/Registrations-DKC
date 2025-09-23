@@ -179,3 +179,51 @@ export const RecreateInvoiceOutputSchema = z.object({
   newTotalAmount: z.number(),
 });
 export type RecreateInvoiceOutput = z.infer<typeof RecreateInvoiceOutputSchema>;
+
+
+// === Schemas for create-psja-split-invoice-flow.ts ===
+export const CreatePsjaSplitInvoiceInputSchema = z.object({
+  sponsorName: z.string(),
+  sponsorEmail: z.string().email(),
+  bookkeeperEmail: z.string().email().or(z.literal('')).optional(),
+  gtCoordinatorEmail: z.string().email().or(z.literal('')).optional(),
+  schoolName: z.string(),
+  schoolAddress: z.string().optional(),
+  schoolPhone: z.string().optional(),
+  district: z.literal('PHARR-SAN JUAN-ALAMO ISD'),
+  teamCode: z.string().optional(),
+  eventName: z.string(),
+  eventDate: z.string(),
+  uscfFee: z.number(),
+  players: z.array(PlayerToInvoiceSchema),
+  originalInvoiceNumber: z.string().optional(),
+  revisionNumber: z.number().optional().describe('Revision number for this invoice'),
+  revisionMessage: z.string().optional().describe('Message explaining the revision'),
+});
+export type CreatePsjaSplitInvoiceInput = z.infer<typeof CreatePsjaSplitInvoiceInputSchema>;
+
+export const CreatePsjaSplitInvoiceOutputSchema = z.object({
+  gtInvoice: CreateInvoiceOutputSchema.optional(),
+  independentInvoice: CreateInvoiceOutputSchema.optional(),
+});
+export type CreatePsjaSplitInvoiceOutput = z.infer<typeof CreatePsjaSplitInvoiceOutputSchema>;
+
+// === Schemas for record-payment-flow.ts ===
+export const RecordPaymentInputSchema = z.object({
+  invoiceId: z.string().describe('The ID of the invoice to record a payment for.'),
+  amount: z.number().describe('The payment amount in dollars.'),
+  note: z.string().optional().describe('A note for the payment, e.g., check number or transaction ID.'),
+  paymentDate: z.string().optional().describe('The date of the payment in YYYY-MM-DD format.'),
+  paymentMethod: z.string().optional().describe('The method of payment (e.g., Check, Cash App).'),
+  externalPaymentId: z.string().optional().describe('A unique ID for the payment from the local system.'),
+  requestingUserRole: z.string().describe('Role of user recording the payment'),
+});
+export type RecordPaymentInput = z.infer<typeof RecordPaymentInputSchema>;
+
+export const RecordPaymentOutputSchema = z.object({
+  paymentId: z.string(),
+  status: z.string(),
+  totalPaid: z.number(),
+  totalInvoiced: z.number(),
+});
+export type RecordPaymentOutput = z.infer<typeof RecordPaymentOutputSchema>;

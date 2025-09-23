@@ -6,46 +6,11 @@
  * The other is for Independent/Regular players, sent to the Bookkeeper.
  */
 
-import { z } from 'genkit';
-import { createInvoice, type CreateInvoiceInput, type CreateInvoiceOutput } from './create-invoice-flow';
-
-const PlayerToInvoiceSchema = z.object({
-  playerName: z.string(),
-  uscfId: z.string(),
-  baseRegistrationFee: z.number(),
-  lateFee: z.number().nullable(),
-  uscfAction: z.boolean(),
-  isGtPlayer: z.boolean().optional(),
-  section: z.string().optional(),
-  waiveLateFee: z.boolean().optional(), // Added field
-});
-
-export const CreatePsjaSplitInvoiceInputSchema = z.object({
-  sponsorName: z.string(),
-  sponsorEmail: z.string().email(),
-  bookkeeperEmail: z.string().email().or(z.literal('')).optional(),
-  gtCoordinatorEmail: z.string().email().or(z.literal('')).optional(),
-  schoolName: z.string(),
-  schoolAddress: z.string().optional(),
-  schoolPhone: z.string().optional(),
-  district: z.literal('PHARR-SAN JUAN-ALAMO ISD'),
-  teamCode: z.string().optional(),
-  eventName: z.string(),
-  eventDate: z.string(),
-  uscfFee: z.number(),
-  players: z.array(PlayerToInvoiceSchema),
-  originalInvoiceNumber: z.string().optional(),
-  revisionNumber: z.number().optional().describe('Revision number for this invoice'),
-  revisionMessage: z.string().optional().describe('Message explaining the revision'),
-});
-export type CreatePsjaSplitInvoiceInput = z.infer<typeof CreatePsjaSplitInvoiceInputSchema>;
-
-
-export const CreatePsjaSplitInvoiceOutputSchema = z.object({
-  gtInvoice: CreateInvoiceOutputSchema.optional(),
-  independentInvoice: CreateInvoiceOutputSchema.optional(),
-});
-export type CreatePsjaSplitInvoiceOutput = z.infer<typeof CreatePsjaSplitInvoiceOutputSchema>;
+import { createInvoice, type CreateInvoiceInput } from './create-invoice-flow';
+import { 
+    type CreatePsjaSplitInvoiceInput, 
+    type CreatePsjaSplitInvoiceOutput 
+} from './schemas';
 
 
 export async function createPsjaSplitInvoice(
@@ -73,7 +38,7 @@ export async function createPsjaSplitInvoice(
       gtInvoice = await createInvoice({
         sponsorName: input.sponsorName,
         sponsorEmail: input.gtCoordinatorEmail || input.sponsorEmail,
-        sponsorPhone: input.sponsorPhone,
+        sponsorPhone: input.schoolPhone,
         bookkeeperEmail: input.gtCoordinatorEmail,
         schoolName: input.schoolName,
         schoolAddress: input.schoolAddress,
@@ -112,7 +77,7 @@ export async function createPsjaSplitInvoice(
       independentInvoice = await createInvoice({
         sponsorName: input.sponsorName,
         sponsorEmail: input.sponsorEmail,
-        sponsorPhone: input.sponsorPhone,
+        sponsorPhone: input.schoolPhone,
         bookkeeperEmail: input.bookkeeperEmail,
         schoolName: input.schoolName,
         schoolAddress: input.schoolAddress,

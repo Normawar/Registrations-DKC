@@ -12,9 +12,7 @@ import { createInvoice } from './create-invoice-flow';
 import { cancelInvoice } from './cancel-invoice-flow';
 import { createPsjaSplitInvoice } from './create-psja-split-invoice-flow';
 import {
-  RecreateInvoiceInputSchema,
   type RecreateInvoiceInput,
-  RecreateInvoiceOutputSchema,
   type RecreateInvoiceOutput,
 } from './schemas';
 import { getSquareClient } from '@/lib/square-client';
