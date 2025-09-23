@@ -343,7 +343,7 @@ export default function ProfilePage() {
         
         toast({
             title: "Password Changed",
-            description: "Your password has been successfully updated and your account is now fully active.",
+            description: "Your account is now fully active. You may need to sign out and back in to see the updated menu.",
         });
         passwordForm.reset();
       } catch (error) {
