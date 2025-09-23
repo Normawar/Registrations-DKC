@@ -60,7 +60,7 @@ applicationId: "sq0idp-2nOEj3tUd-PtlED-EdE3MQ"
 ```
 
 ### ✅ Reliable Square Client Pattern (CRITICAL)
-Due to environment initialization issues, the Square client **MUST** be instantiated directly inside the server action or flow that uses it. **DO NOT** use a shared client instance from `square-client.ts`.
+Due to environment initialization issues, the Square client **MUST** be instantiated directly inside the server action or flow that uses it. **DO NOT** use a shared client instance.
 
 ```typescript
 // ✅ Correct: Initialize inside the server action
@@ -75,8 +75,6 @@ export async function mySquareAction(input: any) {
   
   // ... use squareClient here
 }
-
-// ❌ Wrong: Using a shared/imported client is forbidden.
 ```
 
 ## Firebase Integration
@@ -98,7 +96,8 @@ export async function createInvoiceAction(data: any) {
 }
 ```
 
-- **Admin SDK for Admin-Only Tasks**: The `firebase-admin` SDK (via `getDb()` and `getAdminAuth()` from `@/lib/firebase-admin`) should ONLY be used for operations that absolutely require admin privileges, such as user management in `src/app/users/actions.ts`. For all other database operations in server actions, use the client SDK pattern above.
+- **Admin SDK for Admin-Only Tasks**: The `firebase-admin` SDK (via `getDb()` and `getAdminAuth()` from `@/lib/firebase-admin`) should ONLY be used for operations that absolutely require admin privileges, such as user management. For all other database operations in server actions, use the client SDK pattern above.
+
 
 ### Module Import Rules (Critical)
 - **`'use server'` files for INVOICES/PAYMENTS**: MUST import `db` from `@/lib/services/firestore-service`.
@@ -139,8 +138,6 @@ const OutputSchema = z.object({ /* ... */ });
 export type FlowInput = z.infer<typeof InputSchema>;
 export type FlowOutput = z.infer<typeof OutputSchema>;
 
-// Note: For simple database/API actions, a standard Server Action is preferred.
-// Use Genkit flows when LLM interaction is required.
 const myFlow = ai.defineFlow(
   {
     name: 'myFlowName',
@@ -178,6 +175,76 @@ import { AlertDialog, AlertDialogAction } from '@/components/ui/alert-dialog';
 const confirmDelete = () => {
   // Use AlertDialog component instead of confirm()
 };
+```
+
+### Date Input Pattern (Required)
+The native `<input type="date">` displays in `YYYY-MM-DD` format and is inconsistent across browsers. To enforce `MM/DD/YYYY` formatting, the following custom component **MUST** be used for all date inputs.
+
+```typescript
+// ✅ Correct: Custom DateInput component
+const DateInput = React.forwardRef<HTMLInputElement, {
+  value?: Date;
+  onChange?: (date: Date | undefined) => void;
+  placeholder?: string;
+  className?: string;
+}>(({ value, onChange, placeholder, className }, ref) => {
+  const [displayValue, setDisplayValue] = useState('');
+  
+  useEffect(() => {
+    if (value && isValid(value)) {
+      setDisplayValue(format(value, 'MM/dd/yyyy'));
+    } else {
+      setDisplayValue('');
+    }
+  }, [value]);
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const inputValue = e.target.value;
+    if (inputValue === '') {
+      onChange?.(undefined);
+      return;
+    }
+    const parsedDate = parse(inputValue, 'MM/dd/yyyy', new Date());
+    if (isValid(parsedDate)) {
+      onChange?.(parsedDate);
+      setDisplayValue(format(parsedDate, 'MM/dd/yyyy'));
+    } else {
+      // Revert to last valid value or empty
+      setDisplayValue(value && isValid(value) ? format(value, 'MM/dd/yyyy') : '');
+    }
+  };
+
+  return (
+    <Input
+      ref={ref}
+      type="text" // Use text input to control formatting
+      value={displayValue}
+      onChange={(e) => setDisplayValue(e.target.value)}
+      onBlur={handleBlur}
+      placeholder={placeholder || 'MM/DD/YYYY'}
+      className={className}
+    />
+  );
+});
+DateInput.displayName = 'DateInput';
+
+// Usage in a form:
+<FormField
+  control={form.control}
+  name="dob"
+  render={({ field }) => (
+    <FormItem>
+      <FormLabel>Date of Birth</FormLabel>
+      <FormControl>
+        <DateInput
+          value={field.value}
+          onChange={field.onChange}
+        />
+      </FormControl>
+      <FormMessage />
+    </FormItem>
+  )}
+/>
 ```
 
 ### Server Action Button Pattern
