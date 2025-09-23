@@ -1,4 +1,4 @@
-# Comprehensive Project Reference (Updated - 9/23/25 6:00 pm central)
+# Comprehensive Project Reference (Updated - 9/23/25 6:33 pm central)
 
 ## Tech Stack & Architecture Requirements
 
@@ -362,6 +362,16 @@ runConfig:
   cpu: 1
   memoryMiB: 512
 ```
+
+## Environment Variables (Required)
+
+For the application to function correctly, especially its AI capabilities, the following environment variables MUST be set in the `.env` file:
+
+```
+GEMINI_API_KEY=your_actual_api_key_here
+```
+
+- **`GEMINI_API_KEY`**: This key is essential for all Genkit flows and AI features. The application will fail to start on the server without it.
 
 ## Critical Debugging Lessons
 
