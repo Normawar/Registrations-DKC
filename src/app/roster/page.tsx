@@ -57,14 +57,14 @@ const playerFormSchema = z.object({
       invalid_type_error: "Rating must be a number or UNR."
     }).optional()
   ),
-  grade: z.string().optional().transform(val => val === '' ? undefined : val),
-  section: z.string().optional().transform(val => val === '' ? undefined : val),
-  email: z.string().min(1, { message: "Email is required for roster players." }).email({ message: "Please enter a valid email." }),
-  zipCode: z.string().min(1, { message: "Zip Code is required for roster players." }),
+  grade: z.string().min(1, { message: "Please select a grade." }),
+  section: z.string().min(1, { message: "Please select a section." }),
+  email: z.string().min(1, { message: "Email is required." }).email({ message: "Please enter a valid email." }),
+  zipCode: z.string().min(5, { message: "A valid 5-digit Zip Code is required." }),
   phone: z.string().optional().transform(val => val === '' ? undefined : val),
-  dob: z.date().optional(),
+  dob: z.date({ required_error: "Date of Birth is required."}),
   studentType: z.string().optional().transform(val => val === '' ? undefined : val),
-  state: z.string().optional().transform(val => val === '' ? undefined : val),
+  state: z.string().min(1, { message: "State is required."}),
   school: z.string().min(1, { message: "School name is required."}),
   district: z.string().min(1, { message: "District name is required."}),
 }).refine(data => {
@@ -134,7 +134,7 @@ const DateInput = React.forwardRef<HTMLInputElement, {
   return (
     <Input
       ref={ref}
-      type="text"
+      type="text" // Use text input to control formatting
       value={displayValue}
       onChange={handleChange}
       onBlur={handleBlur}
@@ -749,11 +749,11 @@ function DistrictRostersPageContent() {
                     <div className="space-y-4">
                       <h3 className="text-lg font-semibold border-b pb-2">Contact Information</h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email *</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                        <FormField control={form.control} name="zipCode" render={({ field }) => ( <FormItem><FormLabel>Zip Code *</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                        <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email *</FormLabel><FormControl><Input type="email" {...field} value={field.value || ''}/></FormControl><FormMessage /></FormItem>)} />
+                        <FormField control={form.control} name="zipCode" render={({ field }) => ( <FormItem><FormLabel>Zip Code *</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>)} />
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <FormField control={form.control} name="state" render={({ field }) => ( <FormItem><FormLabel>State</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                        <FormField control={form.control} name="state" render={({ field }) => ( <FormItem><FormLabel>State</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>)} />
                       </div>
                     </div>
                     <Separator className="my-6" />
@@ -765,10 +765,10 @@ function DistrictRostersPageContent() {
             <div className="p-6 pt-4 border-t bg-muted/30 shrink-0">
               <div className="flex justify-between">
                 {playerToEdit ? (
-                  <Button type="button" variant="destructive" onClick={() => { handleDeletePlayer(playerToEdit); setIsEditOpen(false); }}>
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete Player
-                  </Button>
+                    <Button type="button" variant="destructive" onClick={() => handleDeletePlayer(playerToEdit)}>
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete Player
+                    </Button>
                 ) : ( <div></div> )}
                 <div className="flex gap-3">
                   <Button type="button" variant="ghost" onClick={() => setIsEditOpen(false)}>Cancel</Button>
@@ -1043,7 +1043,7 @@ function UserRosterPageContent() {
                                 <FormField control={form.control} name="district" render={({ field }) => (
                                   <FormItem>
                                     <FormLabel>District</FormLabel>
-                                    <Select onValueChange={(v) => { field.onChange(v); handleDistrictChange(v); }} value={field.value}>
+                                    <Select onValueChange={(v) => { field.onChange(v); setSchoolsForEditDistrict(getSchoolsForDistrict(v)); form.setValue('school', ''); }} value={field.value}>
                                       <FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl>
                                       <SelectContent>{dbDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
                                     </Select>
@@ -1095,8 +1095,8 @@ function UserRosterPageContent() {
                             <div className="space-y-4">
                               <h3 className="text-lg font-semibold border-b pb-2">Contact Information</h3>
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email *</FormLabel><FormControl><Input type="email" {...field} value={field.value || ''}/></FormControl><FormMessage /></FormItem>)} />
-                                <FormField control={form.control} name="zipCode" render={({ field }) => ( <FormItem><FormLabel>Zip Code *</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>)} />
+                                <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} value={field.value || ''}/></FormControl><FormMessage /></FormItem>)} />
+                                <FormField control={form.control} name="zipCode" render={({ field }) => ( <FormItem><FormLabel>Zip Code</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>)} />
                               </div>
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <FormField control={form.control} name="state" render={({ field }) => ( <FormItem><FormLabel>State</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>)} />
