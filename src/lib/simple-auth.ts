@@ -1,4 +1,3 @@
-
 // FIXED VERSION: Refactored to prevent recursion and handle zombie auth users
 
 import { auth, db } from '@/lib/firebase';
@@ -149,23 +148,10 @@ function isTestAccount(email: string): boolean {
          email === 'noemi.cuello@psjaisd.us';
 }
 
+// DEPRECATED: This function is removed to simplify sign-in.
+// Test accounts should be created through the standard sign-up flow.
 function getTestAccountProfile(email: string): Partial<SponsorProfile> | null {
-  const testProfiles: Record<string, Partial<SponsorProfile>> = {
-    'sandra.ojeda@psjaisd.us': {
-      firstName: 'Sandra',
-      lastName: 'Ojeda',
-      role: 'district_coordinator',
-      district: 'PHARR-SAN JUAN-ALAMO ISD',
-      school: 'All Schools',
-      phone: '555-555-5555',
-      isDistrictCoordinator: true,
-      avatarType: 'icon',
-      avatarValue: 'KingIcon',
-    },
-    // Add other test profiles...
-  };
-  
-  return testProfiles[email] || null;
+  return null;
 }
 
 async function getOrCreateUserProfile(user: User, normalizedEmail: string): Promise<SponsorProfile> {
@@ -177,17 +163,10 @@ async function getOrCreateUserProfile(user: User, normalizedEmail: string): Prom
     profileData = applyProfileCorrections(profileData, user, normalizedEmail);
 
     if (!profileData) {
-      const testProfileData = getTestAccountProfile(normalizedEmail);
-      if (testProfileData) {
-          profileData = {
-              uid: user.uid,
-              email: normalizedEmail,
-              ...testProfileData,
-          } as SponsorProfile;
-      } else {
-          profileData = createFallbackProfile(user, normalizedEmail);
-      }
-      await setDoc(doc(db, 'users', user.uid), profileData);
+        // If no profile exists after corrections, create a fallback.
+        profileData = createFallbackProfile(user, normalizedEmail);
+        await setDoc(doc(db, 'users', user.uid), profileData);
+        console.log(`Created fallback profile for user ${user.uid}`);
     }
 
     return profileData;
@@ -487,5 +466,3 @@ export async function correctOrganizerAccountData(email: string, password: strin
   } finally {
   }
 }
-
-    
