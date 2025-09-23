@@ -123,29 +123,41 @@ export async function createUserAction(
     return { success: false, error: 'Email and temporary password are required.' };
   }
 
-  // Delegate user creation to simpleSignUp to ensure consistent logic
-  // This approach is not ideal as it calls a client-SDK-dependent function from the server,
-  // but it's a temporary workaround to the problem of inconsistent user creation.
-  // The correct long-term fix is to use Firebase Admin SDK exclusively here.
   try {
-    const result = await simpleSignUp(email, tempPassword, {
+    const adminAuth = getAdminAuth();
+    const adminDb = getDb();
+    
+    const userRecord = await adminAuth.createUser({
+      email,
+      password: tempPassword,
+      emailVerified: true,
+      displayName: `${profileData.firstName} ${profileData.lastName}`,
+    });
+
+    const newProfile: Omit<SponsorProfile, 'uid'> = {
       ...profileData,
+      email: userRecord.email!,
       role: profileData.role,
       isDistrictCoordinator: profileData.isDistrictCoordinator,
       avatarType: 'icon',
       avatarValue: 'PawnIcon',
       forceProfileUpdate: true,
-    });
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
 
-    if (result.success) {
-      return { success: true, tempPassword };
-    } else {
-      // This path is unlikely given the simpleSignUp implementation
-      return { success: false, error: 'Failed to create user account.' };
-    }
+    await adminDb.collection('users').doc(userRecord.uid).set(newProfile);
+
+    return { success: true, tempPassword };
   } catch (error: any) {
-    console.error('Error creating user via simpleSignUp from server action:', error);
-    return { success: false, error: error.message || 'An unknown error occurred.' };
+    console.error('Error creating user with Admin SDK:', error);
+    let message = 'Failed to create user.';
+    if (error.code === 'auth/email-already-exists') {
+      message = 'This email address is already in use by an existing account.';
+    } else if (error.code === 'auth/invalid-password') {
+      message = 'The temporary password must be at least 6 characters long.';
+    }
+    return { success: false, error: message };
   }
 }
 
