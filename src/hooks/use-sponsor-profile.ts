@@ -3,10 +3,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '@/lib/services/firestore-service';
+import { db } from '@/lib/firebase';
 import { User } from 'firebase/auth';
 import { AuthService } from '@/lib/auth';
-import { useMasterDb } from '@/context/master-db-context';
 
 export type SponsorProfile = {
   firstName: string;
@@ -36,27 +35,21 @@ export function useSponsorProfile() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<SponsorProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const { isDbLoaded } = useMasterDb(); // Depend on the master DB context
 
   // Listen for auth state changes to keep user and profile in sync
   useEffect(() => {
     const unsubscribe = AuthService.onAuthStateChanged(async (authUser, userProfile) => {
-        // We need both the authenticated user and the master database to be ready
-        if (authUser && userProfile && isDbLoaded) {
+        if (authUser && userProfile) {
             setUser(authUser);
             setProfile(userProfile);
-            setLoading(false);
-        } else if (!authUser) {
-            // If there's no user, we are not loading a profile.
+        } else {
             setUser(null);
             setProfile(null);
-            setLoading(false);
         }
-        // If authUser exists but isDbLoaded is false, we keep loading=true
-        // and wait for the isDbLoaded dependency in the next useEffect to trigger the final state.
+        setLoading(false);
     });
     return () => unsubscribe();
-  }, [isDbLoaded]); // Add isDbLoaded as a dependency
+  }, []);
 
 
   const updateProfile = useCallback(async (newProfileData: Partial<SponsorProfile> | null, authUser?: User | null) => {

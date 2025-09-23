@@ -32,14 +32,53 @@ export function EnhancedPlayerSearchDialog({
   userProfile?: SponsorProfile | null;
   preFilterByUserProfile?: boolean;
 }) {
-  const { isDbLoaded, dbDistricts, getSchoolsForDistrict, searchPlayers } = useMasterDb();
+  const { searchPlayers } = useMasterDb();
   
+  const [dbDistricts, setDbDistricts] = useState<string[]>([]);
+  const [dbSchools, setDbSchools] = useState<string[]>([]);
+  const [isDbLoaded, setIsDbLoaded] = useState(false);
+
   // DATABASE SEARCH STATE
   const [searchCriteria, setSearchCriteria] = useState<Partial<SearchCriteria>>({});
   const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [availableSchools, setAvailableSchools] = useState<string[]>([]);
   
+  // Fetch districts and all schools on component mount
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const [districtsRes, schoolsRes] = await Promise.all([
+          fetch('/api/districts'),
+          fetch('/api/schools')
+        ]);
+        const districts = await districtsRes.json();
+        const schools = await schoolsRes.json();
+        setDbDistricts(districts);
+        setDbSchools(schools);
+        setIsDbLoaded(true);
+      } catch (error) {
+        console.error("Failed to load initial search data:", error);
+      }
+    }
+    fetchData();
+  }, []);
+
+  const getSchoolsForDistrict = useCallback(async (district: string) => {
+    if (district === 'all' || !district) {
+      setAvailableSchools(dbSchools);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/schools?district=${encodeURIComponent(district)}`);
+      const schools = await res.json();
+      setAvailableSchools(schools);
+    } catch (error) {
+      console.error(`Failed to fetch schools for district ${district}:`, error);
+      setAvailableSchools([]);
+    }
+  }, [dbSchools]);
+
   const availableDistricts = React.useMemo(() => {
     if (!preFilterByUserProfile || !userProfile || userProfile.role === 'organizer' || userProfile.isDistrictCoordinator) {
       return dbDistricts;
@@ -53,8 +92,7 @@ export function EnhancedPlayerSearchDialog({
   // Update available schools when district changes
   useEffect(() => {
     if (isDbLoaded) {
-      const schools = getSchoolsForDistrict(searchCriteria.district || 'all');
-      setAvailableSchools(schools);
+      getSchoolsForDistrict(searchCriteria.district || 'all');
     }
   }, [searchCriteria.district, isDbLoaded, getSchoolsForDistrict]);
 

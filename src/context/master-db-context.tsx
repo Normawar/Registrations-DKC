@@ -3,7 +3,7 @@
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useMemo } from 'react';
 import { collection, getDocs, doc, setDoc, writeBatch, deleteDoc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/services/firestore-service';
+import { db } from '@/lib/firebase';
 import { MasterPlayer } from '@/lib/data/full-master-player-data';
 import { SponsorProfile } from '@/hooks/use-sponsor-profile';
 import Papa from 'papaparse';
@@ -510,7 +510,9 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const searchPlayers = async (criteria: Partial<SearchCriteria>): Promise<SearchResult> => {
-    if (!db) return { players: [], hasMore: false, totalFound: 0, message: 'Database not initialized.' };
+    if (!isDbLoaded) {
+      return { players: [], hasMore: false, totalFound: 0, message: 'Database is still loading...' };
+    }
 
     try {
         const response = await fetch('/api/search-players', {
