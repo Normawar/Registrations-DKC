@@ -1,6 +1,4 @@
 // src/lib/firebase-admin.ts
-'use server';
-
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
 import { getAuth, Auth } from 'firebase-admin/auth';
@@ -45,4 +43,4 @@ try {
   authAdmin = null as any;
 }
 
-export { db, authAdmin };
+export { db, authAdmin as adminAuth };
