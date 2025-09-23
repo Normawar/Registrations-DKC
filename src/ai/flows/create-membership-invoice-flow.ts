@@ -8,7 +8,6 @@
  * - CreateMembershipInvoiceOutput - The return type for the function.
  */
 
-import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { randomUUID } from 'crypto';
 import { ApiError, type InvoiceRecipient, type Address } from 'square';
@@ -25,7 +24,7 @@ const PlayerInfoSchema = z.object({
   zipCode: z.string().describe("The player's zip code."),
 });
 
-const CreateMembershipInvoiceInputSchema = z.object({
+export const CreateMembershipInvoiceInputSchema = z.object({
     purchaserName: z.string().describe('The name of the person paying for the membership.'),
     purchaserEmail: z.string().email().describe('The email of the person paying for the membership.'),
     bookkeeperEmail: z.string().email().or(z.literal('')).optional(),
@@ -40,7 +39,7 @@ const CreateMembershipInvoiceInputSchema = z.object({
 });
 export type CreateMembershipInvoiceInput = z.infer<typeof CreateMembershipInvoiceInputSchema>;
 
-const CreateMembershipInvoiceOutputSchema = z.object({
+export const CreateMembershipInvoiceOutputSchema = z.object({
   invoiceId: z.string().describe('The unique ID for the generated invoice.'),
   invoiceNumber: z.string().optional().describe('The user-facing invoice number.'),
   status: z.string().describe('The status of the invoice (e.g., DRAFT, PUBLISHED).'),
@@ -49,16 +48,6 @@ const CreateMembershipInvoiceOutputSchema = z.object({
 export type CreateMembershipInvoiceOutput = z.infer<typeof CreateMembershipInvoiceOutputSchema>;
 
 export async function createMembershipInvoice(input: CreateMembershipInvoiceInput): Promise<CreateMembershipInvoiceOutput> {
-  return createMembershipInvoiceFlow(input);
-}
-
-const createMembershipInvoiceFlow = ai.defineFlow(
-  {
-    name: 'createMembershipInvoiceFlow',
-    inputSchema: CreateMembershipInvoiceInputSchema,
-    outputSchema: CreateMembershipInvoiceOutputSchema,
-  },
-  async (input) => {
     if (input.membershipType.toLowerCase().includes('error') || input.membershipType.toLowerCase().includes('invalid')) {
         throw new Error(`Invalid membership type provided: "${input.membershipType}". Please return to the previous page and get a valid membership suggestion.`);
     }
@@ -248,5 +237,4 @@ const createMembershipInvoiceFlow = ai.defineFlow(
         throw new Error('An unexpected error occurred during membership invoice creation.');
       }
     }
-  }
-);
+}

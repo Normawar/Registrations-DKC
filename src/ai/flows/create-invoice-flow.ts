@@ -8,12 +8,11 @@
  * - CreateInvoiceOutput - The return type for the createInvoice function.
  */
 
-import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { randomUUID } from 'crypto';
 import { ApiError, type OrderLineItem, type InvoiceRecipient, type Address } from 'square';
 import { format } from 'date-fns';
-import { doc, getDoc, setDoc, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase-admin';
 import { generateTeamCode } from '@/lib/school-utils';
 import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
@@ -29,7 +28,7 @@ const PlayerInvoiceInfoSchema = z.object({
   waiveLateFee: z.boolean().optional().describe('Flag to waive late fee for a player.'),
 });
 
-const CreateInvoiceInputSchema = z.object({
+export const CreateInvoiceInputSchema = z.object({
     sponsorName: z.string().describe('The name of the sponsor to be invoiced.'),
     sponsorEmail: z.string().email().describe('The email of the sponsor.'),
     sponsorPhone: z.string().optional().describe('The phone number of the sponsor.'),
@@ -51,7 +50,7 @@ const CreateInvoiceInputSchema = z.object({
 });
 export type CreateInvoiceInput = z.infer<typeof CreateInvoiceInputSchema>;
 
-const CreateInvoiceOutputSchema = z.object({
+export const CreateInvoiceOutputSchema = z.object({
   invoiceId: z.string().describe('The unique ID for the generated invoice.'),
   invoiceNumber: z.string().optional().describe('The user-facing invoice number.'),
   status: z.string().describe('The status of the invoice (e.g., DRAFT, PUBLISHED).'),
@@ -60,16 +59,6 @@ const CreateInvoiceOutputSchema = z.object({
 export type CreateInvoiceOutput = z.infer<typeof CreateInvoiceOutputSchema>;
 
 export async function createInvoice(input: CreateInvoiceInput): Promise<CreateInvoiceOutput> {
-  return createInvoiceFlow(input);
-}
-
-const createInvoiceFlow = ai.defineFlow(
-  {
-    name: 'createInvoiceFlow',
-    inputSchema: CreateInvoiceInputSchema,
-    outputSchema: CreateInvoiceOutputSchema,
-  },
-  async (input) => {
     // Step 0: Globally fix all null or undefined fields in players
     const processedPlayers = input.players.map(p => ({
       ...p,
@@ -289,5 +278,4 @@ const createInvoiceFlow = ai.defineFlow(
       }
       throw error instanceof Error ? new Error(error.message) : new Error('Unexpected error during invoice creation.');
     }
-  }
-);
+}

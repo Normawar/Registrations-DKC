@@ -8,7 +8,6 @@
  * - CreateOrganizerInvoiceInvoiceOutput - The return type for the function.
  */
 
-import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { randomUUID } from 'crypto';
 import { ApiError, type InvoiceRecipient, type Address } from 'square';
@@ -20,7 +19,7 @@ const LineItemSchema = z.object({
   note: z.string().optional().describe('Any additional notes for the line item.'),
 });
 
-const CreateOrganizerInvoiceInputSchema = z.object({
+export const CreateOrganizerInvoiceInputSchema = z.object({
     sponsorName: z.string().describe('The name of the person or entity to be invoiced.'),
     sponsorEmail: z.string().email().describe('The email of the invoice recipient.'),
     bookkeeperEmail: z.string().email().or(z.literal('')).optional(),
@@ -35,7 +34,7 @@ const CreateOrganizerInvoiceInputSchema = z.object({
 });
 export type CreateOrganizerInvoiceInput = z.infer<typeof CreateOrganizerInvoiceInputSchema>;
 
-const CreateOrganizerInvoiceOutputSchema = z.object({
+export const CreateOrganizerInvoiceOutputSchema = z.object({
   invoiceId: z.string().describe('The unique ID for the generated invoice.'),
   invoiceNumber: z.string().optional().describe('The user-facing invoice number.'),
   status: z.string().describe('The status of the invoice (e.g., DRAFT, PUBLISHED).'),
@@ -44,16 +43,6 @@ const CreateOrganizerInvoiceOutputSchema = z.object({
 export type CreateOrganizerInvoiceOutput = z.infer<typeof CreateOrganizerInvoiceOutputSchema>;
 
 export async function createOrganizerInvoice(input: CreateOrganizerInvoiceInput): Promise<CreateOrganizerInvoiceOutput> {
-  return createOrganizerInvoiceFlow(input);
-}
-
-const createOrganizerInvoiceFlow = ai.defineFlow(
-  {
-    name: 'createOrganizerInvoiceFlow',
-    inputSchema: CreateOrganizerInvoiceInputSchema,
-    outputSchema: CreateOrganizerInvoiceOutputSchema,
-  },
-  async (input) => {
     const squareClient = await getSquareClient();
     const locationId = await getSquareLocationId();
     const { customersApi, ordersApi, invoicesApi } = squareClient;
@@ -222,5 +211,4 @@ const createOrganizerInvoiceFlow = ai.defineFlow(
         throw new Error('An unexpected error occurred during organizer invoice creation.');
       }
     }
-  }
-);
+}
