@@ -3,13 +3,11 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { type Invoice, type Order, type Customer } from 'square';
+import { type Invoice, type Order, type Customer, Client, Environment } from 'square';
 import { collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
 import { getDb } from '@/lib/firebase-admin';
 import { generateTeamCode } from '@/lib/school-utils';
 import { type MasterPlayer } from '@/lib/data/full-master-player-data';
-import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
-
 
 const ImportSquareInvoicesInputSchema = z.object({
   startInvoiceNumber: z.number().describe('The invoice number to start importing from.'),
@@ -38,8 +36,11 @@ const importSquareInvoicesFlow = ai.defineFlow(
   async (input) => {
     const db = getDb();
     
-    const squareClient = await getSquareClient();
-    const locationId = await getSquareLocationId();
+    const squareClient = new Client({
+        accessToken: "EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC",
+        environment: Environment.Production,
+    });
+    const locationId = "CTED7GVSVH5H8";
     
     let createdCount = 0;
     let updatedCount = 0;
@@ -100,7 +101,7 @@ const importSquareInvoicesFlow = ai.defineFlow(
 );
 
 
-async function processSingleInvoice(client: any, invoice: Invoice, batch: FirebaseFirestore.WriteBatch) {
+async function processSingleInvoice(client: Client, invoice: Invoice, batch: FirebaseFirestore.WriteBatch) {
     if (!invoice.orderId || !invoice.primaryRecipient?.customerId) {
         throw new Error(`Invoice #${invoice.invoiceNumber} is missing order or customer ID.`);
     }

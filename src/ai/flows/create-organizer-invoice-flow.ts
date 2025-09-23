@@ -7,13 +7,15 @@
  */
 
 import { randomUUID } from 'crypto';
-import { ApiError, type InvoiceRecipient, type Address } from 'square';
-import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
+import { ApiError, type InvoiceRecipient, type Address, Client, Environment } from 'square';
 import { type CreateOrganizerInvoiceInput, type CreateOrganizerInvoiceOutput } from './schemas';
 
 export async function createOrganizerInvoice(input: CreateOrganizerInvoiceInput): Promise<CreateOrganizerInvoiceOutput> {
-    const squareClient = await getSquareClient();
-    const locationId = await getSquareLocationId();
+    const squareClient = new Client({
+        accessToken: "EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC",
+        environment: Environment.Production,
+    });
+    const locationId = "CTED7GVSVH5H8";
     const { customersApi, ordersApi, invoicesApi } = squareClient;
     
     console.log("Starting Square organizer invoice creation with input:", input);

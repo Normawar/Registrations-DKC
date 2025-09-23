@@ -7,10 +7,9 @@
 
 import {z} from 'genkit';
 import { randomUUID } from 'crypto';
-import { ApiError } from 'square';
+import { ApiError, Client, Environment } from 'square';
 import { createOrganizerInvoice } from './create-organizer-invoice-flow';
 import { cancelInvoice } from './cancel-invoice-flow';
-import { getSquareClient } from '@/lib/square-client';
 
 const LineItemSchema = z.object({
   name: z.string().describe('The name or description of the line item.'),
@@ -44,7 +43,10 @@ export const RecreateOrganizerInvoiceOutputSchema = z.object({
 export type RecreateOrganizerInvoiceOutput = z.infer<typeof RecreateOrganizerInvoiceOutputSchema>;
 
 export async function recreateOrganizerInvoice(input: RecreateOrganizerInvoiceInput): Promise<RecreateOrganizerInvoiceOutput> {
-    const squareClient = await getSquareClient();
+    const squareClient = new Client({
+        accessToken: "EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC",
+        environment: Environment.Production,
+    });
 
     try {
       const { result: { invoice: originalInvoice } } = await squareClient.invoicesApi.getInvoice(input.originalInvoiceId);

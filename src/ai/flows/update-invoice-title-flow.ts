@@ -9,9 +9,8 @@
  */
 
 import {z} from 'genkit';
-import { ApiError } from 'square';
+import { ApiError, Client, Environment } from 'square';
 import { randomUUID } from 'crypto';
-import { getSquareClient } from '@/lib/square-client';
 
 export const UpdateInvoiceTitleInputSchema = z.object({
   invoiceId: z.string().describe('The ID of the invoice to update.'),
@@ -27,7 +26,10 @@ export const UpdateInvoiceTitleOutputSchema = z.object({
 export type UpdateInvoiceTitleOutput = z.infer<typeof UpdateInvoiceTitleOutputSchema>;
 
 export async function updateInvoiceTitle(input: UpdateInvoiceTitleInput): Promise<UpdateInvoiceTitleOutput> {
-    const squareClient = await getSquareClient();
+    const squareClient = new Client({
+        accessToken: "EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC",
+        environment: Environment.Production,
+    });
     const { invoicesApi } = squareClient;
       
     try {

@@ -7,9 +7,8 @@
  */
 
 import { randomUUID } from 'crypto';
-import { ApiError, type InvoiceRecipient, type Address } from 'square';
+import { ApiError, type InvoiceRecipient, type Address, Client, Environment } from 'square';
 import { format } from 'date-fns';
-import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
 import { type CreateMembershipInvoiceInput, type CreateMembershipInvoiceOutput } from './schemas';
 
 export async function createMembershipInvoice(input: CreateMembershipInvoiceInput): Promise<CreateMembershipInvoiceOutput> {
@@ -17,8 +16,11 @@ export async function createMembershipInvoice(input: CreateMembershipInvoiceInpu
         throw new Error(`Invalid membership type provided: "${input.membershipType}". Please return to the previous page and get a valid membership suggestion.`);
     }
     
-    const squareClient = await getSquareClient();
-    const locationId = await getSquareLocationId();
+    const squareClient = new Client({
+        accessToken: "EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC",
+        environment: Environment.Production,
+    });
+    const locationId = "CTED7GVSVH5H8";
     const { customersApi, ordersApi, invoicesApi } = squareClient;
 
     console.log("Starting Square membership invoice creation with input:", input);

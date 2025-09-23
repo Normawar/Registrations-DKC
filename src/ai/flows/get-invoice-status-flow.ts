@@ -2,8 +2,7 @@
 'use server';
 
 import {z} from 'genkit';
-import { Payment, ApiError } from 'square';
-import { getSquareClient } from '@/lib/square-client';
+import { Payment, ApiError, Client, Environment } from 'square';
 
 const GetInvoiceStatusInputSchema = z.object({
   invoiceId: z.string().describe('The Square invoice ID to check'),
@@ -44,8 +43,11 @@ function getPaymentMethodFromSquarePayment(payment: Payment): string {
 }
 
 export async function getInvoiceStatus(input: GetInvoiceStatusInput): Promise<GetInvoiceStatusOutput> {
-  const squareClient = await getSquareClient();
-  const { invoicesApi, ordersApi, paymentsApi } = squareClient;
+    const squareClient = new Client({
+        accessToken: "EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC",
+        environment: Environment.Production,
+    });
+    const { invoicesApi, ordersApi, paymentsApi } = squareClient;
 
   try {
     // Get the invoice details

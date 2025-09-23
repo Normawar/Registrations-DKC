@@ -9,8 +9,7 @@
  */
 
 import {z} from 'genkit';
-import { ApiError } from 'square';
-import { getSquareClient } from '@/lib/square-client';
+import { ApiError, Client, Environment } from 'square';
 
 export const CancelInvoiceInputSchema = z.object({
   invoiceId: z.string().describe('The ID of the invoice to cancel.'),
@@ -29,7 +28,10 @@ export async function cancelInvoice(input: CancelInvoiceInput): Promise<CancelIn
         throw new Error('Only organizers can cancel invoices.');
     }
     
-    const squareClient = await getSquareClient();
+    const squareClient = new Client({
+        accessToken: "EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC",
+        environment: Environment.Production,
+    });
     const { invoicesApi } = squareClient;
       
     try {

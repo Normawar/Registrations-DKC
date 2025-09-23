@@ -1,11 +1,11 @@
+
 'use server';
 /**
  * @fileOverview Records a payment against a Square invoice using the Square API.
  */
 
-import { ApiError } from 'square';
+import { ApiError, Client, Environment } from 'square';
 import { randomUUID } from 'crypto';
-import { getSquareClient } from '@/lib/square-client';
 import { type RecordPaymentInput, type RecordPaymentOutput } from './schemas';
 
 export async function recordPayment(input: RecordPaymentInput): Promise<RecordPaymentOutput> {
@@ -13,7 +13,10 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
         throw new Error('Only organizers can record payments.');
     }
     
-    const squareClient = await getSquareClient();
+    const squareClient = new Client({
+        accessToken: "EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC",
+        environment: Environment.Production,
+    });
     const { paymentsApi, invoicesApi } = squareClient;
 
     try {
