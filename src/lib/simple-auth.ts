@@ -1,4 +1,5 @@
-// FIXED VERSION: Refactored to prevent recursion
+
+// FIXED VERSION: Refactored to prevent recursion and handle zombie auth users
 
 import { auth, db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, writeBatch, updateDoc } from 'firebase/firestore';
@@ -20,11 +21,10 @@ export function validateEmail(email: string): boolean {
 // Prevent multiple simultaneous auth operations on the same email
 const authOperationsInProgress = new Set<string>();
 
-// FIXED: Simplified signup function that prevents recursion
+// FIXED: `simpleSignUp` now correctly handles zombie users
 export async function simpleSignUp(email: string, password: string, userData: Omit<SponsorProfile, 'uid' | 'email'>) {
   const normalizedEmail = normalizeEmail(email);
   
-  // Prevent concurrent operations on the same email
   if (authOperationsInProgress.has(normalizedEmail)) {
     throw new Error('Authentication operation already in progress for this email');
   }
@@ -47,19 +47,32 @@ export async function simpleSignUp(email: string, password: string, userData: Om
     const authInstance = getAuth();
     let user: User;
 
-    // Handle special accounts FIRST to avoid complex nested logic
-    const specialAccountProfile = await handleSpecialAccounts(normalizedEmail, trimmedPassword, authInstance);
-    if (specialAccountProfile) {
-      return specialAccountProfile;
+    try {
+      // Try to create the user first
+      const userCredential = await createUserWithEmailAndPassword(authInstance, normalizedEmail, trimmedPassword);
+      user = userCredential.user;
+      console.log('✅ New user created with UID:', user.uid);
+    } catch (error: any) {
+      if (error.code === 'auth/email-already-in-use') {
+        console.log(`⚠️ Email ${normalizedEmail} exists in Auth. Attempting to sign in and repair profile.`);
+        try {
+          // If email exists, try to sign in. This confirms ownership.
+          const userCredential = await signInWithEmailAndPassword(authInstance, normalizedEmail, trimmedPassword);
+          user = userCredential.user;
+          console.log(`✅ Existing user ${normalizedEmail} signed in. Checking for missing profile.`);
+          // If sign-in succeeds, it means they are the owner but might be missing a Firestore profile.
+        } catch (signInError: any) {
+          // If sign-in fails, it means email is taken AND password is wrong.
+          console.error('❌ Sign-in attempt failed for existing email:', signInError);
+          throw new Error('An account with this email already exists and the password provided is incorrect.');
+        }
+      } else {
+        // For other creation errors (weak password, etc.), re-throw
+        throw error;
+      }
     }
 
-    // Regular user signup logic
-    // FIXED: Removed the incorrect sign-in fallback. If email is in use, it will now correctly throw an error.
-    const userCredential = await createUserWithEmailAndPassword(authInstance, normalizedEmail, trimmedPassword);
-    user = userCredential.user;
-    console.log('✅ New user created with UID:', user.uid);
-
-    // Create/update profile
+    // Create or update profile
     const userProfile: SponsorProfile = {
       ...userData,
       email: normalizedEmail,
@@ -68,8 +81,9 @@ export async function simpleSignUp(email: string, password: string, userData: Om
       updatedAt: new Date().toISOString(),
     };
 
+    // Use setDoc with merge to either create or overwrite the profile, fixing "zombie" accounts
     await setDoc(doc(db, 'users', user.uid), userProfile, { merge: true });
-    console.log('✅ User profile saved successfully');
+    console.log('✅ User profile created/repaired successfully');
 
     return {
       success: true,
@@ -85,59 +99,6 @@ export async function simpleSignUp(email: string, password: string, userData: Om
   }
 }
 
-// FIXED: Extract special account handling to prevent nested complexity
-async function handleSpecialAccounts(normalizedEmail: string, trimmedPassword: string, authInstance: any): Promise<any | null> {
-  try {
-    // Handle organizer account
-    if (normalizedEmail === 'norma@dkchess.com') {
-      return await handleOrganizerAccount(normalizedEmail, trimmedPassword, authInstance);
-    }
-    
-    return null;
-  } finally {
-  }
-}
-
-async function handleOrganizerAccount(email: string, password: string, authInstance: any) {
-  try {
-      let user: User;
-    
-    try {
-      const userCredential = await signInWithEmailAndPassword(authInstance, email, password);
-      user = userCredential.user;
-      console.log('✅ Organizer signed in');
-    } catch (error: any) {
-      if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') {
-        const userCredential = await createUserWithEmailAndPassword(authInstance, email, password);
-        user = userCredential.user;
-        console.log('✅ Organizer created');
-      } else {
-        throw error;
-      }
-    }
-    
-    const organizerProfile: SponsorProfile = {
-      uid: user.uid,
-      email,
-      firstName: 'Norma',
-      lastName: 'Guerra-Stueber',
-      role: 'organizer',
-      district: 'All Districts',
-      school: 'Dark Knight Chess',
-      phone: '956-393-8875',
-      isDistrictCoordinator: true,
-      avatarType: 'icon',
-      avatarValue: 'KingIcon',
-      forceProfileUpdate: false,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    
-    await setDoc(doc(db, 'users', user.uid), organizerProfile, { merge: true });
-    return { success: true, user, profile: organizerProfile };
-  } finally {
-  }
-}
 
 // FIXED: Simplified signin function
 export async function simpleSignIn(email: string, password: string) {
