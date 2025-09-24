@@ -10,7 +10,6 @@ import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { PlayerSearchDialog } from '@/components/PlayerSearchDialog';
 
-
 function RosterPage() {
   console.log('🏠 RosterPage rendering...');
   
@@ -24,23 +23,28 @@ function RosterPage() {
   const { updatePlayer, refreshDatabase } = useMasterDb();
   const { profile } = useSponsorProfile();
 
+  useEffect(() => {
+    console.log('RosterPage useEffect - refreshDatabase reference changed');
+  }, [refreshDatabase]);
+
   const handleEditPlayer = useCallback((player: MasterPlayer) => {
     setPlayerToEdit(player);
     setIsEditOpen(true);
   }, []);
   
   const handlePlayerSelectedFromSearch = useCallback((player: any) => {
-    console.log('🔍 handlePlayerSelectedFromSearch called with:', player.firstName, player.lastName);
+    console.log('🔍 handlePlayerSelectedFromSearch called - START');
+    console.log('🔍 Current state - isSearchOpen:', isSearchOpen, 'isEditOpen:', isEditOpen);
     
     // Prevent multiple rapid calls
-    if (isSearchOpen === false) {
-      console.log('⚠️ Search already closed, ignoring duplicate call');
+    if (!isSearchOpen) {
+      console.log('⚠️ Search not open, ignoring call');
       return;
     }
     
     const isMasterPlayer = 'uscfId' in player;
     let playerToProcess: MasterPlayer;
-  
+
     if (isMasterPlayer) {
       playerToProcess = player as MasterPlayer;
     } else {
@@ -66,44 +70,35 @@ function RosterPage() {
       };
     }
     
-    console.log('🔍 Setting search closed...');
+    console.log('🔍 Setting isSearchOpen to false');
     setIsSearchOpen(false);
     
-    // Use setTimeout to ensure state update happens first
-    setTimeout(() => {
-      console.log('🔍 Opening player edit dialog...');
-      handleEditPlayer(playerToProcess);
-    }, 100);
+    console.log('🔍 Setting playerToEdit');
+    setPlayerToEdit(playerToProcess);
     
-  }, [isSearchOpen, profile, handleEditPlayer]);
+    console.log('🔍 Setting isEditOpen to true');
+    setIsEditOpen(true);
+    
+    console.log('🔍 handlePlayerSelectedFromSearch - END');
+  }, [isSearchOpen, profile, isEditOpen, handleEditPlayer]);
 
   const handleAddToRoster = async (player: MasterPlayer) => {
+    console.log('📝 handleAddToRoster called');
     if (!profile) return;
-    
-    // Close the details dialog
+    const updatedPlayer = { 
+      ...player, 
+      school: profile.school, 
+      district: profile.district 
+    };
+    await updatePlayer(updatedPlayer, profile);
+    console.log('📝 Player updated, closing edit dialog');
     setIsEditOpen(false);
-
-    if (profile.role === 'sponsor' || profile.isDistrictCoordinator) {
-      const updatedPlayer = { 
-        ...player, 
-        school: profile.school, 
-        district: profile.district 
-      };
-      await updatePlayer(updatedPlayer, profile);
-    }
-    
-    refreshDatabase(); // Refresh data to show the new player
+    console.log('📝 handleAddToRoster complete');
   };
   
   const handlePlayerCreatedOrUpdated = useCallback(() => {
-    console.log('🔄 handlePlayerCreatedOrUpdated called - SKIPPING refresh to prevent loop');
-    // DO NOT call refreshDatabase here
+    console.log('🔄 handlePlayerCreatedOrUpdated called - doing nothing');
   }, []);
-
-  useEffect(() => {
-    console.log('RosterPage useEffect - refreshDatabase reference changed');
-  }, [refreshDatabase]);
-
 
   return (
     <Suspense fallback={<div>Loading...</div>}>
