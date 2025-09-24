@@ -315,10 +315,11 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   }, [loadDatabase]);
 
 
-  const refreshDatabase = async () => {
+  const refreshDatabase = useCallback(async () => {
+    console.log('🔄 refreshDatabase called from:', new Error().stack?.split('\n')[1]);
     await loadDatabase();
     toast({ title: 'Database Refreshed', description: 'Fetched the latest player and school data from the server.' });
-  };
+  }, [loadDatabase, toast]);
 
   const addPlayer = async (player: MasterPlayer, editingProfile: SponsorProfile | null) => {
     if (!db) return;
