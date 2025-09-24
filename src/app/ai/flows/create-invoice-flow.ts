@@ -3,23 +3,21 @@
 /**
  * @fileOverview Creates an invoice with the Square API and saves player data to Firestore.
  * This flow is now unified to handle both individual and sponsor registrations.
- * It has been refactored to use the client 'firebase' SDK due to persistent admin SDK initialization failures.
+ * It has been refactored to use the Admin SDK's getDb() function for Firestore operations.
  */
 
 import { randomUUID } from 'crypto';
 import { ApiError, type OrderLineItem, type InvoiceRecipient, Client, Environment } from 'square';
 import { format } from 'date-fns';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '@/lib/services/firestore-service'; // USING CLIENT SDK
+import { getDb } from '@/lib/firebase-admin'; // USING ADMIN SDK GETTER
 import { generateTeamCode } from '@/lib/school-utils';
 import { type CreateInvoiceInput, type CreateInvoiceOutput } from './schemas';
 
 // This function now acts as a standalone Server Action.
 export async function createInvoice(input: CreateInvoiceInput): Promise<CreateInvoiceOutput> {
   
-  if (!db) {
-    throw new Error('FATAL: Client Firestore DB is not available.');
-  }
+  const db = getDb();
 
   // Step 0: Globally fix all null or undefined fields in players
   const processedPlayers = input.players.map(p => ({

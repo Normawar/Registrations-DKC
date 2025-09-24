@@ -1,8 +1,8 @@
-# Comprehensive Project Reference (Updated - 9/23/25 6:33 pm central)
+# Comprehensive Project Reference (Updated - 9/23/25 9:23 PM central)
 
-## Tech Stack & Architecture Requirements
+## 1. Tech Stack & Development Environment
 
-### Predefined Tech Stack
+### Core Technologies (Predefined Stack)
 - **Framework**: Next.js (App Router)
 - **Frontend**: React + TypeScript
 - **UI Components**: ShadCN UI (exclusive component library)
@@ -11,15 +11,29 @@
 - **Backend**: Firebase (Firestore + Authentication)
 - **AI Library**: Genkit (exclusive for all AI functionality)
 
-### Development Environment
+### Environment & Deployment
 - **Deployment**: Firebase Studio + App Hosting
 - **Production Domain**: register.dkchess.com
 - **Build System**: Firebase App Hosting with `apphosting.yaml`
 
-## Critical Architecture Rules
+### Required Environment Variables
+```env
+GEMINI_API_KEY=your_actual_api_key_here
+```
+⚠️ **Critical**: This key is essential for all Genkit flows and AI features. The application will fail to start on the server without it.
+
+### Production Deployment Configuration
+```yaml
+# apphosting.yaml (Required Format)
+runConfig:
+  cpu: 1
+  memoryMiB: 512
+```
+
+## 2. Architecture & Design Patterns
 
 ### Server-Side Logic (Strict Requirement)
-All database writes, payments, and sensitive operations MUST occur in Server Actions or API Routes. NO direct client-side access to Firebase services (except for the `useMasterDb` read-only context).
+All database writes, payments, and sensitive operations **MUST** occur in Server Actions or API Routes. NO direct client-side access to Firebase services (except for the `useMasterDb` read-only context).
 
 ```typescript
 // ✅ Correct: Server Actions or API Routes
@@ -52,6 +66,13 @@ const { schools, districts } = useMasterDb(); // Global data access for client-s
 // All data writes MUST use server actions.
 ```
 
+### Module Import Rules (Critical)
+- **`'use server'` files**: MUST import from `@/lib/firebase-admin`
+- **`'use client'` files**: MUST import from `@/lib/firebase` or `@/lib/services/firestore-service`
+- **NEVER** mix these imports. A server file must never import the client SDK, and a client file must never import the admin SDK.
+
+## 3. Date & Data Formatting Standards
+
 ### Date Format Standard
 **ALL dates in the application must be displayed and entered using MM/DD/YYYY format.**
 
@@ -68,9 +89,39 @@ const displayDate = format(new Date(), 'MM/dd/yyyy');
 />
 ```
 
-## Square API Integration (Production)
+### Date Input Pattern
+```typescript
+import { format, parse, isValid } from 'date-fns';
 
-### Working Credentials
+// For date display
+const displayDate = format(new Date(), 'MM/dd/yyyy');
+
+// For date input validation
+const validateDateInput = (dateString: string): Date | null => {
+  try {
+    const parsed = parse(dateString, 'MM/dd/yyyy', new Date());
+    return isValid(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+// Date input component
+<Input
+  type="text"
+  placeholder="MM/DD/YYYY"
+  pattern="\d{2}/\d{2}/\d{4}"
+  value={dateValue}
+  onChange={(e) => {
+    const date = validateDateInput(e.target.value);
+    if (date) setDateValue(format(date, 'MM/dd/yyyy'));
+  }}
+/>
+```
+
+## 4. Square API Integration (Complete Reference)
+
+### Production Credentials
 ```typescript
 accessToken: "EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC"
 environment: Environment.Production
@@ -100,7 +151,7 @@ import { getSquareClient } from '@/lib/square-client';
 const client = getSquareClient(); // This pattern has failed and is forbidden.
 ```
 
-### ⚠️ IMPORTANT: Phone Number Handling Update
+### ⚠️ Phone Number Handling Update (December 2024)
 **Due to persistent Square API validation issues, phone numbers are NO LONGER sent to Square API calls.**
 
 Phone numbers are optional for Square invoices and were causing validation errors. The current implementation completely omits phone numbers from customer creation and updates.
@@ -119,7 +170,7 @@ const createCustomerResponse = await customersApi.createCustomer({
 });
 ```
 
-If phone numbers are needed for other purposes:
+**Alternatives for phone numbers:**
 1. Store them separately in Firestore
 2. Add them to the customer notes field as text
 3. Include them in the invoice description
@@ -167,7 +218,7 @@ const validateSquareData = (input: any) => {
 };
 ```
 
-### Common Square API Validation Rules
+### Square API Validation Rules
 - **Email Addresses**: Must be valid email format, required for primary recipient
 - **Money Amounts**: Must be positive numbers, converted to cents (multiply by 100)
 - **Location ID**: Must exist in your Square account
@@ -175,7 +226,79 @@ const validateSquareData = (input: any) => {
 - **Addresses**: Minimum 5 characters if provided
 - **Phone Numbers**: NOT SENT TO API (omitted to avoid validation errors)
 
-## Genkit AI Implementation
+### Error Handling
+```typescript
+try {
+  const response = await squareClient.invoicesApi.createInvoice(payload);
+  return response.result;
+} catch (error) {
+  if (error instanceof ApiError) {
+    const errorDetail = error.result?.errors?.[0]?.detail || error.message;
+    console.error('Square API Error:', error.result?.errors);
+    throw new Error(`Square API Error: ${errorDetail}`);
+  }
+  throw error instanceof Error ? error : new Error('Unknown error occurred');
+}
+```
+
+### Common Square Issues & Solutions
+- Token/environment must match (`production` token = `Environment.Production`)
+- **Hard-coded client initialization inside server actions is the only reliable pattern**
+- **Phone numbers are OMITTED from API calls to avoid validation errors**
+- **Always validate data before API calls** to prevent 500 errors
+- Emails must be valid format, money amounts must be positive numbers
+
+## 5. Firebase Integration
+
+### ✅ Reliable Firebase Admin SDK Pattern (CRITICAL)
+The Firebase Admin SDK has proven to be unreliable when initialized at the module level in this environment. It **MUST** be initialized just-in-time using the getter functions from `firebase-admin.ts`.
+
+```typescript
+// ✅ Correct: Use the getter function inside the server action
+'use server';
+import { getDb, getAdminAuth } from '@/lib/firebase-admin';
+
+export async function myDbAction() {
+  const db = getDb(); // Get instance just-in-time
+  const auth = getAdminAuth();
+  
+  // Now you can safely use db and auth
+  await db.collection('users').get();
+}
+
+// ❌ Wrong: Importing the instance directly
+import { db } from '@/lib/firebase-admin'; // FORBIDDEN: This will be null/undefined
+```
+
+### User Deletion (Force Delete)
+```typescript
+'use server';
+import { getDb, getAdminAuth } from '@/lib/firebase-admin';
+
+export async function forceDeleteUser(userId: string) {
+  const db = getDb();
+  const auth = getAdminAuth();
+  
+  // Must delete from BOTH:
+  // 1. Firestore database
+  await db.collection('users').doc(userId).delete();
+  
+  // 2. Firebase Authentication
+  await auth.deleteUser(userId);
+}
+```
+
+### Firebase Error Handling
+```typescript
+try {
+  await db.collection('users').doc(userId).set(userData);
+} catch (error) {
+  console.error('Firebase Error:', error);
+  throw new Error('Failed to save user data');
+}
+```
+
+## 6. Genkit AI Implementation
 
 ### Flow Structure (Required Pattern)
 ```typescript
@@ -218,7 +341,7 @@ const myPrompt = ai.definePrompt(
 );
 ```
 
-## UI Component Patterns
+## 7. UI Component Patterns
 
 ### ShadCN Component Usage
 ```typescript
@@ -252,137 +375,9 @@ function MyComponent() {
 }
 ```
 
-### Date Input Pattern
-```typescript
-import { format, parse } from 'date-fns';
+## 8. Critical Debugging Lessons & Common Issues
 
-// For date display
-const displayDate = format(new Date(), 'MM/dd/yyyy');
-
-// For date input validation
-const validateDateInput = (dateString: string): Date | null => {
-  try {
-    const parsed = parse(dateString, 'MM/dd/yyyy', new Date());
-    return isValid(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
-};
-
-// Date input component
-<Input
-  type="text"
-  placeholder="MM/DD/YYYY"
-  pattern="\d{2}/\d{2}/\d{4}"
-  value={dateValue}
-  onChange={(e) => {
-    const date = validateDateInput(e.target.value);
-    if (date) setDateValue(format(date, 'MM/dd/yyyy'));
-  }}
-/>
-```
-
-## Firebase Integration
-
-### ✅ Reliable Firebase Admin SDK Pattern (CRITICAL)
-The Firebase Admin SDK has proven to be unreliable when initialized at the module level in this environment. It **MUST** be initialized just-in-time using the getter functions from `firebase-admin.ts`.
-
-```typescript
-// ✅ Correct: Use the getter function inside the server action
-'use server';
-import { getDb, getAdminAuth } from '@/lib/firebase-admin';
-
-export async function myDbAction() {
-  const db = getDb(); // Get instance just-in-time
-  const auth = getAdminAuth();
-  
-  // Now you can safely use db and auth
-  await db.collection('users').get();
-}
-
-// ❌ Wrong: Importing the instance directly
-import { db } from '@/lib/firebase-admin'; // FORBIDDEN: This will be null/undefined
-```
-
-### Module Import Rules (Critical)
-- **`'use server'` files**: MUST import from `@/lib/firebase-admin`.
-- **`'use client'` files**: MUST import from `@/lib/firebase` or `@/lib/services/firestore-service`.
-- **NEVER** mix these imports. A server file must never import the client SDK, and a client file must never import the admin SDK.
-
-### User Deletion (Force Delete)
-```typescript
-'use server';
-import { getDb, getAdminAuth } from '@/lib/firebase-admin';
-
-export async function forceDeleteUser(userId: string) {
-  const db = getDb();
-  const auth = getAdminAuth();
-  
-  // Must delete from BOTH:
-  // 1. Firestore database
-  await db.collection('users').doc(userId).delete();
-  
-  // 2. Firebase Authentication
-  await auth.deleteUser(userId);
-}
-```
-
-## Error Handling Patterns
-
-### Square API Error Handling
-```typescript
-try {
-  const response = await squareClient.invoicesApi.createInvoice(payload);
-  return response.result;
-} catch (error) {
-  if (error instanceof ApiError) {
-    const errorDetail = error.result?.errors?.[0]?.detail || error.message;
-    console.error('Square API Error:', error.result?.errors);
-    throw new Error(`Square API Error: ${errorDetail}`);
-  }
-  throw error instanceof Error ? error : new Error('Unknown error occurred');
-}
-```
-
-### Firebase Error Handling
-```typescript
-try {
-  await db.collection('users').doc(userId).set(userData);
-} catch (error) {
-  console.error('Firebase Error:', error);
-  throw new Error('Failed to save user data');
-}
-```
-
-## Production Deployment
-
-### apphosting.yaml (Required Format)
-```yaml
-runConfig:
-  cpu: 1
-  memoryMiB: 512
-```
-
-## Environment Variables (Required)
-
-For the application to function correctly, especially its AI capabilities, the following environment variables MUST be set in the `.env` file:
-
-```
-GEMINI_API_KEY=your_actual_api_key_here
-```
-
-- **`GEMINI_API_KEY`**: This key is essential for all Genkit flows and AI features. The application will fail to start on the server without it.
-
-## Critical Debugging Lessons
-
-### Square API
-- Token/environment must match (`production` token = `Environment.Production`)
-- **Hard-coded client initialization inside server actions is the only reliable pattern**
-- **Phone numbers are OMITTED from API calls to avoid validation errors**
-- **Always validate data before API calls** to prevent 500 errors
-- Emails must be valid format, money amounts must be positive numbers
-
-### Firebase Admin SDK
+### Firebase Admin SDK Issues
 - **Direct import of `db` or `adminAuth` will fail.** Always use the `getDb()` and `getAdminAuth()` functions inside your server-side code
 - Private key formatting is critical. Newlines must be properly escaped (`\\n`)
 
@@ -391,17 +386,19 @@ GEMINI_API_KEY=your_actual_api_key_here
 - Use `'use server'` directive for all server actions and Genkit flows
 - Verify `lucide-react` icons exist before using
 
-## Recent Updates & Changes
+## 9. Global Component Implementation Process
 
-### Phone Number Handling (December 2024)
-- **REMOVED**: Phone numbers are no longer sent to Square API
-- **REASON**: Persistent validation errors despite multiple formatting attempts
-- **IMPACT**: Invoices work perfectly without phone numbers (they're optional)
-- **ALTERNATIVES**: Store phone numbers in Firestore or customer notes if needed
+### Making Components "Global"
+When requested to make a component or feature "global," follow this procedure:
 
-## For New Feature Implementation
+1. **Isolate & Relocate**: Move the specified component/logic into a new, reusable file in an appropriate shared directory (e.g., `src/components`)
+2. **Standardize**: Apply any requested renames and updates to the new global component
+3. **Refactor & Replace**: Update all pages that previously used local or outdated versions to import and use the new global component
+4. **Eliminate**: Delete the old, local implementations from their original files to prevent regressions
 
-**Always provide:**
+## 10. Implementation Checklist
+
+**For New Feature Implementation, always provide:**
 1. This comprehensive reference file
 2. Specific feature requirements
 3. Expected input/output data structures
@@ -419,3 +416,19 @@ GEMINI_API_KEY=your_actual_api_key_here
 - [ ] Hydration error prevention
 - [ ] No phone numbers sent to Square API
 - [ ] Production-ready configuration
+- [ ] Environment variables properly set
+- [ ] Firebase Admin SDK using getter functions
+- [ ] Square client instantiated inside server actions
+
+## 11. Recent Updates & Breaking Changes
+
+### Phone Number Handling (December 2024)
+- **REMOVED**: Phone numbers are no longer sent to Square API
+- **REASON**: Persistent validation errors despite multiple formatting attempts
+- **IMPACT**: Invoices work perfectly without phone numbers (they're optional)
+- **ALTERNATIVES**: Store phone numbers in Firestore or customer notes if needed
+
+### Firebase Admin SDK Pattern (Ongoing)
+- **CRITICAL**: Module-level initialization fails in production
+- **SOLUTION**: Always use `getDb()` and `getAdminAuth()` getter functions
+- **IMPACT**: All server actions must follow the just-in-time initialization pattern

@@ -9,15 +9,13 @@ import { randomUUID } from 'crypto';
 import { ApiError, type OrderLineItem, type InvoiceRecipient, Client, Environment } from 'square';
 import { format } from 'date-fns';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '@/lib/services/firestore-service'; // USING CLIENT SDK
+import { getDb } from '@/lib/firebase-admin'; // USING ADMIN SDK
 import { generateTeamCode } from '@/lib/school-utils';
 import { type CreateInvoiceInput, type CreateInvoiceOutput } from './schemas';
 
 export async function createInvoice(input: CreateInvoiceInput): Promise<CreateInvoiceOutput> {
   
-  if (!db) {
-    throw new Error('FATAL: Client Firestore DB is not available.');
-  }
+  const db = getDb();
 
   // Process players with defaults
   const processedPlayers = input.players.map(p => ({
