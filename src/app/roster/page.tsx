@@ -24,7 +24,6 @@ import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { CSVUploadComponent } from '@/components/csv-upload';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { EnhancedPlayerSearchDialog } from '@/components/EnhancedPlayerSearchDialog';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
@@ -503,7 +502,7 @@ function DistrictRostersPageContent() {
   };
 
   return (
-    <>
+    <AppLayout>
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold font-headline">District Rosters</h1>
@@ -670,7 +669,6 @@ function DistrictRostersPageContent() {
           ))}
         </div>
       </div>
-      
       <EnhancedPlayerSearchDialog
         isOpen={isSearchOpen}
         onOpenChange={setIsSearchOpen}
@@ -678,138 +676,136 @@ function DistrictRostersPageContent() {
         userProfile={profile}
         preFilterByUserProfile={false}
       />
-
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="sm:max-w-4xl max-h-[95vh] flex flex-col p-0">
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col p-0">
           <DialogHeader className="p-6 pb-4 border-b shrink-0">
             <DialogTitle>{playerToEdit ? 'Edit Player' : 'Create New Player'}</DialogTitle>
             <DialogDescription>
               {playerToEdit ? 'Modify the player\'s information below.' : 'Enter the details for the new player.'}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid md:grid-cols-2 gap-x-8 flex-1 overflow-y-auto">
-            <div className="p-6">
-                <Form {...form}>
-                    <form id="edit-player-form-user" onSubmit={form.handleSubmit(onEditSubmit)} className="space-y-6">
-                        <div className="space-y-4">
-                            <h3 className="text-lg font-semibold border-b pb-2">Player Information</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <FormField control={form.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )}/>
-                            <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )}/>
-                            <FormField control={form.control} name="middleName" render={({ field }) => ( <FormItem><FormLabel>Middle Name (Optional)</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )}/>
-                            </div>
-                        </div>
+            <div className="grid md:grid-cols-2 gap-x-8 flex-1 overflow-y-auto">
+              <ScrollArea className="p-6 pr-3">
+                  <Form {...form}>
+                      <form id="edit-player-form-user" onSubmit={form.handleSubmit(onEditSubmit)} className="space-y-6">
+                          <div className="space-y-4">
+                              <h3 className="text-lg font-semibold border-b pb-2">Player Information</h3>
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              <FormField control={form.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )}/>
+                              <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )}/>
+                              <FormField control={form.control} name="middleName" render={({ field }) => ( <FormItem><FormLabel>Middle Name (Optional)</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )}/>
+                              </div>
+                          </div>
 
-                        <div className="space-y-4">
-                            <h3 className="text-lg font-semibold border-b pb-2">School Information</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormField control={form.control} name="district" render={({ field }) => (
-                                <FormItem>
-                                <FormLabel>District</FormLabel>
-                                <Select onValueChange={(v) => { field.onChange(v); setSchoolsForEditDistrict(getSchoolsForDistrict(v)); form.setValue('school', ''); }} value={field.value}>
-                                    <FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl>
-                                    <SelectContent>{dbDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
-                                </Select>
-                                <FormMessage />
-                                </FormItem>
-                            )} />
-                            
-                            <FormField control={form.control} name="school" render={({ field }) => (
-                                <FormItem>
-                                <FormLabel>School</FormLabel>
-                                <Select onValueChange={field.onChange} value={field.value}>
-                                    <FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl>
-                                    <SelectContent>{schoolsForEditDistrict.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                                </Select>
-                                <FormMessage />
-                                </FormItem>
-                            )} />
-                            </div>
+                          <div className="space-y-4">
+                              <h3 className="text-lg font-semibold border-b pb-2">School Information</h3>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <FormField control={form.control} name="district" render={({ field }) => (
+                                  <FormItem>
+                                  <FormLabel>District</FormLabel>
+                                  <Select onValueChange={(v) => { field.onChange(v); setSchoolsForEditDistrict(getSchoolsForDistrict(v)); form.setValue('school', ''); }} value={field.value}>
+                                      <FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl>
+                                      <SelectContent>{dbDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                  </FormItem>
+                              )} />
+                              
+                              <FormField control={form.control} name="school" render={({ field }) => (
+                                  <FormItem>
+                                  <FormLabel>School</FormLabel>
+                                  <Select onValueChange={field.onChange} value={field.value}>
+                                      <FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl>
+                                      <SelectContent>{schoolsForEditDistrict.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                  </FormItem>
+                              )} />
+                              </div>
 
-                            {editDistrict === 'PHARR-SAN JUAN-ALAMO ISD' && (
-                            <FormField control={form.control} name="studentType" render={({ field }) => (
-                                <FormItem className="space-y-3">
-                                <FormLabel>Student Type</FormLabel>
-                                <FormControl><RadioGroup onValueChange={field.onChange} value={field.value || 'independent'} className="flex items-center space-x-4">
-                                    <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="independent" /></FormControl><FormLabel className="font-normal">Independent</FormLabel></FormItem>
-                                    <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="gt" /></FormControl><FormLabel className="font-normal">GT (Gifted & Talented)</FormLabel></FormItem>
-                                </RadioGroup></FormControl><FormMessage />
-                                </FormItem>
-                            )}/>
-                            )}
-                        </div>
+                              {editDistrict === 'PHARR-SAN JUAN-ALAMO ISD' && (
+                              <FormField control={form.control} name="studentType" render={({ field }) => (
+                                  <FormItem className="space-y-3">
+                                  <FormLabel>Student Type</FormLabel>
+                                  <FormControl><RadioGroup onValueChange={field.onChange} value={field.value || 'independent'} className="flex items-center space-x-4">
+                                      <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="independent" /></FormControl><FormLabel className="font-normal">Independent</FormLabel></FormItem>
+                                      <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="gt" /></FormControl><FormLabel className="font-normal">GT (Gifted & Talented)</FormLabel></FormItem>
+                                  </RadioGroup></FormControl><FormMessage />
+                                  </FormItem>
+                              )}/>
+                              )}
+                          </div>
 
-                        <div className="space-y-4">
-                            <h3 className="text-lg font-semibold border-b pb-2">Chess Information</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormField control={form.control} name="uscfId" render={({ field }) => ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input {...field} /></FormControl><FormDescription>Enter USCF ID number or "NEW".</FormDescription><FormMessage /></FormItem> )} />
-                            <FormField control={form.control} name="regularRating" render={({ field }) => ( <FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="text" placeholder="e.g., 1500, UNR, or NEW" value={field.value?.toString() || ''} onChange={(e) => { const value = e.target.value; if (value === '' || value.toUpperCase() === 'UNR' || value.toUpperCase() === 'NEW') { field.onChange(undefined); } else { field.onChange(value); } }} /></FormControl><FormDescription>Enter rating, UNR, or NEW</FormDescription><FormMessage /></FormItem> )} />
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormField control={form.control} name="dob" render={({ field }) => (<FormItem><FormLabel>Date of Birth</FormLabel><FormControl><DateInput value={field.value} onChange={field.onChange} placeholder="MM/DD/YYYY" /></FormControl><FormMessage /></FormItem>)} />
-                            <FormField control={form.control} name="uscfExpiration" render={({ field }) => (<FormItem><FormLabel>USCF Expiration</FormLabel><FormControl><DateInput value={field.value} onChange={field.onChange} placeholder="MM/DD/YYYY"/></FormControl><FormMessage /></FormItem>)} />
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormField control={form.control} name="grade" render={({ field }) => ( <FormItem><FormLabel>Grade</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select grade" /></SelectTrigger></FormControl><SelectContent position="item-aligned">{grades.map(grade => <SelectItem key={grade} value={grade}>{grade}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
-                            <FormField control={form.control} name="section" render={({ field }) => ( <FormItem><FormLabel>Section</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select section" /></SelectTrigger></FormControl><SelectContent position="item-aligned">{sections.map(section => <SelectItem key={section} value={section}>{section}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
-                            </div>
-                        </div>
-                        
-                        <div className="space-y-4">
-                            <h3 className="text-lg font-semibold border-b pb-2">Contact Information</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email *</FormLabel><FormControl><Input type="email" {...field} value={field.value || ''}/></FormControl><FormMessage /></FormItem>)} />
-                            <FormField control={form.control} name="zipCode" render={({ field }) => ( <FormItem><FormLabel>Zip Code *</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>)} />
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormField control={form.control} name="state" render={({ field }) => ( <FormItem><FormLabel>State</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>)} />
-                            </div>
-                        </div>
-                    </form>
-                </Form>
+                          <div className="space-y-4">
+                              <h3 className="text-lg font-semibold border-b pb-2">Chess Information</h3>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <FormField control={form.control} name="uscfId" render={({ field }) => ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input {...field} /></FormControl><FormDescription>Enter USCF ID number or "NEW".</FormDescription><FormMessage /></FormItem> )} />
+                              <FormField control={form.control} name="regularRating" render={({ field }) => ( <FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="text" placeholder="e.g., 1500, UNR, or NEW" value={field.value?.toString() || ''} onChange={(e) => { const value = e.target.value; if (value === '' || value.toUpperCase() === 'UNR' || value.toUpperCase() === 'NEW') { field.onChange(undefined); } else { field.onChange(value); } }} /></FormControl><FormDescription>Enter rating, UNR, or NEW</FormDescription><FormMessage /></FormItem> )} />
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <FormField control={form.control} name="dob" render={({ field }) => (<FormItem><FormLabel>Date of Birth</FormLabel><FormControl><DateInput value={field.value} onChange={field.onChange} placeholder="MM/DD/YYYY" /></FormControl><FormMessage /></FormItem>)} />
+                              <FormField control={form.control} name="uscfExpiration" render={({ field }) => (<FormItem><FormLabel>USCF Expiration</FormLabel><FormControl><DateInput value={field.value} onChange={field.onChange} placeholder="MM/DD/YYYY"/></FormControl><FormMessage /></FormItem>)} />
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <FormField control={form.control} name="grade" render={({ field }) => ( <FormItem><FormLabel>Grade</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select grade" /></SelectTrigger></FormControl><SelectContent position="item-aligned">{grades.map(grade => <SelectItem key={grade} value={grade}>{grade}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
+                              <FormField control={form.control} name="section" render={({ field }) => ( <FormItem><FormLabel>Section</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select section" /></SelectTrigger></FormControl><SelectContent position="item-aligned">{sections.map(section => <SelectItem key={section} value={section}>{section}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
+                              </div>
+                          </div>
+                          
+                          <div className="space-y-4">
+                              <h3 className="text-lg font-semibold border-b pb-2">Contact Information</h3>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email *</FormLabel><FormControl><Input type="email" {...field} value={field.value || ''}/></FormControl><FormMessage /></FormItem>)} />
+                              <FormField control={form.control} name="zipCode" render={({ field }) => ( <FormItem><FormLabel>Zip Code *</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>)} />
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <FormField control={form.control} name="state" render={({ field }) => ( <FormItem><FormLabel>State</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>)} />
+                              </div>
+                          </div>
+                      </form>
+                  </Form>
+              </ScrollArea>
+              <ScrollArea className="p-6 border-l pr-3">
+                  <ChangeHistorySection player={playerToEdit} />
+              </ScrollArea>
             </div>
-            <div className="p-6 border-l">
-                <ChangeHistorySection player={playerToEdit} />
-            </div>
-          </div>
-          <DialogFooter className="p-6 pt-4 border-t bg-muted/30 shrink-0">
-            <div className="flex justify-between w-full">
-              {playerToEdit && profile?.role === 'organizer' ? (
-                  <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                          <Button type="button" variant="destructive">
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Permanently Delete Player
-                          </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                          <AlertDialogHeader>
-                              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                  This will permanently delete {playerToEdit.firstName} {playerToEdit.lastName} from the entire master database. This action CANNOT be undone and will affect all users.
-                              </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={() => handleDeletePlayer(playerToEdit)}>
-                                  Yes, Permanently Delete
-                              </AlertDialogAction>
-                          </AlertDialogFooter>
-                      </AlertDialogContent>
-                  </AlertDialog>
-              ) : ( <div></div> )}
-              
-              <div className="flex gap-3">
-                <Button type="button" variant="ghost" onClick={() => setIsEditOpen(false)}>Cancel</Button>
-                 <Button onClick={form.handleSubmit(onEditSubmit)}>
-                    {playerToEdit ? 'Save Changes' : 'Save and Add to Roster'}
-                </Button>
+            <DialogFooter className="p-6 pt-4 border-t bg-muted/30 shrink-0">
+              <div className="flex justify-between w-full">
+                {playerToEdit && profile?.role === 'organizer' ? (
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button type="button" variant="destructive">
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Permanently Delete Player
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    This will permanently delete {playerToEdit.firstName} {playerToEdit.lastName} from the entire master database. This action CANNOT be undone and will affect all users.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={() => handleDeletePlayer(playerToEdit)}>
+                                    Yes, Permanently Delete
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                ) : ( <div></div> )}
+                
+                <div className="flex gap-3">
+                  <Button type="button" variant="ghost" onClick={() => setIsEditOpen(false)}>Cancel</Button>
+                   <Button onClick={form.handleSubmit(onEditSubmit)}>
+                      {playerToEdit ? 'Save Changes' : 'Save and Add to Roster'}
+                  </Button>
+                </div>
               </div>
-            </div>
-          </DialogFooter>
+            </DialogFooter>
         </DialogContent>
       </Dialog>
-    
       <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -822,7 +818,7 @@ function DistrictRostersPageContent() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </AppLayout>
   );
 }
 
@@ -831,9 +827,7 @@ export default function RosterPage() {
     return (
         <Suspense fallback={<div>Loading...</div>}>
             <AuthGuard>
-                <AppLayout>
-                    <DistrictRostersPageContent />
-                </AppLayout>
+                <DistrictRostersPageContent />
             </AuthGuard>
         </Suspense>
     );
