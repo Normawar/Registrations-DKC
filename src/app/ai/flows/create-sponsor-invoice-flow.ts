@@ -8,8 +8,8 @@
  */
 
 import { createInvoice } from './create-invoice-flow';
-import { createPsjaSplitInvoice } from './create-psja-split-invoice-flow';
-import type { CreateInvoiceInput, CreateInvoiceOutput, CreatePsjaSplitInvoiceInput, CreatePsjaSplitInvoiceOutput } from './schemas';
+import { createPsjaSplitInvoice } from '@/ai/flows/create-psja-split-invoice-flow';
+import type { CreateInvoiceInput, CreateInvoiceOutput, CreatePsjaSplitInvoiceInput, CreatePsjaSplitInvoiceOutput } from '@/ai/flows/schemas';
 
 
 export async function createSponsorInvoice(input: CreateInvoiceInput): Promise<CreatePsjaSplitInvoiceOutput> {
