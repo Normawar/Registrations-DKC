@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -24,7 +23,7 @@ import { format } from 'date-fns';
 
 type SortableColumnKey = 'lastName' | 'teamCode' | 'uscfId' | 'regularRating' | 'grade' | 'section';
 
-export function PlayerRosters({ onEditPlayer, onPlayerSelected }: { onEditPlayer: (player: MasterPlayer) => void, onPlayerSelected: (player: any) => void }) {
+export function PlayerRosters({ onEditPlayer, onAddToRoster }: { onEditPlayer: (player: MasterPlayer) => void, onAddToRoster?: (player: MasterPlayer) => void }) {
   const { isDbLoaded, dbDistricts, database: allPlayers, getSchoolsForDistrict, deletePlayer, addPlayer } = useMasterDb();
   const { profile } = useSponsorProfile();
   const { toast } = useToast();
@@ -154,6 +153,30 @@ export function PlayerRosters({ onEditPlayer, onPlayerSelected }: { onEditPlayer
     setPlayerToDelete(null);
   };
 
+  const handlePlayerSelectedFromSearch = (player: any) => {
+      const isMasterPlayer = 'uscfId' in player;
+      let playerToEdit: MasterPlayer;
+
+      if(isMasterPlayer) {
+          playerToEdit = player as MasterPlayer;
+      } else {
+          const nameParts = player.name ? player.name.split(', ') : ['Unknown', 'Player'];
+          playerToEdit = {
+            id: player.uscf_id,
+            uscfId: player.uscf_id,
+            firstName: nameParts[1] || '',
+            lastName: nameParts[0] || '',
+            middleName: nameParts.length > 2 ? nameParts[2] : '',
+            regularRating: player.rating_regular || undefined,
+            uscfExpiration: player.expiration_date ? new Date(player.expiration_date).toISOString() : undefined,
+            state: player.state || 'TX',
+            school: '', district: '', grade: '', section: '', email: '', zipCode: '',
+            events: 0, eventIds: [],
+          };
+      }
+      onEditPlayer(playerToEdit);
+  };
+
   return (
     <>
       <div className="space-y-6">
@@ -253,7 +276,7 @@ export function PlayerRosters({ onEditPlayer, onPlayerSelected }: { onEditPlayer
       <PlayerSearchDialog
         isOpen={isSearchOpen}
         onOpenChange={setIsSearchOpen}
-        onPlayerSelected={onPlayerSelected}
+        onPlayerSelected={handlePlayerSelectedFromSearch}
         portalType={profile?.role || 'individual'}
       />
 

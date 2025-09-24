@@ -1,4 +1,3 @@
-
 'use client';
 
 import { AppLayout } from "@/components/app-layout";
@@ -41,7 +40,7 @@ import { useRouter } from "next/navigation";
 
 function IndividualDashboardContent() {
   const { events } = useEvents();
-  const { database: allPlayers, isDbLoaded } = useMasterDb();
+  const { database: allPlayers, isDbLoaded, updatePlayer } = useMasterDb();
   const { profile, updateProfile, loading: profileLoading } = useSponsorProfile();
   const { toast } = useToast();
   const router = useRouter();
@@ -49,7 +48,7 @@ function IndividualDashboardContent() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [isRegistrationDialogOpen, setIsRegistrationDialogOpen] = useState(false);
-  const [isAddStudentDialogOpen, setIsAddStudentDialogOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const parentStudents = useMemo(() => {
     if (!profile?.studentIds || !isDbLoaded) {
@@ -93,9 +92,12 @@ function IndividualDashboardContent() {
     setIsRegistrationDialogOpen(true);
   }, []);
   
-  const handleStudentAdded = useCallback((newStudent: MasterPlayer) => {
+  const handleStudentAdded = useCallback(async (newStudent: MasterPlayer) => {
     if (!profile?.email) return;
     
+    // First, save the player with any updated info from the dialog
+    await updatePlayer(newStudent, profile);
+
     const existingIds = profile.studentIds || [];
 
     if (!existingIds.includes(newStudent.id)) {
@@ -105,8 +107,8 @@ function IndividualDashboardContent() {
         title: "Student Added",
         description: `${newStudent.firstName} ${newStudent.lastName} has been added to your list.`
       });
-      // Redirect to edit page
-      router.push(`/players?edit=${newStudent.id}`);
+      // Optionally redirect to edit page
+      // router.push(`/players?edit=${newStudent.id}`);
     } else {
        toast({
         variant: 'destructive',
@@ -114,10 +116,10 @@ function IndividualDashboardContent() {
         description: `${newStudent.firstName} ${newStudent.lastName} is already on your list.`
       });
     }
-  }, [profile, toast, router, updateProfile]);
+  }, [profile, toast, router, updateProfile, updatePlayer]);
 
   const handleAddStudentClick = useCallback(() => {
-    setIsAddStudentDialogOpen(true);
+    setIsSearchOpen(true);
   }, []);
 
   const isLoading = profileLoading || !isDbLoaded;
@@ -290,8 +292,8 @@ function IndividualDashboardContent() {
             parentProfile={profile}
           />
           <PlayerSearchDialog 
-            isOpen={isAddStudentDialogOpen}
-            onOpenChange={setIsAddStudentDialogOpen}
+            isOpen={isSearchOpen}
+            onOpenChange={setIsSearchOpen}
             onPlayerSelected={handleStudentAdded}
             excludeIds={parentStudentIds}
             portalType="individual"

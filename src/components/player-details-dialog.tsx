@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -329,7 +328,7 @@ export function PlayerDetailsDialog({ isOpen, onOpenChange, playerToEdit, onPlay
             {playerToEdit?.id ? (<Button type="button" variant="destructive" onClick={handleDelete}><Trash2 className="h-4 w-4 mr-2" />Delete Player</Button>) : (<div></div>)}
             <div className="flex gap-3">
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-              {onAddToRoster && !playerToEdit?.id && (
+              {onAddToRoster && (
                 <Button type="button" onClick={handleAddToRoster}>Add to Roster</Button>
               )}
               <Button type="submit" form="player-details-form">{playerToEdit?.id ? 'Save Changes' : 'Create Player'}</Button>
