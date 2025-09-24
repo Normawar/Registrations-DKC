@@ -1,3 +1,4 @@
+
 'use client';
 
 import { AppLayout } from "@/components/app-layout";
@@ -32,10 +33,11 @@ import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { IndividualRegistrationDialog } from "@/components/individual-registration-dialog";
-import { PlayerSearchDialog } from "@/components/PlayerSearchDialog";
+import { PlayerDetailsDialog } from '@/components/player-details-dialog';
 import { useToast } from "@/hooks/use-toast";
 import { IndividualGuard } from "@/components/auth-guard";
 import { useRouter } from "next/navigation";
+import { PlayerSearchDialog } from "@/components/PlayerSearchDialog";
 
 
 function IndividualDashboardContent() {
@@ -49,6 +51,9 @@ function IndividualDashboardContent() {
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [isRegistrationDialogOpen, setIsRegistrationDialogOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [playerToEdit, setPlayerToEdit] = useState<MasterPlayer | null>(null);
 
   const parentStudents = useMemo(() => {
     if (!profile?.studentIds || !isDbLoaded) {
@@ -92,10 +97,15 @@ function IndividualDashboardContent() {
     setIsRegistrationDialogOpen(true);
   }, []);
   
+  const handleEditPlayer = (player: MasterPlayer) => {
+    setPlayerToEdit(player);
+    setIsEditOpen(true);
+  };
+
   const handleStudentAdded = useCallback(async (newStudent: MasterPlayer) => {
     if (!profile?.email) return;
     
-    // First, save the player with any updated info from the dialog
+    // Save any updates made in the dialog to the master player record first
     await updatePlayer(newStudent, profile);
 
     const existingIds = profile.studentIds || [];
@@ -107,8 +117,6 @@ function IndividualDashboardContent() {
         title: "Student Added",
         description: `${newStudent.firstName} ${newStudent.lastName} has been added to your list.`
       });
-      // Optionally redirect to edit page
-      // router.push(`/players?edit=${newStudent.id}`);
     } else {
        toast({
         variant: 'destructive',
@@ -116,7 +124,7 @@ function IndividualDashboardContent() {
         description: `${newStudent.firstName} ${newStudent.lastName} is already on your list.`
       });
     }
-  }, [profile, toast, router, updateProfile, updatePlayer]);
+  }, [profile, toast, updateProfile, updatePlayer]);
 
   const handleAddStudentClick = useCallback(() => {
     setIsSearchOpen(true);
@@ -245,9 +253,9 @@ function IndividualDashboardContent() {
                             </TableRow>
                           ) : (
                             parentStudents.map((player) => (
-                              <TableRow key={player.id}>
+                              <TableRow key={player.id} onClick={() => handleEditPlayer(player)} className="cursor-pointer">
                                 <TableCell>
-                                    <Link href={`/players?edit=${player.id}`} className="flex items-center gap-3 group">
+                                    <div className="flex items-center gap-3 group">
                                         <Avatar className="h-9 w-9">
                                         <AvatarImage src={`https://picsum.photos/seed/${player.id}/40/40`} alt={`${player.firstName} ${player.lastName}`} data-ai-hint="person face" />
                                         <AvatarFallback>{player.firstName.charAt(0)}{player.lastName.charAt(0)}</AvatarFallback>
@@ -258,7 +266,7 @@ function IndividualDashboardContent() {
                                             {player.email || 'No email'}
                                         </div>
                                         </div>
-                                    </Link>
+                                    </div>
                                 </TableCell>
                                 <TableCell className="text-right">{player.regularRating || 'N/A'}</TableCell>
                               </TableRow>
@@ -294,9 +302,17 @@ function IndividualDashboardContent() {
           <PlayerSearchDialog 
             isOpen={isSearchOpen}
             onOpenChange={setIsSearchOpen}
-            onPlayerSelected={handleStudentAdded}
+            onPlayerSelected={(player) => handleEditPlayer(player as MasterPlayer)}
+            onAddToRoster={handleStudentAdded}
             excludeIds={parentStudentIds}
             portalType="individual"
+          />
+          <PlayerDetailsDialog
+            isOpen={isEditOpen}
+            onOpenChange={setIsEditOpen}
+            playerToEdit={playerToEdit}
+            onPlayerCreatedOrUpdated={() => {}}
+            onAddToRoster={handleStudentAdded}
           />
         </>
       )}

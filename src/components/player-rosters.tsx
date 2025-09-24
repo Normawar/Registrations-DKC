@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -23,8 +24,8 @@ import { format } from 'date-fns';
 
 type SortableColumnKey = 'lastName' | 'teamCode' | 'uscfId' | 'regularRating' | 'grade' | 'section';
 
-export function PlayerRosters({ onEditPlayer, onAddToRoster }: { onEditPlayer: (player: MasterPlayer) => void, onAddToRoster?: (player: MasterPlayer) => void }) {
-  const { isDbLoaded, dbDistricts, database: allPlayers, getSchoolsForDistrict, deletePlayer, addPlayer } = useMasterDb();
+export function PlayerRosters({ onEditPlayer: handleEditPlayerProp, onAddToRoster: onAddToRosterProp }: { onEditPlayer: (player: MasterPlayer) => void, onAddToRoster?: (player: MasterPlayer) => void }) {
+  const { isDbLoaded, dbDistricts, database: allPlayers, getSchoolsForDistrict, deletePlayer, addPlayer, updatePlayer } = useMasterDb();
   const { profile } = useSponsorProfile();
   const { toast } = useToast();
   
@@ -136,7 +137,7 @@ export function PlayerRosters({ onEditPlayer, onAddToRoster }: { onEditPlayer: (
   };
 
   const handleCreateNewPlayer = () => {
-    onEditPlayer({} as MasterPlayer); // Pass empty object to signify creation
+    handleEditPlayerProp({} as MasterPlayer); // Pass empty object to signify creation
   };
 
   const handleDeletePlayer = (player: MasterPlayer) => {
@@ -151,6 +152,17 @@ export function PlayerRosters({ onEditPlayer, onAddToRoster }: { onEditPlayer: (
     }
     setIsAlertOpen(false);
     setPlayerToDelete(null);
+  };
+  
+  const handleAddToRoster = async (player: MasterPlayer) => {
+    if (!profile) return;
+    const updatedPlayer = { 
+      ...player, 
+      school: profile.school, 
+      district: profile.district 
+    };
+    await updatePlayer(updatedPlayer, profile);
+    toast({ title: "Player Added", description: `${player.firstName} ${player.lastName} has been added to your roster.` });
   };
 
   const handlePlayerSelectedFromSearch = (player: any) => {
@@ -174,7 +186,7 @@ export function PlayerRosters({ onEditPlayer, onAddToRoster }: { onEditPlayer: (
             events: 0, eventIds: [],
           };
       }
-      onEditPlayer(playerToEdit);
+      handleEditPlayerProp(playerToEdit);
   };
 
   return (
@@ -260,7 +272,7 @@ export function PlayerRosters({ onEditPlayer, onAddToRoster }: { onEditPlayer: (
                           <TableCell>{p.grade}</TableCell>
                           <TableCell>{p.section}</TableCell>
                           <TableCell>
-                            <Button variant="ghost" size="sm" onClick={() => onEditPlayer(p)}>Edit</Button>
+                            <Button variant="ghost" size="sm" onClick={() => handleEditPlayerProp(p)}>Edit</Button>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -277,6 +289,7 @@ export function PlayerRosters({ onEditPlayer, onAddToRoster }: { onEditPlayer: (
         isOpen={isSearchOpen}
         onOpenChange={setIsSearchOpen}
         onPlayerSelected={handlePlayerSelectedFromSearch}
+        onAddToRoster={onAddToRosterProp}
         portalType={profile?.role || 'individual'}
       />
 

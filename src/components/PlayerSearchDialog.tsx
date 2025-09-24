@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -18,6 +19,7 @@ export function PlayerSearchDialog({
   isOpen, 
   onOpenChange, 
   onPlayerSelected,
+  onAddToRoster,
   excludeIds = [],
   title = "Search Master Player Database",
   userProfile = null,
@@ -27,6 +29,7 @@ export function PlayerSearchDialog({
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   onPlayerSelected: (player: MasterPlayer | USCFPlayer) => void;
+  onAddToRoster?: (player: MasterPlayer) => void;
   excludeIds?: string[];
   title?: string;
   userProfile?: SponsorProfile | null;
@@ -238,7 +241,13 @@ export function PlayerSearchDialog({
                       <th className="border border-gray-300 px-4 py-2 text-left">Name</th><th className="border border-gray-300 px-4 py-2 text-left">USCF ID</th><th className="border border-gray-300 px-4 py-2 text-left">State</th><th className="border border-gray-300 px-4 py-2 text-left">School</th><th className="border border-gray-300 px-4 py-2 text-left">Rating</th><th className="border border-gray-300 px-4 py-2 text-left">Action</th>
                     </tr></thead>
                     <tbody>{searchResult.players?.map((player: MasterPlayer) => (<tr key={player.id} className="hover:bg-gray-50">
-                      <td className="border border-gray-300 px-4 py-2">{player.firstName} {player.middleName} {player.lastName}</td><td className="border border-gray-300 px-4 py-2">{player.uscfId}</td><td className="border border-gray-300 px-4 py-2">{player.state}</td><td className="border border-gray-300 px-4 py-2">{player.school}</td><td className="border border-gray-300 px-4 py-2">{player.regularRating}</td><td className="border border-gray-300 px-4 py-2"><button onClick={() => handleSelectPlayer(player)} className="bg-green-500 text-white px-2 py-1 rounded text-xs">Select</button></td>
+                      <td className="border border-gray-300 px-4 py-2">{player.firstName} {player.middleName} {player.lastName}</td><td className="border border-gray-300 px-4 py-2">{player.uscfId}</td><td className="border border-gray-300 px-4 py-2">{player.state}</td><td className="border border-gray-300 px-4 py-2">{player.school}</td><td className="border border-gray-300 px-4 py-2">{player.regularRating}</td><td className="border border-gray-300 px-4 py-2">
+                        {onAddToRoster ? (
+                          <button onClick={() => onAddToRoster(player)} className="bg-blue-500 text-white px-2 py-1 rounded text-xs">Add to Roster</button>
+                        ) : (
+                          <button onClick={() => handleSelectPlayer(player)} className="bg-green-500 text-white px-2 py-1 rounded text-xs">Select</button>
+                        )}
+                      </td>
                     </tr>))}</tbody>
                   </table>
                 </div>
