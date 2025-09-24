@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
-import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
+import { useSponsorProfile, type SponsorProfile } from '@/hooks/use-sponsor-profile';
 import { useToast } from '@/hooks/use-toast';
 import { History, Trash2 } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
@@ -175,15 +175,17 @@ const ChangeHistorySection = ({ player }: { player: MasterPlayer | null }) => {
 };
 
 
-export function PlayerDetailsDialog({ isOpen, onOpenChange, playerToEdit, onPlayerCreatedOrUpdated, onAddToRoster }: {
+export function PlayerDetailsDialog({ isOpen, onOpenChange, playerToEdit, onPlayerCreatedOrUpdated, onAddToRoster, portalType, userProfile, mode }: {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   playerToEdit: MasterPlayer | null;
-  onPlayerCreatedOrUpdated: () => void;
-  onAddToRoster?: (player: MasterPlayer) => void;
+  onPlayerCreatedOrUpdated?: () => void;
+  onAddToRoster?: (player: MasterPlayer) => Promise<void>;
+  portalType: 'individual' | 'sponsor' | 'district-coordinator' | 'organizer';
+  userProfile: SponsorProfile | null;
+  mode: 'edit' | 'create';
 }) {
   const { addPlayer, updatePlayer, deletePlayer, dbDistricts, getSchoolsForDistrict, database } = useMasterDb();
-  const { profile } = useSponsorProfile();
   const { toast } = useToast();
   const [schoolsForEditDistrict, setSchoolsForEditDistrict] = useState<string[]>([]);
   
@@ -226,7 +228,7 @@ export function PlayerDetailsDialog({ isOpen, onOpenChange, playerToEdit, onPlay
   }, [isOpen, playerToEdit, form, getSchoolsForDistrict]);
 
   const onEditSubmit = async (values: PlayerFormValues) => {
-    if (!profile) return;
+    if (!userProfile) return;
     
     const isEmailInUse = database.some(p => p.email === values.email && p.id !== (playerToEdit?.id || values.id));
     if (isEmailInUse) {
@@ -242,33 +244,13 @@ export function PlayerDetailsDialog({ isOpen, onOpenChange, playerToEdit, onPlay
     }) as MasterPlayer;
     
     if (playerToEdit?.id && !playerToEdit.id.startsWith('temp_')) {
-      await updatePlayer(playerToSave, profile);
+      await updatePlayer(playerToSave, userProfile);
       toast({ title: "Player Updated" });
     } else {
-      await addPlayer(playerToSave, profile);
+      await addPlayer(playerToSave, userProfile);
       toast({ title: "Player Created" });
     }
-    onPlayerCreatedOrUpdated();
-    onOpenChange(false);
-  };
-  
-  const handleAddToRoster = async () => {
-    const values = form.getValues();
-    const result = playerFormSchema.safeParse(values);
-    if (!result.success) {
-      form.trigger();
-      toast({ variant: 'destructive', title: "Validation Error", description: "Please fix the errors before adding to roster."});
-      return;
-    }
-
-    if (onAddToRoster) {
-        const player = sanitizePlayerForFirebase({ ...playerToEdit, ...result.data }) as MasterPlayer;
-        if (!player.id || player.id.startsWith('temp_')) {
-          player.id = player.uscfId.toUpperCase() === 'NEW' ? `temp_${Date.now()}` : player.uscfId;
-        }
-        await addPlayer(player, profile);
-        onAddToRoster(player);
-    }
+    onPlayerCreatedOrUpdated?.();
     onOpenChange(false);
   };
 
@@ -276,8 +258,101 @@ export function PlayerDetailsDialog({ isOpen, onOpenChange, playerToEdit, onPlay
     if (playerToEdit) {
       await deletePlayer(playerToEdit.id);
       toast({ title: "Player Deleted", description: `${playerToEdit.firstName} ${playerToEdit.lastName} has been removed.` });
-      onPlayerCreatedOrUpdated();
+      onPlayerCreatedOrUpdated?.();
       onOpenChange(false);
+    }
+  };
+
+  const getAvailableActions = useCallback(() => {
+    if (!playerToEdit || !userProfile) return [];
+    
+    switch (portalType) {
+      case 'individual':
+        const isAlreadyStudent = userProfile.studentIds?.includes(playerToEdit.id);
+        return isAlreadyStudent ? [] : ['Add to Student List'];
+        
+      case 'sponsor':
+        const isAlreadyInSchool = playerToEdit.school === userProfile.school;
+        return isAlreadyInSchool ? [] : ['Add to School Roster'];
+        
+      case 'district-coordinator':
+        return [
+          'Assign to School',
+          'Transfer to Different School', 
+          'Assign Coach/Sponsor',
+          'Add to Team Roster'
+        ];
+        
+      case 'organizer':
+        return [
+          'Assign to Parent Account',
+          'Assign to School',
+          'Transfer District', 
+          'Mark as Independent/Homeschool',
+          'Bulk Assign'
+        ];
+        
+      default:
+        return [];
+    }
+  }, [portalType, playerToEdit, userProfile]);
+
+  const handleAction = async (action: string, player: MasterPlayer) => {
+    if (!player || !userProfile || !onAddToRoster) return;
+    
+    try {
+      switch (action) {
+        case 'Add to Student List':
+        case 'Add to School Roster':
+          await onAddToRoster(player);
+          break;
+          
+        case 'Assign to School':
+          // TODO: Show school selection dropdown
+          // For now, use onAddToRoster
+          await onAddToRoster(player);
+          break;
+          
+        case 'Assign to Parent Account':
+          // TODO: Show parent account selection
+          console.log('Parent assignment not yet implemented');
+          break;
+          
+        case 'Transfer to Different School':
+          // TODO: Show school transfer interface
+          console.log('School transfer not yet implemented');
+          break;
+          
+        case 'Assign Coach/Sponsor':
+          // TODO: Show sponsor selection
+          console.log('Coach assignment not yet implemented');
+          break;
+          
+        case 'Add to Team Roster':
+          // TODO: Show team selection
+          console.log('Team assignment not yet implemented');
+          break;
+          
+        case 'Transfer District':
+          // TODO: Show district transfer interface
+          console.log('District transfer not yet implemented');
+          break;
+          
+        case 'Mark as Independent/Homeschool':
+          // Update player to homeschool status
+          const homeschoolPlayer = { 
+            ...player, 
+            school: 'Homeschool', 
+            district: 'Homeschool' 
+          };
+          await onAddToRoster(homeschoolPlayer);
+          break;
+          
+        default:
+          console.log(`Action ${action} not implemented yet`);
+      }
+    } catch (error) {
+      console.error(`Error executing ${action}:`, error);
     }
   };
 
@@ -285,8 +360,8 @@ export function PlayerDetailsDialog({ isOpen, onOpenChange, playerToEdit, onPlay
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-4xl max-h-[95vh] flex flex-col p-0">
         <DialogHeader className="p-6 pb-4 border-b shrink-0">
-          <DialogTitle>{playerToEdit?.id && !playerToEdit.id.startsWith('temp_') ? `Player Details: ${playerToEdit.firstName} ${playerToEdit.lastName}` : 'Create New Player'}</DialogTitle>
-          <DialogDescription>{playerToEdit?.id ? 'Modify the player\'s information below.' : 'Enter the details for the new player.'}</DialogDescription>
+          <DialogTitle>{mode === 'edit' ? `Player Details: ${playerToEdit?.firstName} ${playerToEdit?.lastName}` : 'Create New Player'}</DialogTitle>
+          <DialogDescription>{mode === 'edit' ? 'Modify the player\'s information below.' : 'Enter the details for the new player.'}</DialogDescription>
         </DialogHeader>
         <ScrollArea className="flex-1 overflow-y-auto">
           <div className="p-6 space-y-8">
@@ -337,13 +412,25 @@ export function PlayerDetailsDialog({ isOpen, onOpenChange, playerToEdit, onPlay
         </ScrollArea>
         <DialogFooter className="p-6 pt-4 border-t bg-muted/30 shrink-0">
           <div className="flex justify-between w-full">
-            {playerToEdit?.id && profile?.role === 'organizer' ? (<Button type="button" variant="destructive" onClick={handleDelete}><Trash2 className="h-4 w-4 mr-2" />Delete Player</Button>) : (<div></div>)}
-            <div className="flex gap-3">
-              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-              {onAddToRoster ? (
-                <Button type="button" onClick={handleAddToRoster}>Add to Roster</Button>
-              ) : null}
-              <Button type="submit" form="player-details-form">{playerToEdit?.id && !playerToEdit.id.startsWith('temp_') ? 'Save Changes' : 'Create Player'}</Button>
+            {mode === 'edit' && playerToEdit?.id && userProfile?.role === 'organizer' ? (<Button type="button" variant="destructive" onClick={handleDelete}><Trash2 className="h-4 w-4 mr-2" />Delete Player</Button>) : (<div></div>)}
+            <div className="flex flex-wrap gap-2 justify-end">
+              {mode === 'edit' && (
+                <Button type="submit" form="player-details-form">
+                  Update Player
+                </Button>
+              )}
+              {getAvailableActions().map(action => (
+                <Button 
+                  key={action}
+                  onClick={() => handleAction(action, form.getValues() as MasterPlayer)}
+                  variant={action.includes('Add') ? 'default' : 'outline'}
+                >
+                  {action}
+                </Button>
+              ))}
+              <Button variant="ghost" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
             </div>
           </div>
         </DialogFooter>

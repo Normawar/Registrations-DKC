@@ -368,6 +368,9 @@ function IndividualDashboardContent() {
             playerToEdit={playerToEdit}
             onPlayerCreatedOrUpdated={handlePlayerCreatedOrUpdated}
             onAddToRoster={handleStudentAdded}
+            portalType="individual"
+            userProfile={profile}
+            mode={playerToEdit?.id && !playerToEdit.id.startsWith('temp_') ? 'edit' : 'create'}
           />
         </>
       )}

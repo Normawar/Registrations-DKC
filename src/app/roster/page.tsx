@@ -7,14 +7,13 @@ import { AppLayout } from '@/components/app-layout';
 import { PlayerRosters } from '@/components/player-rosters';
 import { PlayerDetailsDialog } from '@/components/player-details-dialog';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
-import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
+import { useSponsorProfile, type SponsorProfile } from '@/hooks/use-sponsor-profile';
 import { PlayerSearchDialog } from '@/components/PlayerSearchDialog';
 import { useToast } from '@/hooks/use-toast';
 
 function RosterPage() {
   console.log('🏠 RosterPage rendering...');
   
-  // Add this to track what's causing renders
   const renderCount = useRef(0);
   renderCount.current += 1;
   console.log('Render count:', renderCount.current);
@@ -23,10 +22,9 @@ function RosterPage() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [playerToEdit, setPlayerToEdit] = useState<MasterPlayer | null>(null);
   const { updatePlayer, refreshDatabase } = useMasterDb();
-  const { profile } = useSponsorProfile();
+  const { profile, updateProfile } = useSponsorProfile();
   const { toast } = useToast();
 
-  // Track if refreshDatabase is being called accidentally
   useEffect(() => {
     console.log('RosterPage useEffect - refreshDatabase reference changed');
   }, [refreshDatabase]);
@@ -80,44 +78,62 @@ function RosterPage() {
   }, [profile]);
   
   const handleAddToRoster = async (player: MasterPlayer) => {
-    console.log('📝 handleAddToRoster called');
-    if (!profile) return;
+    if (!profile || !player) return;
     
     try {
-      const updatedPlayer = { 
-        ...player, 
-        school: profile.school, 
-        district: profile.district 
-      };
+      switch (profile.role) {
+        case 'individual':
+          const currentStudentIds = profile.studentIds || [];
+          if (!currentStudentIds.includes(player.id)) {
+            await updateProfile({ 
+              studentIds: [...currentStudentIds, player.id] 
+            });
+          }
+          break;
+          
+        case 'sponsor':
+          const updatedPlayer = { 
+            ...player, 
+            school: profile.school, 
+            district: profile.district 
+          };
+          await updatePlayer(updatedPlayer, profile);
+          break;
+          
+        case 'district-coordinator':
+          const dcUpdatedPlayer = { 
+            ...player, 
+            district: profile.district,
+            school: player.school || profile.school
+          };
+          await updatePlayer(dcUpdatedPlayer, profile);
+          break;
+          
+        case 'organizer':
+          await updatePlayer(player, profile);
+          break;
+      }
       
-      // Update the player in Firebase
-      await updatePlayer(updatedPlayer, profile);
-      console.log('📝 Player updated successfully');
-      
-      // Close the dialog
       setIsEditOpen(false);
       setPlayerToEdit(null);
       
-      // Show success message without triggering database refresh
       toast({
-        title: "Player Added to Roster",
-        description: `${player.firstName} ${player.lastName} has been added to your roster.`
+        title: "Player Updated",
+        description: `${player.firstName} ${player.lastName} has been updated successfully.`
       });
       
-      console.log('📝 handleAddToRoster complete');
     } catch (error) {
-      console.error('Error in handleAddToRoster:', error);
+      console.error('Error updating player:', error);
       toast({
         title: "Error",
-        description: "Failed to add player to roster. Please try again.",
+        description: "Failed to update player. Please try again.",
         variant: "destructive"
       });
     }
   };
   
   const handlePlayerCreatedOrUpdated = useCallback(() => {
-    console.log('🔄 handlePlayerCreatedOrUpdated called - SKIPPING refresh to prevent loop');
-    // DO NOT call refreshDatabase here
+    console.log('🔄 handlePlayerCreatedOrUpdated called - doing nothing');
   }, []);
 
   const handleSearchPlayerClick = useCallback(() => {
@@ -139,12 +155,14 @@ function RosterPage() {
             playerToEdit={playerToEdit}
             onPlayerCreatedOrUpdated={handlePlayerCreatedOrUpdated}
             onAddToRoster={handleAddToRoster}
+            portalType={profile?.role || 'individual'}
+            userProfile={profile}
+            mode={playerToEdit?.id && !playerToEdit.id.startsWith('temp_') ? 'edit' : 'create'}
           />
           <PlayerSearchDialog
             isOpen={isSearchOpen}
             onOpenChange={setIsSearchOpen}
             onPlayerSelected={handlePlayerSelectedFromSearch}
-            onAddToRoster={handleAddToRoster}
             portalType={profile?.role || 'individual'}
             userProfile={profile}
           />
