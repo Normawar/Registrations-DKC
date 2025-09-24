@@ -12,10 +12,12 @@ import { useToast } from '@/hooks/use-toast';
 import { useMasterDb } from '@/context/master-db-context';
 import Papa from 'papaparse';
 import { format, isSameMonth, isSameYear } from 'date-fns';
-import { Upload, Download, UserPlus, FileText, CheckCircle, Loader2, ClipboardPaste, Sparkles } from 'lucide-react';
+import { Upload, Download, UserPlus, FileText, CheckCircle, Loader2, ClipboardPaste, Sparkles, Award } from 'lucide-react';
 import { collection, doc, getDocs, writeBatch, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useEvents } from '@/hooks/use-events';
 
 interface VoucherAssignment {
   id: string;
@@ -39,6 +41,7 @@ interface VoucherAssignment {
 export default function VoucherManagementPage() {
   const { toast } = useToast();
   const { database, updatePlayer } = useMasterDb();
+  const { events } = useEvents();
   
   const [availableVouchers, setAvailableVouchers] = useState<string[]>([]);
   const [pendingMemberships, setPendingMemberships] = useState<any[]>([]);
@@ -46,24 +49,28 @@ export default function VoucherManagementPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [pastedVouchers, setPastedVouchers] = useState('');
   const [expiringGtPlayers, setExpiringGtPlayers] = useState<any[]>([]);
+  const [allInvoices, setAllInvoices] = useState<any[]>([]);
 
-  // Load data from Firestore on component mount
+  // State for the new feature
+  const [selectedTournament, setSelectedTournament] = useState<string>('');
+  
+  // Load all necessary data from Firestore on component mount
   const loadData = async () => {
     if (!db) return;
     try {
-        const vouchersCol = collection(db, 'vouchers');
-        const assignedCol = collection(db, 'assignedVouchers');
-
-        const [vouchersSnapshot, assignedSnapshot] = await Promise.all([
-            getDocs(vouchersCol),
-            getDocs(assignedCol)
+        const [vouchersSnapshot, assignedSnapshot, invoicesSnapshot] = await Promise.all([
+            getDocs(collection(db, 'vouchers')),
+            getDocs(collection(db, 'assignedVouchers')),
+            getDocs(collection(db, 'invoices')),
         ]);
 
         const vouchers = vouchersSnapshot.docs.map(doc => doc.data().voucherNumber);
         const assigned = assignedSnapshot.docs.map(doc => doc.data() as VoucherAssignment);
+        const invoices = invoicesSnapshot.docs.map(doc => doc.data());
         
         setAvailableVouchers(vouchers);
         setAssignedVouchers(assigned);
+        setAllInvoices(invoices);
     } catch (error) {
         console.error("Failed to load voucher data from Firestore:", error);
         toast({ variant: 'destructive', title: 'Error', description: 'Could not load voucher data.' });
@@ -72,14 +79,10 @@ export default function VoucherManagementPage() {
 
   const loadPendingMemberships = useCallback(async () => {
     if (!db) return;
-    const invoicesCol = collection(db, 'invoices');
-    const invoiceSnapshot = await getDocs(invoicesCol);
-    const allConfirmations = invoiceSnapshot.docs.map(doc => doc.data());
-
     const pending = [];
     const assignedPlayerIds = new Set(assignedVouchers.map(v => v.playerId));
     
-    for (const confirmation of allConfirmations) {
+    for (const confirmation of allInvoices) {
       for (const [playerId, selection] of Object.entries(confirmation.selections || {})) {
         if ((selection as any).uscfStatus === 'new' || (selection as any).uscfStatus === 'renewing') {
           const player = database.find(p => p.id === playerId);
@@ -89,9 +92,6 @@ export default function VoucherManagementPage() {
             const isPsjaDistrict = player.district === 'PHARR-SAN JUAN-ALAMO ISD';
             const isGtPlayer = player.studentType === 'gt';
 
-            // Logic for voucher eligibility:
-            // 1. If PSJA district and GT player, eligible regardless of payment status.
-            // 2. For all other cases (PSJA Independent, other districts), invoice must be paid.
             const isEligibleForVoucher = (isPsjaDistrict && isGtPlayer) || isPaid;
 
             if (isEligibleForVoucher) {
@@ -111,17 +111,17 @@ export default function VoucherManagementPage() {
       }
     }
     setPendingMemberships(pending);
-  }, [database, assignedVouchers]);
+  }, [database, assignedVouchers, allInvoices]);
 
   useEffect(() => {
     loadData();
   }, []);
 
   useEffect(() => {
-    if (database.length > 0) {
+    if (database.length > 0 && allInvoices.length > 0) {
       loadPendingMemberships();
     }
-  }, [database, assignedVouchers, loadPendingMemberships]);
+  }, [database, assignedVouchers, allInvoices, loadPendingMemberships]);
 
   const findExpiringGtPlayers = useCallback(() => {
       if (database.length === 0) return;
@@ -141,6 +141,35 @@ export default function VoucherManagementPage() {
   useEffect(() => {
     findExpiringGtPlayers();
   }, [findExpiringGtPlayers]);
+
+  const pendingGtByTournament = useMemo(() => {
+    if (!selectedTournament) return [];
+
+    const assignedPlayerIds = new Set(assignedVouchers.map(v => v.playerId));
+    const tournamentInvoices = allInvoices.filter(inv => inv.eventId === selectedTournament);
+
+    const pendingPlayers = new Map();
+
+    for (const invoice of tournamentInvoices) {
+        for (const [playerId, selection] of Object.entries(invoice.selections || {})) {
+            const player = database.find(p => p.id === playerId);
+            if (player && 
+                player.district === 'PHARR-SAN JUAN-ALAMO ISD' && 
+                player.studentType === 'gt' &&
+                (selection as any).uscfStatus !== 'current' &&
+                !assignedPlayerIds.has(playerId) &&
+                !pendingPlayers.has(playerId)
+            ) {
+                pendingPlayers.set(playerId, {
+                    player,
+                    membershipType: (selection as any).uscfStatus,
+                    eventName: invoice.eventName,
+                });
+            }
+        }
+    }
+    return Array.from(pendingPlayers.values());
+  }, [selectedTournament, allInvoices, database, assignedVouchers]);
 
 
   const extractVoucherNumbers = (text: string): string[] => {
@@ -179,8 +208,8 @@ export default function VoucherManagementPage() {
   };
 
   const autoAssignVouchers = async (playersToAssign: any[], membershipType: 'new' | 'renewing' = 'renewing') => {
-      if (availableVouchers.length === 0) {
-        toast({ title: "No Available Vouchers", variant: "destructive" });
+      if (availableVouchers.length < playersToAssign.length) {
+        toast({ title: "Not Enough Vouchers", description: `You need ${playersToAssign.length} vouchers but only have ${availableVouchers.length} available.`, variant: "destructive" });
         return;
       }
       
@@ -191,17 +220,15 @@ export default function VoucherManagementPage() {
       });
 
       if (unassigned.length === 0) {
-        toast({ title: "No players to assign." });
+        toast({ title: "No new players to assign." });
         return;
       }
       
-      const assignmentsToMake = Math.min(unassigned.length, availableVouchers.length);
       const newAssignments: VoucherAssignment[] = [];
       
-      unassigned.slice(0, assignmentsToMake).forEach((item, index) => {
+      unassigned.forEach((item, index) => {
         const voucherNumber = availableVouchers[index];
         const player = item.player || item; // Handle both pending memberships and direct player objects
-        const confirmation = item.confirmation || {};
         
         newAssignments.push({
           id: `${player.id}-${Date.now()}`,
@@ -210,7 +237,7 @@ export default function VoucherManagementPage() {
           voucherNumber,
           membershipType: item.membershipType || membershipType,
           assignedDate: new Date().toISOString(),
-          eventName: confirmation.eventName,
+          eventName: item.eventName,
           playerEmail: player.email,
           playerPhone: player.phone,
           playerAddress: `${player.address || ''} ${player.city || ''} ${player.state || ''} ${player.zipCode || ''}`.trim(),
@@ -224,7 +251,7 @@ export default function VoucherManagementPage() {
           batch.set(docRef, assignment);
       });
       
-      const usedVouchers = availableVouchers.slice(0, assignmentsToMake);
+      const usedVouchers = availableVouchers.slice(0, newAssignments.length);
       usedVouchers.forEach(voucher => {
           const docRef = doc(db, 'vouchers', voucher);
           batch.delete(docRef);
@@ -443,6 +470,49 @@ export default function VoucherManagementPage() {
           <TabsContent value="assign" className="space-y-6">
             <Card>
               <CardHeader>
+                <CardTitle>PSJA GT Memberships by Tournament</CardTitle>
+                <CardDescription>Assign vouchers to PSJA GT players who need new or renewing memberships for a specific event.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <Select onValueChange={setSelectedTournament}>
+                    <SelectTrigger className="w-full md:w-1/2">
+                      <SelectValue placeholder="Select a tournament..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {events.map(event => <SelectItem key={event.id} value={event.id}>{event.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Button onClick={() => autoAssignVouchers(pendingGtByTournament)} disabled={pendingGtByTournament.length === 0}>
+                    <Award className="h-4 w-4 mr-2" />
+                    Assign Vouchers to {pendingGtByTournament.length} Players
+                  </Button>
+                </div>
+                {selectedTournament && (
+                  <div className="border rounded-md mt-4">
+                    <Table>
+                      <TableHeader><TableRow><TableHead>Player</TableHead><TableHead>School</TableHead><TableHead>Membership Needed</TableHead></TableRow></TableHeader>
+                      <TableBody>
+                        {pendingGtByTournament.length === 0 ? (
+                          <TableRow><TableCell colSpan={3} className="text-center h-24">No pending GT memberships for this event.</TableCell></TableRow>
+                        ) : (
+                          pendingGtByTournament.map(item => (
+                            <TableRow key={item.player.id}>
+                              <TableCell>{item.player.firstName} {item.player.lastName}</TableCell>
+                              <TableCell>{item.player.school}</TableCell>
+                              <TableCell><Badge variant="destructive">{item.membershipType}</Badge></TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
                 <CardTitle>GT Player Membership Renewals</CardTitle>
                 <CardDescription>
                   This tool finds GT players whose USCF memberships are expiring this month.
@@ -461,7 +531,7 @@ export default function VoucherManagementPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Auto-Assign Vouchers</CardTitle>
+                <CardTitle>Auto-Assign Vouchers (All Other Players)</CardTitle>
                 <CardDescription>Automatically assign available vouchers to players who need new or renewed memberships from event registrations.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
