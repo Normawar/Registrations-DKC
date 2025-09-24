@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useMasterDb, type MasterPlayer } from "@/context/master-db-context";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
-import { School, User, DollarSign, CheckCircle, Clock, AlertCircle, Lock } from "lucide-react";
+import { School, User, DollarSign, CheckCircle, Lock, AlertCircle, Clock } from "lucide-react";
 import { format, differenceInHours, isSameDay, startOfDay } from "date-fns";
 import { InvoiceDetailsDialog } from '@/components/invoice-details-dialog';
 import { createInvoice } from '@/ai/flows/create-invoice-flow';
@@ -160,7 +160,6 @@ export function SponsorRegistrationDialog({
     return { fee: event.regularFee, type: 'Regular Registration' };
   };
 
-  // Calculate fees with breakdown
   const calculateFeeBreakdown = () => {
     if (!event) return { 
       registrationFees: 0, 
@@ -178,7 +177,6 @@ export function SponsorRegistrationDialog({
     const lateFeePerStudent = currentFee - event.regularFee;
     const lateFeeTotal = selectedCount * lateFeePerStudent;
     
-    // Separate GT and Independent students
     const gtStudents = Object.entries(selectedStudents).filter(([playerId]) => {
       const player = rosterPlayers.find(p => p.id === playerId);
       return player?.studentType === 'gt';
@@ -189,37 +187,25 @@ export function SponsorRegistrationDialog({
       return player?.studentType !== 'gt';
     });
 
-    // GT breakdown (only registration fees)
     const gtRegistrationFees = gtStudents.length * event.regularFee;
-    const gtLateFees = gtStudents.length * lateFeePerStudent; // Will be moved to school invoice
 
-    // Independent/School breakdown
     const indRegistrationFees = independentStudents.length * event.regularFee;
-    const allLateFees = lateFeeTotal; // School pays ALL late fees (GT + Independent)
+    const allLateFees = lateFeeTotal;
     
-    // USCF fees (Independent students only, exclude GT)
     const uscfFee = 24;
-    const uscfPlayersToCharge = independentStudents.filter(([playerId, details]) => {
-      if (details.uscfStatus === 'current') return false;
-      return true; // Independent students pay USCF fees
-    });
+    const uscfPlayersToCharge = independentStudents.filter(([_, details]) => details.uscfStatus !== 'current');
     const uscfTotal = uscfPlayersToCharge.length * uscfFee;
     
+    const total = baseTotal + lateFeeTotal + uscfTotal;
+
     return {
       registrationFees: baseTotal,
       lateFees: lateFeeTotal,
       uscfFees: uscfTotal,
-      total: baseTotal + lateFeeTotal + uscfTotal,
+      total: total,
       feeType: feeType,
-      gtBreakdown: {
-        registrationFees: gtRegistrationFees,
-        lateFees: 0, // GT never pays late fees
-      },
-      schoolBreakdown: {
-        registrationFees: indRegistrationFees,
-        lateFees: allLateFees, // School pays ALL late fees
-        uscfFees: uscfTotal,
-      }
+      gtBreakdown: { registrationFees: gtRegistrationFees, lateFees: 0 },
+      schoolBreakdown: { registrationFees: indRegistrationFees, lateFees: allLateFees, uscfFees: uscfTotal }
     };
   };
 
@@ -577,7 +563,7 @@ export function SponsorRegistrationDialog({
         )}
         {feeBreakdown.uscfFees > 0 && (
           <div className="flex justify-between">
-            <span>USCF Fees ({Object.values(selectedStudents).filter(s => s.uscfStatus !== 'current' && !rosterPlayers.find(p => p.id === Object.keys(selectedStudents)[Object.values(selectedStudents).indexOf(s)])?.studentType?.includes('gt')).length} × $24)</span>
+            <span>USCF Fees ({Object.values(selectedStudents).filter(s => s.uscfStatus !== 'current').length} × $24)</span>
             <span>${feeBreakdown.uscfFees.toFixed(2)}</span>
           </div>
         )}
@@ -614,15 +600,8 @@ export function SponsorRegistrationDialog({
             <h4 className="font-medium text-blue-800">GT Program Invoice</h4>
             <div className="space-y-1 text-sm mt-2">
               <div className="flex justify-between">
-                <span>Registration Fees ({Object.entries(selectedStudents).filter(([playerId]) => {
-                  const player = rosterPlayers.find(p => p.id === playerId);
-                  return player?.studentType === 'gt';
-                }).length} GT students × ${event.regularFee})</span>
+                <span>Registration Fees</span>
                 <span>${breakdown.gtBreakdown.registrationFees.toFixed(2)}</span>
-              </div>
-              <div className="text-xs text-blue-600">
-                • USCF fees covered under district bulk plan<br/>
-                • Late fees billed to school
               </div>
             </div>
           </div>
@@ -633,16 +612,13 @@ export function SponsorRegistrationDialog({
             <h4 className="font-medium text-green-800">School Invoice</h4>
             <div className="space-y-1 text-sm mt-2">
               <div className="flex justify-between">
-                <span>Registration Fees ({Object.entries(selectedStudents).filter(([playerId]) => {
-                  const player = rosterPlayers.find(p => p.id === playerId);
-                  return player?.studentType !== 'gt';
-                }).length} Independent × ${event.regularFee})</span>
+                <span>Registration Fees (Independent)</span>
                 <span>${breakdown.schoolBreakdown.registrationFees.toFixed(2)}</span>
               </div>
               
               {breakdown.lateFees > 0 && (
                 <div className="flex justify-between text-amber-600">
-                  <span>ALL Late Fees ({Object.keys(selectedStudents).length} students × ${(breakdown.lateFees / Object.keys(selectedStudents).length).toFixed(2)})</span>
+                  <span>ALL Late Fees</span>
                   <span>${breakdown.schoolBreakdown.lateFees.toFixed(2)}</span>
                 </div>
               )}
@@ -667,10 +643,10 @@ export function SponsorRegistrationDialog({
 
 
   if (!event) return null;
+  
+  const isPsjaRestricted = event.isPsjaOnly && profile?.district !== 'PHARR-SAN JUAN-ALAMO ISD';
 
-  const isRestrictedEvent = event.isPsjaOnly && profile?.district !== 'PHARR-SAN JUAN-ALAMO ISD';
-
-  if (event.isClosed || isRestrictedEvent) {
+  if (event.isClosed || isPsjaRestricted) {
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent>
@@ -906,17 +882,19 @@ export function SponsorRegistrationDialog({
 
             {profile?.district === 'PHARR-SAN JUAN-ALAMO ISD' ? renderPsjaFeeBreakdown() : renderStandardFeeBreakdown()}
             
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="split-uscf-fees"
-                checked={splitUscfFees}
-                onCheckedChange={(checked) => setSplitUscfFees(!!checked)}
-                disabled={feeBreakdown.uscfFees === 0}
-              />
-              <Label htmlFor="split-uscf-fees" className="text-sm font-medium">
-                Create a separate invoice for USCF fees
-              </Label>
-            </div>
+            {profile?.district !== 'PHARR-SAN JUAN-ALAMO ISD' && (
+              <div className="flex items-center space-x-2 pt-4">
+                <Checkbox
+                  id="split-uscf-fees"
+                  checked={splitUscfFees}
+                  onCheckedChange={(checked) => setSplitUscfFees(!!checked)}
+                  disabled={feeBreakdown.uscfFees === 0}
+                />
+                <Label htmlFor="split-uscf-fees" className="text-sm font-medium">
+                  Create a separate invoice for USCF fees
+                </Label>
+              </div>
+            )}
 
             {feeBreakdown.lateFees > 0 && (
               <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">

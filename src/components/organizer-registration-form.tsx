@@ -360,10 +360,10 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         const uscfFee = 24;
         const registrationFees = stagedPlayers.length * event.regularFee;
         const lateFees = stagedPlayers.length * (currentFee - event.regularFee);
-        const uscfFees = stagedPlayers.filter(s => s.uscfStatus !== 'current' && s.studentType !== 'gt').length * uscfFee;
+        const uscfFees = stagedPlayers.filter(p => p.uscfStatus !== 'current' && p.studentType !== 'gt').length * uscfFee;
         const total = registrationFees + lateFees + uscfFees;
         return { registrationFees, uscfFees, lateFees, total, feeType };
-    }, [stagedPlayers, event]);
+    }, [stagedPlayers, event, getFeeForEvent]);
 
     const handleFinalize = async () => {
         const usersRef = collection(db, 'users');
@@ -784,7 +784,54 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
     }
     
     if(view === 'review') {
-        const registrationTotal = feeBreakdown.registrationFees + feeBreakdown.lateFees;
+        const isPsja = selectedDistrict === 'PHARR-SAN JUAN-ALAMO ISD';
+        const hasGt = stagedPlayers.some(p => p.studentType === 'gt');
+        const hasIndependent = stagedPlayers.some(p => p.studentType !== 'gt');
+        const showPsjaSplitView = isPsja && hasGt && hasIndependent;
+
+        const renderPsjaFeeBreakdown = () => {
+            const breakdown = feeBreakdown; // It already contains the logic
+            return (
+              <div className="border rounded-lg p-4 space-y-3">
+                <h3 className="font-semibold">PSJA Split Invoice Breakdown</h3>
+                <div className="bg-blue-50 p-3 rounded">
+                  <h4 className="font-medium text-blue-800">GT Program Invoice</h4>
+                  <div className="space-y-1 text-sm mt-2">
+                    <div className="flex justify-between">
+                      <span>Registration Fees</span>
+                      <span>${breakdown.gtBreakdown.registrationFees.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-green-50 p-3 rounded">
+                  <h4 className="font-medium text-green-800">School Invoice</h4>
+                  <div className="space-y-1 text-sm mt-2">
+                    <div className="flex justify-between">
+                      <span>Registration Fees (Independent)</span>
+                      <span>${breakdown.schoolBreakdown.registrationFees.toFixed(2)}</span>
+                    </div>
+                    {breakdown.schoolBreakdown.lateFees > 0 && (
+                      <div className="flex justify-between text-amber-600">
+                        <span>ALL Late Fees</span>
+                        <span>${breakdown.schoolBreakdown.lateFees.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {breakdown.schoolBreakdown.uscfFees > 0 && (
+                      <div className="flex justify-between">
+                        <span>USCF Fees (Independent only)</span>
+                        <span>${breakdown.schoolBreakdown.uscfFees.toFixed(2)}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="border-t pt-2 flex justify-between font-semibold">
+                  <span>Combined Total</span>
+                  <span>${breakdown.total.toFixed(2)}</span>
+                </div>
+              </div>
+            );
+        };
+          
         return (
             <Card>
                 <CardHeader>
@@ -809,64 +856,21 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                         </div>
                     </div>
 
-                    {splitUscfFees && feeBreakdown.uscfFees > 0 ? (
-                        <div className="space-y-4">
-                            <div className="border rounded-lg p-4 space-y-3">
-                                <h3 className="font-semibold">Invoice 1: Registration & Late Fees</h3>
-                                <div className="space-y-2 text-sm">
-                                    <div className="flex justify-between">
-                                        <span>Registration & Late Fees</span>
-                                        <span>${registrationTotal.toFixed(2)}</span>
-                                    </div>
-                                    <div className="border-t pt-2 flex justify-between font-bold">
-                                        <span>Invoice 1 Total</span>
-                                        <span>${registrationTotal.toFixed(2)}</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="border rounded-lg p-4 space-y-3">
-                                <h3 className="font-semibold">Invoice 2: USCF Memberships</h3>
-                                <div className="space-y-2 text-sm">
-                                    <div className="flex justify-between">
-                                        <span>USCF Fees</span>
-                                        <span>${feeBreakdown.uscfFees.toFixed(2)}</span>
-                                    </div>
-                                    <div className="border-t pt-2 flex justify-between font-bold">
-                                        <span>Invoice 2 Total</span>
-                                        <span>${feeBreakdown.uscfFees.toFixed(2)}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    ) : (
+                    {showPsjaSplitView ? renderPsjaFeeBreakdown() : (
                         <div className="border rounded-lg p-4 space-y-3">
                             <h3 className="font-semibold">Charge Breakdown</h3>
+                            {/* Standard breakdown logic */}
                             <div className="space-y-2 text-sm">
-                                <div className="flex justify-between">
-                                <span>Registration Fees ({stagedPlayers.length} × ${event.regularFee})</span>
-                                <span>${feeBreakdown.registrationFees.toFixed(2)}</span>
-                                </div>
-                                {feeBreakdown.lateFees > 0 && (
-                                <div className="flex justify-between text-amber-600">
-                                    <span>{feeBreakdown.feeType} ({stagedPlayers.length} × ${(feeBreakdown.lateFees / stagedPlayers.length).toFixed(2)})</span>
-                                    <span>${feeBreakdown.lateFees.toFixed(2)}</span>
-                                </div>
-                                )}
-                                {feeBreakdown.uscfFees > 0 && (
-                                <div className="flex justify-between">
-                                    <span>USCF Fees ({stagedPlayers.filter(s => s.uscfStatus !== 'current' && s.studentType !== 'gt').length} × $24)</span>
-                                    <span>${feeBreakdown.uscfFees.toFixed(2)}</span>
-                                </div>
-                                )}
-                                <div className="border-t pt-2 flex justify-between font-semibold">
-                                <span>Total Amount</span>
-                                <span>${feeBreakdown.total.toFixed(2)}</span>
-                                </div>
+                                <div className="flex justify-between"><span>Registration Fees ({stagedPlayers.length} × ${event.regularFee})</span><span>${feeBreakdown.registrationFees.toFixed(2)}</span></div>
+                                {feeBreakdown.lateFees > 0 && (<div className="flex justify-between text-amber-600"><span>{feeBreakdown.feeType} ({stagedPlayers.length} × ${(feeBreakdown.lateFees / stagedPlayers.length).toFixed(2)})</span><span>${feeBreakdown.lateFees.toFixed(2)}</span></div>)}
+                                {feeBreakdown.uscfFees > 0 && (<div className="flex justify-between"><span>USCF Fees ({stagedPlayers.filter(s => s.uscfStatus !== 'current').length} × $24)</span><span>${feeBreakdown.uscfFees.toFixed(2)}</span></div>)}
+                                <div className="border-t pt-2 flex justify-between font-semibold"><span>Total Amount</span><span>${feeBreakdown.total.toFixed(2)}</span></div>
                             </div>
                         </div>
                     )}
-
-                    <div className="space-y-3 pt-4">
+                    
+                    {!showPsjaSplitView && (
+                      <div className="space-y-3 pt-4">
                         <Label>Invoice Options</Label>
                         <RadioGroup value={invoiceType} onValueChange={(v) => setInvoiceType(v as 'team' | 'individual')} className="flex items-center space-x-4">
                             <div className="flex items-center space-x-2"><RadioGroupItem value="team" id="team" /><Label htmlFor="team" className="cursor-pointer">Invoice as Team (One Invoice)</Label></div>
@@ -874,18 +878,12 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                         </RadioGroup>
                         {invoiceType === 'team' && (
                             <div className="pl-6 flex items-center space-x-2">
-                                <Checkbox
-                                    id="split-uscf-fees"
-                                    checked={splitUscfFees}
-                                    onCheckedChange={(checked) => setSplitUscfFees(!!checked)}
-                                    disabled={feeBreakdown.uscfFees === 0}
-                                />
-                                <Label htmlFor="split-uscf-fees" className="text-sm font-medium">
-                                    Create a separate invoice for USCF fees
-                                </Label>
+                                <Checkbox id="split-uscf-fees" checked={splitUscfFees} onCheckedChange={(checked) => setSplitUscfFees(!!checked)} disabled={feeBreakdown.uscfFees === 0} />
+                                <Label htmlFor="split-uscf-fees" className="text-sm font-medium">Create a separate invoice for USCF fees</Label>
                             </div>
                         )}
-                    </div>
+                      </div>
+                    )}
                 </CardContent>
                 <CardFooter className="flex justify-between">
                     <Button variant="outline" onClick={() => setView('selection')}>Back to Selection</Button>
