@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useMemo } from 'react';
@@ -384,8 +385,8 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
             if (oldValue !== newValue) {
                 changedFields.push({
                     field: key,
-                    oldValue,
-                    newValue,
+                    oldValue: oldValue,
+                    newValue: newValue,
                 });
             }
         }
