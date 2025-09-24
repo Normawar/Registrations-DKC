@@ -355,22 +355,43 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
     };
 
     const feeBreakdown = useMemo(() => {
-        if (!event) return { registrationFees: 0, uscfFees: 0, lateFees: 0, total: 0, feeType: 'Regular Registration' };
+        if (!event) {
+          return { registrationFees: 0, uscfFees: 0, lateFees: 0, total: 0, feeType: 'Regular Registration', gtBreakdown: { registrationFees: 0 }, schoolBreakdown: { registrationFees: 0, lateFees: 0, uscfFees: 0 } };
+        }
+    
         const { fee: currentFee, type: feeType } = getFeeForEvent();
         const uscfFee = 24;
+    
         let uscfPlayersToCharge = stagedPlayers.filter(p => p.uscfStatus !== 'current');
-
         if (selectedDistrict === 'PHARR-SAN JUAN-ALAMO ISD') {
-            uscfPlayersToCharge = uscfPlayersToCharge.filter(p => p.studentType !== 'gt');
+          uscfPlayersToCharge = uscfPlayersToCharge.filter(p => p.studentType !== 'gt');
         }
-
+    
         const registrationFees = stagedPlayers.length * event.regularFee;
         const lateFees = stagedPlayers.length * (currentFee - event.regularFee);
         const uscfFees = uscfPlayersToCharge.length * uscfFee;
         const total = registrationFees + lateFees + uscfFees;
-        
-        return { registrationFees, uscfFees, lateFees, total, feeType };
-    }, [stagedPlayers, event, getFeeForEvent, selectedDistrict]);
+    
+        // For PSJA split view
+        const gtStudents = stagedPlayers.filter(p => p.studentType === 'gt');
+        const independentStudents = stagedPlayers.filter(p => p.studentType !== 'gt');
+    
+        const gtRegistrationFees = gtStudents.length * event.regularFee;
+        const indRegistrationFees = independentStudents.length * event.regularFee;
+    
+        // Corrected USCF calculation for independent PSJA students
+        const indUscfFees = independentStudents.filter(p => p.uscfStatus !== 'current').length * uscfFee;
+    
+        return {
+          registrationFees,
+          uscfFees,
+          lateFees,
+          total,
+          feeType,
+          gtBreakdown: { registrationFees: gtRegistrationFees },
+          schoolBreakdown: { registrationFees: indRegistrationFees, lateFees: lateFees, uscfFees: indUscfFees }
+        };
+      }, [stagedPlayers, event, getFeeForEvent, selectedDistrict]);
 
     const handleFinalize = async () => {
         const usersRef = collection(db, 'users');
@@ -797,7 +818,6 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         const showPsjaSplitView = isPsja && hasGt && hasIndependent;
 
         const renderPsjaFeeBreakdown = () => {
-            const breakdown = feeBreakdown; 
             return (
               <div className="border rounded-lg p-4 space-y-3">
                 <h3 className="font-semibold">PSJA Split Invoice Breakdown</h3>
@@ -806,7 +826,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                   <div className="space-y-1 text-sm mt-2">
                     <div className="flex justify-between">
                       <span>Registration Fees</span>
-                      <span>${breakdown.gtBreakdown.registrationFees.toFixed(2)}</span>
+                      <span>${feeBreakdown.gtBreakdown.registrationFees.toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
@@ -815,25 +835,25 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                   <div className="space-y-1 text-sm mt-2">
                     <div className="flex justify-between">
                       <span>Registration Fees (Independent)</span>
-                      <span>${breakdown.schoolBreakdown.registrationFees.toFixed(2)}</span>
+                      <span>${feeBreakdown.schoolBreakdown.registrationFees.toFixed(2)}</span>
                     </div>
-                    {breakdown.schoolBreakdown.lateFees > 0 && (
+                    {feeBreakdown.schoolBreakdown.lateFees > 0 && (
                       <div className="flex justify-between text-amber-600">
                         <span>ALL Late Fees</span>
-                        <span>${breakdown.schoolBreakdown.lateFees.toFixed(2)}</span>
+                        <span>${feeBreakdown.schoolBreakdown.lateFees.toFixed(2)}</span>
                       </div>
                     )}
-                    {breakdown.schoolBreakdown.uscfFees > 0 && (
+                    {feeBreakdown.schoolBreakdown.uscfFees > 0 && (
                       <div className="flex justify-between">
                         <span>USCF Fees (Independent only)</span>
-                        <span>${breakdown.schoolBreakdown.uscfFees.toFixed(2)}</span>
+                        <span>${feeBreakdown.schoolBreakdown.uscfFees.toFixed(2)}</span>
                       </div>
                     )}
                   </div>
                 </div>
                 <div className="border-t pt-2 flex justify-between font-semibold">
                   <span>Combined Total</span>
-                  <span>${breakdown.total.toFixed(2)}</span>
+                  <span>${feeBreakdown.total.toFixed(2)}</span>
                 </div>
               </div>
             );
