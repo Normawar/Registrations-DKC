@@ -51,8 +51,10 @@ function RosterPage() {
         eventIds: [],
       };
     }
-    setIsSearchOpen(false); // Close search dialog
-    handleEditPlayer(playerToProcess); // Open details dialog
+    // Close the search dialog
+    setIsSearchOpen(false);
+    // Open the details dialog with the selected player
+    handleEditPlayer(playerToProcess);
   };
 
   const handleAddToRoster = async (player: MasterPlayer) => {
