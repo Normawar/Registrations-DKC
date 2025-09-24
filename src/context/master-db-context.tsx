@@ -246,6 +246,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   const [isDbError, setIsDbError] = useState(false);
   const { toast } = useToast();
   const [playerCount, setPlayerCount] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const dbSchools = useMemo(() => {
     return [...new Set(schools.map(s => s.schoolName).filter(Boolean))].sort();
@@ -317,9 +318,20 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
 
   const refreshDatabase = useCallback(async () => {
     console.log('🔄 refreshDatabase called from:', new Error().stack?.split('\n')[1]);
-    await loadDatabase();
-    toast({ title: 'Database Refreshed', description: 'Fetched the latest player and school data from the server.' });
-  }, [loadDatabase, toast]);
+    
+    if (isRefreshing) {
+      console.log('Already refreshing, skipping...');
+      return;
+    }
+    
+    setIsRefreshing(true);
+    try {
+        await loadDatabase();
+        toast({ title: 'Database Refreshed', description: 'Fetched the latest player and school data from the server.' });
+    } finally {
+        setIsRefreshing(false);
+    }
+  }, [loadDatabase, toast, isRefreshing]);
 
   const addPlayer = async (player: MasterPlayer, editingProfile: SponsorProfile | null) => {
     if (!db) return;
@@ -710,3 +722,4 @@ export const useMasterDb = () => {
   }
   return context;
 };
+
