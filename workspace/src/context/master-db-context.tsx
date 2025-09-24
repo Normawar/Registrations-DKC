@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { type School } from '@/lib/data/school-data';
 import { generateTeamCode } from '@/lib/school-utils';
 import type { SearchCriteria, SearchResult } from '@/lib/data/search-types';
+import { sanitizePlayerForFirebase } from '@/lib/utils/sanitize-player';
 
 
 // --- Types ---
@@ -65,29 +66,6 @@ interface MasterDbContextType {
 // --- Context Definition ---
 
 const MasterDbContext = createContext<MasterDbContextType | undefined>(undefined);
-
-// Helper function to clean undefined values for Firebase
-const removeUndefined = (obj: any): any => {
-    if (obj === null || obj === undefined) {
-      return null;
-    }
-    
-    if (Array.isArray(obj)) {
-      return obj.map(removeUndefined);
-    }
-    
-    if (typeof obj === 'object') {
-      const cleaned: any = {};
-      Object.keys(obj).forEach(key => {
-        if (obj[key] !== undefined) {
-          cleaned[key] = removeUndefined(obj[key]);
-        }
-      });
-      return cleaned;
-    }
-    
-    return obj;
-  };
 
 // Add this helper function for parsing CSV data
 const parseCSVData = (data: any[]): MasterPlayer[] => {
@@ -190,7 +168,7 @@ const parseCSVData = (data: any[]): MasterPlayer[] => {
       }
 
       // Ensure no undefined values made it through
-      const cleanedPlayerData = removeUndefined(playerData);
+      const cleanedPlayerData = sanitizePlayerForFirebase(playerData);
       
       newPlayers.push(cleanedPlayerData as MasterPlayer);
     } catch(e) {
@@ -261,6 +239,14 @@ const flagPotentialMatches = (uscfPlayers: any[], tempPlayers: MasterPlayer[]) =
 
 // --- Provider Component ---
 
+// Extend the window interface for the global throttle flag
+declare global {
+    interface Window {
+        lastRefreshTime?: number;
+    }
+}
+
+
 export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   const [database, setDatabase] = useState<MasterPlayer[]>([]);
   const [schools, setSchools] = useState<School[]>([]);
@@ -303,20 +289,33 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
       .sort();
   }, [schools, allSchoolNames]);
 
-  const loadDatabase = useCallback(async () => {
-    if (!db) {
-        setIsDbLoaded(true);
-        setIsDbError(true);
-        return;
+  const refreshDatabase = useCallback(async () => {
+    console.log('🔄 refreshDatabase called - checking if should proceed...');
+    
+    // Use a global flag on the window object to throttle
+    const now = Date.now();
+    if (typeof window !== 'undefined') {
+        if (window.lastRefreshTime && (now - window.lastRefreshTime) < 2000) { // Increased throttle to 2s
+            console.log('🚫 Refresh blocked - too recent');
+            return;
+        }
+        window.lastRefreshTime = now;
     }
-    setIsDbLoaded(false);
     
     try {
+      if (!db) {
+        setIsDbError(true);
+        console.error("Firestore not initialized.");
+        return;
+      }
+      console.log('🔄 Starting database refresh...');
+      setIsDbLoaded(false);
+      
       const [playersSnapshot, schoolsSnapshot] = await Promise.all([
         getDocs(collection(db, 'players')),
         getDocs(collection(db, 'schools'))
       ]);
-
+  
       const players = playersSnapshot.docs.map(doc => doc.data() as MasterPlayer);
       const schoolList = schoolsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as School));
       
@@ -325,22 +324,22 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
       setPlayerCount(players.length);
       setIsDbLoaded(true);
       
-    } catch (error: any) {
-      console.error('Failed to load data from Firestore:', error);
-      setIsDbLoaded(false);
+      toast({ 
+        title: 'Database Refreshed', 
+        description: 'Fetched the latest player and school data from the server.' 
+      });
+    } catch (error) {
+      console.error('Refresh failed:', error);
       setIsDbError(true);
+      toast({ variant: 'destructive', title: 'Refresh Failed', description: 'Could not fetch data from the server.'});
     }
-  }, []);
+  }, [toast]); // Empty dependency array to prevent recreation on re-renders
+
 
   useEffect(() => {
-    loadDatabase();
-  }, [loadDatabase]);
+    refreshDatabase();
+  }, [refreshDatabase]);
 
-
-  const refreshDatabase = async () => {
-    await loadDatabase();
-    toast({ title: 'Database Refreshed', description: 'Fetched the latest player and school data from the server.' });
-  };
 
   const addPlayer = async (player: MasterPlayer, editingProfile: SponsorProfile | null) => {
     if (!db) return;
@@ -350,16 +349,26 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
 
         const newPlayer: MasterPlayer = {
             ...player,
-            dateCreated: now,
-            createdBy: creatorName,
-            updatedAt: now, // Also set updatedAt on creation
+            createdAt: player.createdAt || now,
+            dateCreated: player.dateCreated || now,
+            createdBy: player.createdBy || creatorName,
+            updatedAt: now,
             dateUpdated: now,
             updatedBy: creatorName,
         };
-        const cleanedPlayer = removeUndefined(newPlayer);
-        const playerRef = doc(db, 'players', cleanedPlayer.id);
+        const cleanedPlayer = sanitizePlayerForFirebase(newPlayer) as MasterPlayer;
+        const playerRef = doc(db, 'players', cleanedPlayer.id!);
         await setDoc(playerRef, cleanedPlayer, { merge: true });
-        await loadDatabase();
+        
+        setDatabase(prev => {
+            const exists = prev.some(p => p.id === cleanedPlayer.id);
+            if(exists) {
+                return prev.map(p => p.id === cleanedPlayer.id ? cleanedPlayer : p);
+            }
+            return [...prev, cleanedPlayer];
+        });
+        setPlayerCount(database.length);
+
     } catch (error) {
         console.error("Error adding player:", error);
         throw error;
@@ -373,22 +382,20 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     const oldPlayer = oldPlayerDoc.exists() ? oldPlayerDoc.data() as MasterPlayer : null;
 
     if (!oldPlayer) {
-        return addPlayer(updatedPlayer, editingProfile); // Fallback to add if not found
+        return addPlayer(updatedPlayer, editingProfile);
     }
 
     const changedFields: { field: string; oldValue: any; newValue: any }[] = [];
     (Object.keys(updatedPlayer) as Array<keyof MasterPlayer>).forEach(key => {
-        if (updatedPlayer[key] !== oldPlayer[key]) {
-            const oldValue = oldPlayer[key] === undefined ? null : oldPlayer[key];
-            const newValue = updatedPlayer[key] === undefined ? null : updatedPlayer[key];
-            
-            if (oldValue !== newValue) {
-                changedFields.push({
-                    field: key,
-                    oldValue,
-                    newValue,
-                });
-            }
+        const oldValue = oldPlayer[key];
+        const newValue = updatedPlayer[key];
+        const oldString = String(oldValue);
+        const newString = String(newValue);
+
+        if (oldString !== newString) {
+            let finalOldValue = oldValue === undefined || oldValue === null || oldValue === '' ? "not avail" : oldValue;
+            let finalNewValue = newValue === undefined || newValue === null || newValue === '' ? "deleted" : newValue;
+            changedFields.push({ field: key, oldValue: finalOldValue, newValue: finalNewValue });
         }
     });
 
@@ -415,15 +422,18 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
         return; // No changes
     }
     
-    const cleanedPlayer = removeUndefined(finalPlayer);
+    const cleanedPlayer = sanitizePlayerForFirebase(finalPlayer) as MasterPlayer;
     await setDoc(doc(db, 'players', finalPlayer.id), cleanedPlayer, { merge: true });
-    await loadDatabase(); // Refresh data
+    
+    setDatabase(prev => prev.map(p => p.id === cleanedPlayer.id ? cleanedPlayer : p));
   };
 
   const deletePlayer = async (playerId: string) => {
     if (!db) return;
     await deleteDoc(doc(db, 'players', playerId));
-    await loadDatabase(); // Refresh data
+    
+    setDatabase(prev => prev.filter(p => p.id !== playerId));
+    setPlayerCount(prev => prev - 1);
   };
   
   const addSchool = async (school: Omit<School, 'id' | 'teamCode' | 'notes'>) => {
@@ -436,20 +446,23 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
         notes: [],
     };
     await setDoc(doc(db, 'schools', id), newSchool);
-    await loadDatabase();
+    
+    setSchools(prev => [...prev, newSchool]);
   };
 
   const updateSchool = async (school: School) => {
       if (!db) return;
       const schoolWithCode = { ...school, teamCode: school.teamCode || generateTeamCode(school) };
       await setDoc(doc(db, 'schools', school.id), schoolWithCode, { merge: true });
-      await loadDatabase();
+      
+      setSchools(prev => prev.map(s => s.id === school.id ? schoolWithCode : s));
   };
 
   const deleteSchool = async (schoolId: string) => {
       if (!db) return;
       await deleteDoc(doc(db, 'schools', schoolId));
-      await loadDatabase();
+      
+      setSchools(prev => prev.filter(s => s.id !== schoolId));
   };
   
   const addBulkSchools = async (data: any[]) => {
@@ -492,7 +505,8 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
         }
       });
       await batch.commit();
-      await loadDatabase();
+      
+      setSchools(prev => [...prev, ...newSchools as School[]]);
     }
     return { uploaded: newSchools.length, errors };
   };
@@ -508,14 +522,11 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
           }
       });
       await batch.commit();
-      await loadDatabase();
+      
+      setSchools(prev => prev.map(s => s.district === oldDistrict ? { ...s, district: newDistrict, teamCode: generateTeamCode(s) } : s));
   };
   
   const searchPlayers = async (criteria: Partial<SearchCriteria>): Promise<SearchResult> => {
-    if (!isDbLoaded) {
-      return { players: [], hasMore: false, totalFound: 0, message: 'Database is still loading...' };
-    }
-
     try {
         const response = await fetch('/api/search-players', {
             method: 'POST',
@@ -618,7 +629,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
                 
                 onProgress?.({ stage: 'complete', currentBatch: totalBatches, totalBatches, uploadedRecords: totalRecords, totalRecords, percentage: 100, message: 'Update complete! Refreshing local data...' });
                 
-                await loadDatabase();
+                await refreshDatabase();
                 resolve({ updated: updatedCount, created: createdCount, errors });
             },
             error: (error: any) => {
@@ -646,11 +657,9 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
       const playerDoc = await getDoc(playerRef);
       
       if (playerDoc.exists()) {
-        // Player exists, update their info
         batch.update(playerRef, uscfPlayer);
         updated++;
       } else {
-        // Player doesn't exist, create a new record
         const newPlayer: MasterPlayer = {
           id: uscfPlayer.uscfId,
           uscfId: uscfPlayer.uscfId,
@@ -659,14 +668,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
           regularRating: uscfPlayer.regularRating,
           state: uscfPlayer.state,
           uscfExpiration: uscfPlayer.uscfExpiration,
-          // Fill in required fields with defaults
-          grade: '',
-          section: '',
-          email: '',
-          school: '',
-          district: '',
-          events: 0,
-          eventIds: [],
+          grade: '', section: '', email: '', school: '', district: '', events: 0, eventIds: [],
         };
         batch.set(playerRef, newPlayer);
         created++;
@@ -674,7 +676,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     }
     
     await batch.commit();
-    await loadDatabase(); // Refresh local state
+    await refreshDatabase();
     
     return { updated, created };
   };
