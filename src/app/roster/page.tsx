@@ -1,233 +1,63 @@
 
-// src/app/roster/page.tsx
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { format, isValid, parse } from 'date-fns';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { AppLayout } from '@/components/app-layout';
 import { AuthGuard } from '@/components/auth-guard';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { PlayerDetailsDialog } from '@/components/player-details-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Search, PlusCircle, Trash2, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, FilePenLine, History, UserPlus, Download, Check } from 'lucide-react';
+import { Search, PlusCircle, Trash2, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, FilePenLine, UserPlus, Download, Check } from 'lucide-react';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { CSVUploadComponent } from '@/components/csv-upload';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { EnhancedPlayerSearchDialog } from '@/components/EnhancedPlayerSearchDialog';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { generateTeamCode } from '@/lib/school-utils';
-import { Separator } from '@/components/ui/separator';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import Papa from 'papaparse';
+import { format } from 'date-fns';
 
-const grades = ['K', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'].map(g => `${g}th Grade`);
-grades[0] = 'Kindergarten';
-
-const sections = ['Kinder-1st', 'Primary K-3', 'Elementary K-5', 'Middle School K-8', 'High School K-12', 'Championship'];
-const gradeToNumber: { [key: string]: number } = { 'Kindergarten': 0, '1st Grade': 1, '2nd Grade': 2, '3rd Grade': 3, '4th Grade': 4, '5th Grade': 5, '6th Grade': 6, '7th Grade': 7, '8th Grade': 8, '9th Grade': 9, '10th Grade': 10, '11th Grade': 11, '12th Grade': 12, };
-const sectionMaxGrade: { [key: string]: number } = { 'Kinder-1st': 1, 'Primary K-3': 3, 'Elementary K-5': 5, 'Middle School K-8': 8, 'High School K-12': 12, 'Championship': 12 };
-
-const playerFormSchema = z.object({
-  id: z.string().optional(),
-  firstName: z.string().min(1, { message: "First Name is required." }),
-  middleName: z.string().optional().transform(val => val === '' ? undefined : val),
-  lastName: z.string().min(1, { message: "Last Name is required." }),
-  uscfId: z.string().min(1, { message: "USCF ID is required." }).regex(/^\d+$|^NEW$/, "USCF ID must be a number or 'NEW'"),
-  uscfExpiration: z.date().optional(),
-  regularRating: z.preprocess(
-    (val) => {
-      if (!val || String(val).toUpperCase() === 'UNR' || val === '') {
-        return undefined;
-      }
-      return val;
-    },
-    z.coerce.number({
-      invalid_type_error: "Rating must be a number or UNR."
-    }).optional()
-  ),
-  grade: z.string().min(1, { message: "Grade is required." }),
-  section: z.string().min(1, { message: "Section is required." }),
-  email: z.string().email({ message: "Please enter a valid email." }),
-  zipCode: z.string().min(5, { message: "A valid 5-digit zip code is required." }),
-  phone: z.string().optional().transform(val => val === '' ? undefined : val),
-  dob: z.date({ required_error: "Date of Birth is required."}),
-  studentType: z.string().optional().transform(val => val === '' ? undefined : val),
-  state: z.string().optional().transform(val => val === '' ? undefined : val),
-  school: z.string().min(1, { message: "School name is required."}),
-  district: z.string().min(1, { message: "District name is required."}),
-}).refine(data => {
-    if (data.uscfId.toUpperCase() !== 'NEW' && data.uscfId.toUpperCase() !== 'UNR') { 
-        return data.uscfExpiration !== undefined; 
-    }
-    return true;
-}, { 
-  message: "USCF Expiration is required unless ID is 'NEW' or 'UNR'.", 
-  path: ["uscfExpiration"] 
-}).refine((data) => {
-  if (!data.grade || !data.section || data.section === 'Championship') return true;
-  const playerGradeLevel = gradeToNumber[data.grade];
-  const sectionMaxLevel = sectionMaxGrade[data.section];
-  if (playerGradeLevel === undefined || sectionMaxLevel === undefined) return true;
-  return playerGradeLevel <= sectionMaxLevel;
-}, { 
-  message: "Player's grade is too high for this section.", 
-  path: ["section"] 
-});
+type SortableColumnKey = 'lastName' | 'teamCode' | 'uscfId' | 'regularRating' | 'grade' | 'section';
 
 
-type PlayerFormValues = z.infer<typeof playerFormSchema>;
-
-const DateInput = React.forwardRef<HTMLInputElement, {
-  value?: Date;
-  onChange?: (date: Date | undefined) => void;
-  placeholder?: string;
-  className?: string;
-}>(({ value, onChange, placeholder, className }, ref) => {
-  const [displayValue, setDisplayValue] = useState('');
-  
+// Hook to prevent body scroll and layout shift when dialogs are open
+const useNoLayoutShift = (isOpen: boolean) => {
   useEffect(() => {
-    if (value && isValid(value)) {
-      setDisplayValue(format(value, 'MM/dd/yyyy'));
-    } else {
-      setDisplayValue('');
+    if (isOpen) {
+      const scrollY = window.scrollY;
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+      
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.left = '0';
+      document.body.style.right = '0';
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+      
+      return () => {
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.left = '';
+        document.body.style.right = '';
+        document.body.style.paddingRight = '';
+        window.scrollTo(0, scrollY);
+      };
     }
-  }, [value]);
-
-  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-    const inputValue = e.target.value;
-    if (inputValue === '') {
-      onChange?.(undefined);
-      return;
-    }
-    const parsedDate = parse(inputValue, 'MM/dd/yyyy', new Date());
-    if (isValid(parsedDate)) {
-      onChange?.(parsedDate);
-      setDisplayValue(format(parsedDate, 'MM/dd/yyyy'));
-    } else {
-      setDisplayValue(value && isValid(value) ? format(value, 'MM/dd/yyyy') : '');
-    }
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setDisplayValue(e.target.value);
-  };
-
-  return (
-    <Input
-      ref={ref}
-      type="text"
-      value={displayValue}
-      onChange={handleChange}
-      onBlur={handleBlur}
-      placeholder={placeholder || 'MM/DD/YYYY'}
-      className={className}
-    />
-  );
-});
-DateInput.displayName = 'DateInput';
-
-const ChangeHistorySection = ({ player }: { player: MasterPlayer | null }) => {
-    if (!player) {
-        return (
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <History className="h-5 w-5 text-muted-foreground" />
-              Record Information
-            </h3>
-            <div className="p-6 text-center text-muted-foreground border rounded-md bg-muted/30">
-              Record information will be available after the player is created.
-            </div>
-          </div>
-        );
-    }
-
-    return (
-        <div className="space-y-4">
-            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <History className="h-5 w-5 text-muted-foreground" />
-              Record Information
-            </h3>
-            
-            {/* Record Creation and Update Summary */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-md bg-muted/30">
-                <div>
-                    <h4 className="font-medium text-sm text-muted-foreground mb-2">RECORD CREATED</h4>
-                    <p className="text-sm font-semibold">
-                        {player.dateCreated 
-                            ? format(new Date(player.dateCreated), 'PPP p') 
-                            : 'Unknown Date'
-                        }
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                        Created by: {player.createdBy || 'Unknown User'}
-                    </p>
-                </div>
-                <div>
-                    <h4 className="font-medium text-sm text-muted-foreground mb-2">LAST UPDATED</h4>
-                    <p className="text-sm font-semibold">
-                        {player.dateUpdated 
-                            ? format(new Date(player.dateUpdated), 'PPP p') 
-                            : (player.dateCreated ? format(new Date(player.dateCreated), 'PPP p') : 'Unknown Date')
-                        }
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                        Updated by: {player.updatedBy || player.createdBy || 'Unknown User'}
-                    </p>
-                </div>
-            </div>
-
-            {/* Change History Details */}
-            {player.changeHistory && player.changeHistory.length > 0 ? (
-                <div>
-                    <h4 className="font-medium text-sm text-muted-foreground mb-3">CHANGE HISTORY</h4>
-                    <div className="space-y-3 border rounded-md p-4 max-h-64 overflow-y-auto bg-background">
-                        {player.changeHistory.slice().reverse().map((entry, index) => (
-                            <div key={entry.timestamp || index} className="text-sm border-l-2 border-muted-foreground pl-4 pb-3 last:pb-0">
-                                <p className="font-medium text-foreground">
-                                    {format(new Date(entry.timestamp), 'PPP p')} by {entry.userName}
-                                </p>
-                                <ul className="list-disc pl-5 mt-2 space-y-1">
-                                    {entry.changes.map((change, changeIndex) => (
-                                        <li key={changeIndex} className="text-xs text-muted-foreground">
-                                            Field <span className="font-semibold text-foreground">{change.field}</span> changed from 
-                                            <span className="italic text-red-600 mx-1">'{String(change.oldValue)}'</span> to 
-                                            <span className="italic text-green-600 mx-1">'{String(change.newValue)}'</span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            ) : (
-                <div>
-                    <h4 className="font-medium text-sm text-muted-foreground mb-3">CHANGE HISTORY</h4>
-                    <div className="p-4 text-center text-xs text-muted-foreground border rounded-md bg-muted/20">
-                        No changes recorded for this player.
-                    </div>
-                </div>
-            )}
-        </div>
-    );
+  }, [isOpen]);
 };
 
 
 function DistrictRostersPageContent() {
-  const { isDbLoaded, dbDistricts, database: allPlayers, getSchoolsForDistrict, deletePlayer, updatePlayer, addPlayer } = useMasterDb();
+  const { isDbLoaded, dbDistricts, database: allPlayers, getSchoolsForDistrict, deletePlayer } = useMasterDb();
   const { profile } = useSponsorProfile();
   const { toast } = useToast();
   
@@ -245,15 +75,8 @@ function DistrictRostersPageContent() {
   
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [playerToEdit, setPlayerToEdit] = useState<MasterPlayer | null>(null);
-  const [schoolsForEditDistrict, setSchoolsForEditDistrict] = useState<string[]>([]);
   
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-
-  const form = useForm<PlayerFormValues>({
-    resolver: zodResolver(playerFormSchema)
-  });
-  
-  const editDistrict = form.watch('district');
+  useNoLayoutShift(isEditOpen);
 
   useEffect(() => {
     if (profile && !selectedDistrict) {
@@ -264,25 +87,6 @@ function DistrictRostersPageContent() {
       }
     }
   }, [profile, selectedDistrict]);
-
-  useEffect(() => {
-    if (editDistrict) {
-      setSchoolsForEditDistrict(getSchoolsForDistrict(editDistrict));
-    }
-  }, [editDistrict, getSchoolsForDistrict]);
-
-  useEffect(() => {
-    if (playerToEdit) {
-      form.reset({
-        ...playerToEdit,
-        dob: playerToEdit.dob ? new Date(playerToEdit.dob) : undefined,
-        uscfExpiration: playerToEdit.uscfExpiration ? new Date(playerToEdit.uscfExpiration) : undefined,
-      });
-      if (playerToEdit.district) {
-        setSchoolsForEditDistrict(getSchoolsForDistrict(playerToEdit.district));
-      }
-    }
-  }, [playerToEdit, form, getSchoolsForDistrict]);
 
   const schoolsForDistrict = useMemo(() => {
     return getSchoolsForDistrict(selectedDistrict);
@@ -341,7 +145,6 @@ function DistrictRostersPageContent() {
     return { all: playersInDistrict.length, gt, independent };
   }, [allPlayers, selectedDistrict]);
   
-  type SortableColumnKey = 'lastName' | 'teamCode' | 'uscfId' | 'regularRating' | 'grade' | 'section';
   const sortPlayers = (players: MasterPlayer[]) => {
     return [...players].sort((a, b) => {
         const key = sortConfig.key;
@@ -423,12 +226,6 @@ function DistrictRostersPageContent() {
 
   const handleCreateNewPlayer = () => {
     setPlayerToEdit(null);
-    form.reset({
-        id: `temp_${Date.now()}`,
-        firstName: '',
-        lastName: '',
-        uscfId: 'NEW'
-    });
     setIsEditOpen(true);
   };
   
@@ -475,37 +272,8 @@ function DistrictRostersPageContent() {
       }
   };
 
-  const onEditSubmit = async (values: PlayerFormValues) => {
-    if (!profile) return;
-    
-    if (playerToEdit) {
-        const updatedPlayer: MasterPlayer = { ...playerToEdit, ...values, dob: values.dob?.toISOString(), uscfExpiration: values.uscfExpiration?.toISOString() };
-        await updatePlayer(updatedPlayer, profile);
-        toast({ title: "Player Updated" });
-    } else { 
-        const newPlayer: MasterPlayer = {
-            ...values,
-            id: values.id || `temp_${Date.now()}`,
-            events: 0,
-            eventIds: [],
-            dob: values.dob?.toISOString(),
-            uscfExpiration: values.uscfExpiration?.toISOString()
-        } as MasterPlayer;
-        await addPlayer(newPlayer, profile);
-        toast({ title: "Player Created" });
-    }
-    
-    setIsEditOpen(false);
-    setPlayerToEdit(null);
-  };
-
-  const handlePlayerSelectedFromSearch = (player: any) => {
-    handleEditPlayer(player);
-    setIsSearchOpen(false);
-  };
-
   return (
-    <AppLayout>
+    <>
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold font-headline">District Rosters</h1>
@@ -517,7 +285,6 @@ function DistrictRostersPageContent() {
             <div className="flex justify-between items-center">
               <CardTitle>Roster Management</CardTitle>
               <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setIsSearchOpen(true)}><UserPlus className="mr-2 h-4 w-4"/> Add Player</Button>
                 <Button onClick={handleCreateNewPlayer}><UserPlus className="mr-2 h-4 w-4"/> Create New Player</Button>
               </div>
             </div>
@@ -672,287 +439,15 @@ function DistrictRostersPageContent() {
           ))}
         </div>
       </div>
-      <EnhancedPlayerSearchDialog
-        isOpen={isSearchOpen}
-        onOpenChange={setIsSearchOpen}
-        onPlayerSelected={handlePlayerSelectedFromSearch}
-        userProfile={profile}
-        preFilterByUserProfile={false}
+
+      <PlayerDetailsDialog
+        isOpen={isEditOpen}
+        onOpenChange={setIsEditOpen}
+        playerToEdit={playerToEdit}
+        onPlayerCreatedOrUpdated={() => {
+          // This callback can trigger a data refresh if needed
+        }}
       />
-      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="sm:max-w-4xl max-h-[95vh] flex flex-col p-0">
-          <DialogHeader className="p-6 pb-4 border-b shrink-0">
-            <DialogTitle>{playerToEdit ? 'Edit Player' : 'Create New Player'}</DialogTitle>
-            <DialogDescription>
-              {playerToEdit ? 'Modify the player\'s information below.' : 'Enter the details for the new player.'}
-            </DialogDescription>
-          </DialogHeader>
-          
-          <ScrollArea className="flex-1 overflow-y-auto">
-            <div className="p-6 space-y-6">
-              <Form {...form}>
-                <form id="edit-player-form" onSubmit={form.handleSubmit(onEditSubmit)} className="space-y-6">
-                  
-                  {/* Player Information Section */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold border-b pb-2">Player Information</h3>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <FormField control={form.control} name="firstName" render={({ field }) => ( 
-                        <FormItem>
-                          <FormLabel>First Name</FormLabel>
-                          <FormControl><Input {...field} /></FormControl>
-                          <FormMessage />
-                        </FormItem> 
-                      )}/>
-                      <FormField control={form.control} name="lastName" render={({ field }) => ( 
-                        <FormItem>
-                          <FormLabel>Last Name</FormLabel>
-                          <FormControl><Input {...field} /></FormControl>
-                          <FormMessage />
-                        </FormItem> 
-                      )}/>
-                      <FormField control={form.control} name="middleName" render={({ field }) => ( 
-                        <FormItem>
-                          <FormLabel>Middle Name (Optional)</FormLabel>
-                          <FormControl><Input {...field} /></FormControl>
-                          <FormMessage />
-                        </FormItem> 
-                      )}/>
-                    </div>
-                  </div>
-
-                  {/* School Information Section */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold border-b pb-2">School Information</h3>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <FormField control={form.control} name="district" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>District</FormLabel>
-                          <Select onValueChange={(v) => { 
-                            field.onChange(v); 
-                            setSchoolsForEditDistrict(getSchoolsForDistrict(v)); 
-                            form.setValue('school', ''); 
-                          }} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {dbDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                      
-                      <FormField control={form.control} name="school" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>School</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {schoolsForEditDistrict.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                    </div>
-
-                    {editDistrict === 'PHARR-SAN JUAN-ALAMO ISD' && (
-                      <FormField
-                        control={form.control}
-                        name="studentType"
-                        render={({ field }) => (
-                          <FormItem className="space-y-3">
-                            <FormLabel>Student Type</FormLabel>
-                            <FormControl>
-                              <RadioGroup 
-                                onValueChange={field.onChange} 
-                                value={field.value || 'independent'} 
-                                className="flex items-center space-x-4"
-                              >
-                                <FormItem className="flex items-center space-x-2 space-y-0">
-                                  <FormControl><RadioGroupItem value="independent" /></FormControl>
-                                  <FormLabel className="font-normal">Independent</FormLabel>
-                                </FormItem>
-                                <FormItem className="flex items-center space-x-2 space-y-0">
-                                  <FormControl><RadioGroupItem value="gt" /></FormControl>
-                                  <FormLabel className="font-normal">GT (Gifted & Talented)</FormLabel>
-                                </FormItem>
-                              </RadioGroup>
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    )}
-                  </div>
-
-                  {/* Chess Information Section */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold border-b pb-2">Chess Information</h3>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <FormField control={form.control} name="uscfId" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>USCF ID</FormLabel>
-                          <FormControl><Input {...field} /></FormControl>
-                          <FormDescription>Enter USCF ID number or "NEW" for new players.</FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                      
-                      <FormField control={form.control} name="regularRating" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Rating</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="text" 
-                              placeholder="e.g., 1500 or UNR" 
-                              value={field.value?.toString() || ''} 
-                              onChange={(e) => { 
-                                const value = e.target.value; 
-                                if (value === '' || value.toUpperCase() === 'UNR') { 
-                                  field.onChange(undefined); 
-                                } else { 
-                                  field.onChange(value); 
-                                } 
-                              }} 
-                            />
-                          </FormControl>
-                          <FormDescription>Enter rating or UNR.</FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <FormField control={form.control} name="dob" render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Date of Birth</FormLabel>
-                            <FormControl><DateInput value={field.value} onChange={field.onChange} /></FormControl>
-                            <FormMessage />
-                        </FormItem>
-                      )} />
-                      <FormField control={form.control} name="uscfExpiration" render={({ field }) => (
-                          <FormItem>
-                              <FormLabel>USCF Expiration</FormLabel>
-                              <FormControl><DateInput value={field.value} onChange={field.onChange} /></FormControl>
-                              <FormMessage />
-                          </FormItem>
-                      )} />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <FormField control={form.control} name="grade" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Grade</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger><SelectValue placeholder="Select grade" /></SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {grades.map(grade => <SelectItem key={grade} value={grade}>{grade}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                      
-                      <FormField control={form.control} name="section" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Section</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger><SelectValue placeholder="Select section" /></SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {sections.map(section => <SelectItem key={section} value={section}>{section}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                    </div>
-                  </div>
-                  
-                  {/* Contact Information Section */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold border-b pb-2">Contact Information</h3>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <FormField control={form.control} name="email" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email</FormLabel>
-                          <FormControl><Input type="email" {...field} /></FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                      
-                      <FormField control={form.control} name="zipCode" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Zip Code</FormLabel>
-                          <FormControl><Input {...field} /></FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                    </div>
-
-                    <FormField control={form.control} name="state" render={({ field }) => (
-                      <FormItem>
-                          <FormLabel>State (Optional, defaults to TX)</FormLabel>
-                          <FormControl><Input {...field} /></FormControl>
-                          <FormMessage />
-                      </FormItem>
-                    )} />
-                  </div>
-
-                  <Separator className="my-6" />
-
-                  {/* Change History Section */}
-                  <ChangeHistorySection player={playerToEdit} />
-
-                </form>
-              </Form>
-            </div>
-          </ScrollArea>
-
-          {/* Footer with action buttons */}
-          <div className="p-6 pt-4 border-t bg-muted/30 shrink-0">
-            <div className="flex justify-between">
-              {playerToEdit ? (
-                <Button 
-                  type="button" 
-                  variant="destructive" 
-                  onClick={() => {
-                    handleDeletePlayer(playerToEdit);
-                    setIsEditOpen(false);
-                  }}
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete Player
-                </Button>
-              ) : (
-                <div></div>
-              )}
-              
-              <div className="flex gap-3">
-                <Button type="button" variant="ghost" onClick={() => setIsEditOpen(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" form="edit-player-form">
-                  {playerToEdit ? 'Save Changes' : 'Create Player'}
-                </Button>
-              </div>
-            </div>
-          </div>
-          
-        </DialogContent>
-      </Dialog>
 
       <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
         <AlertDialogContent>
@@ -966,7 +461,7 @@ function DistrictRostersPageContent() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </AppLayout>
+    </>
   );
 }
 
