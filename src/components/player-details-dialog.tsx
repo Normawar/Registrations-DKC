@@ -18,6 +18,7 @@ import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { useToast } from '@/hooks/use-toast';
 import { History, Trash2 } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
+import { sanitizePlayerForFirebase } from '@/lib/utils/sanitize-player';
 
 // Reusable DateInput component for MM/DD/YYYY format
 const DateInput = React.forwardRef<HTMLInputElement, {
@@ -201,14 +202,15 @@ export function PlayerDetailsDialog({ isOpen, onOpenChange, playerToEdit, onPlay
   useEffect(() => {
     if (isOpen) {
       if (playerToEdit) {
+        const sanitizedPlayer = sanitizePlayerForFirebase(playerToEdit);
         form.reset({
-          ...playerToEdit,
-          dob: playerToEdit.dob ? new Date(playerToEdit.dob) : undefined,
-          uscfExpiration: playerToEdit.uscfExpiration ? new Date(playerToEdit.uscfExpiration) : undefined,
-          state: playerToEdit.state || 'TX',
+          ...sanitizedPlayer,
+          dob: sanitizedPlayer.dob ? new Date(sanitizedPlayer.dob) : undefined,
+          uscfExpiration: sanitizedPlayer.uscfExpiration ? new Date(sanitizedPlayer.uscfExpiration) : undefined,
+          state: sanitizedPlayer.state || 'TX',
         });
-        if (playerToEdit.district) {
-          setSchoolsForEditDistrict(getSchoolsForDistrict(playerToEdit.district));
+        if (sanitizedPlayer.district) {
+          setSchoolsForEditDistrict(getSchoolsForDistrict(sanitizedPlayer.district));
         }
       } else {
         form.reset({
@@ -232,13 +234,18 @@ export function PlayerDetailsDialog({ isOpen, onOpenChange, playerToEdit, onPlay
       return;
     }
     
+    const playerToSave = sanitizePlayerForFirebase({
+      ...playerToEdit,
+      ...values,
+      dob: values.dob.toISOString(),
+      uscfExpiration: values.uscfExpiration?.toISOString(),
+    }) as MasterPlayer;
+    
     if (playerToEdit?.id) {
-      const updatedPlayer: MasterPlayer = { ...playerToEdit, ...values, dob: values.dob?.toISOString(), uscfExpiration: values.uscfExpiration?.toISOString() };
-      await updatePlayer(updatedPlayer, profile);
+      await updatePlayer(playerToSave, profile);
       toast({ title: "Player Updated" });
     } else {
-      const newPlayer: MasterPlayer = { ...values, id: values.id!, events: 0, eventIds: [], dob: values.dob.toISOString(), uscfExpiration: values.uscfExpiration?.toISOString() } as MasterPlayer;
-      await addPlayer(newPlayer, profile);
+      await addPlayer(playerToSave, profile);
       toast({ title: "Player Created" });
     }
     onPlayerCreatedOrUpdated();
@@ -255,7 +262,7 @@ export function PlayerDetailsDialog({ isOpen, onOpenChange, playerToEdit, onPlay
     }
 
     if (onAddToRoster) {
-        const player = { ...playerToEdit, ...result.data } as MasterPlayer;
+        const player = sanitizePlayerForFirebase({ ...playerToEdit, ...result.data }) as MasterPlayer;
         onAddToRoster(player);
     }
     onOpenChange(false);

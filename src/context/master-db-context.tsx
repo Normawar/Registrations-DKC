@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { type School } from '@/lib/data/school-data';
 import { generateTeamCode } from '@/lib/school-utils';
 import type { SearchCriteria, SearchResult } from '@/lib/data/search-types';
+import { sanitizePlayerForFirebase } from '@/lib/utils/sanitize-player';
 
 
 // --- Types ---
@@ -65,29 +66,6 @@ interface MasterDbContextType {
 // --- Context Definition ---
 
 const MasterDbContext = createContext<MasterDbContextType | undefined>(undefined);
-
-// Helper function to clean undefined values for Firebase
-const removeUndefined = (obj: any): any => {
-    if (obj === null || obj === undefined) {
-      return null;
-    }
-    
-    if (Array.isArray(obj)) {
-      return obj.map(removeUndefined);
-    }
-    
-    if (typeof obj === 'object') {
-      const cleaned: any = {};
-      Object.keys(obj).forEach(key => {
-        if (obj[key] !== undefined) {
-          cleaned[key] = removeUndefined(obj[key]);
-        }
-      });
-      return cleaned;
-    }
-    
-    return obj;
-  };
 
 // Add this helper function for parsing CSV data
 const parseCSVData = (data: any[]): MasterPlayer[] => {
@@ -190,7 +168,7 @@ const parseCSVData = (data: any[]): MasterPlayer[] => {
       }
 
       // Ensure no undefined values made it through
-      const cleanedPlayerData = removeUndefined(playerData);
+      const cleanedPlayerData = sanitizePlayerForFirebase(playerData);
       
       newPlayers.push(cleanedPlayerData as MasterPlayer);
     } catch(e) {
@@ -356,8 +334,8 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
             dateUpdated: now,
             updatedBy: creatorName,
         };
-        const cleanedPlayer = removeUndefined(newPlayer);
-        const playerRef = doc(db, 'players', cleanedPlayer.id);
+        const cleanedPlayer = sanitizePlayerForFirebase(newPlayer);
+        const playerRef = doc(db, 'players', cleanedPlayer.id!);
         await setDoc(playerRef, cleanedPlayer, { merge: true });
         await loadDatabase();
     } catch (error) {
@@ -387,7 +365,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
 
         if (oldString !== newString) {
             let finalOldValue = oldValue;
-            if (oldValue === undefined || oldValue === null || oldValue === '') {
+             if (oldValue === undefined || oldValue === null || oldValue === '') {
                 finalOldValue = "not avail";
             }
             
@@ -395,6 +373,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
             if (newValue === undefined || newValue === null || newValue === '') {
                 finalNewValue = "deleted";
             }
+
 
             changedFields.push({
                 field: key,
@@ -427,7 +406,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
         return; // No changes
     }
     
-    const cleanedPlayer = removeUndefined(finalPlayer);
+    const cleanedPlayer = sanitizePlayerForFirebase(finalPlayer);
     await setDoc(doc(db, 'players', finalPlayer.id), cleanedPlayer, { merge: true });
     await loadDatabase(); // Refresh data
   };
