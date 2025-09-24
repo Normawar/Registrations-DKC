@@ -1,5 +1,4 @@
 
-// Updated src/app/roster/page.tsx
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
@@ -7,10 +6,10 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format, isValid, parse } from 'date-fns';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 
 import { AppLayout } from '@/components/app-layout';
-import { AuthGuard, OrganizerGuard } from '@/components/auth-guard';
+import { AuthGuard } from '@/components/auth-guard';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Search, PlusCircle, Trash2, Edit, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Check, FilePenLine, History, UserPlus, Download } from 'lucide-react';
+import { Search, PlusCircle, Trash2, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, FilePenLine, History, UserPlus, Download, Check } from 'lucide-react';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { CSVUploadComponent } from '@/components/csv-upload';
@@ -116,7 +115,6 @@ const DateInput = React.forwardRef<HTMLInputElement, {
       onChange?.(parsedDate);
       setDisplayValue(format(parsedDate, 'MM/dd/yyyy'));
     } else {
-      // Revert to last valid value or empty
       setDisplayValue(value && isValid(value) ? format(value, 'MM/dd/yyyy') : '');
     }
   };
@@ -128,7 +126,7 @@ const DateInput = React.forwardRef<HTMLInputElement, {
   return (
     <Input
       ref={ref}
-      type="text" // Use text input to control formatting
+      type="text"
       value={displayValue}
       onChange={handleChange}
       onBlur={handleBlur}
@@ -221,7 +219,7 @@ const ChangeHistorySection = ({ player }: { player: MasterPlayer | null }) => {
             )}
         </div>
     );
-  };
+};
 
 
 function DistrictRostersPageContent() {
@@ -675,117 +673,120 @@ function DistrictRostersPageContent() {
               {playerToEdit ? 'Modify the player\'s information below.' : 'Enter the details for the new player.'}
             </DialogDescription>
           </DialogHeader>
-          
-          <ScrollArea className="flex-1 overflow-y-auto">
-            <div className='p-6'>
-              <Form {...form}>
-                <form id="edit-player-form-user" onSubmit={form.handleSubmit(onEditSubmit)} className="space-y-6">
-                  
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold border-b pb-2">Player Information</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <FormField control={form.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )}/>
-                      <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )}/>
-                      <FormField control={form.control} name="middleName" render={({ field }) => ( <FormItem><FormLabel>Middle Name (Optional)</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )}/>
-                    </div>
-                  </div>
+          <Tabs defaultValue="details" className="w-full h-full flex flex-col">
+              <TabsList className="grid w-full grid-cols-2 mt-4 px-6">
+                <TabsTrigger value="details">Player Details</TabsTrigger>
+                <TabsTrigger value="history">Record Information</TabsTrigger>
+              </TabsList>
+              <ScrollArea className="flex-1 overflow-y-auto">
+                <TabsContent value="details" className="mt-0">
+                  <div className='p-6'>
+                    <Form {...form}>
+                      <form id="edit-player-form-user" onSubmit={form.handleSubmit(onEditSubmit)} className="space-y-6">
+                        <div className="space-y-4">
+                            <h3 className="text-lg font-semibold border-b pb-2">Player Information</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <FormField control={form.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )}/>
+                            <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )}/>
+                            <FormField control={form.control} name="middleName" render={({ field }) => ( <FormItem><FormLabel>Middle Name (Optional)</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )}/>
+                            </div>
+                        </div>
 
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold border-b pb-2">School Information</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <FormField control={form.control} name="district" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>District</FormLabel>
-                          <Select onValueChange={(v) => { field.onChange(v); setSchoolsForEditDistrict(getSchoolsForDistrict(v)); form.setValue('school', ''); }} value={field.value}>
-                            <FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl>
-                            <SelectContent>{dbDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                      
-                      <FormField control={form.control} name="school" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>School</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl>
-                            <SelectContent>{schoolsForEditDistrict.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                    </div>
+                        <div className="space-y-4">
+                            <h3 className="text-lg font-semibold border-b pb-2">School Information</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField control={form.control} name="district" render={({ field }) => (
+                                <FormItem>
+                                <FormLabel>District</FormLabel>
+                                <Select onValueChange={(v) => { field.onChange(v); setSchoolsForEditDistrict(getSchoolsForDistrict(v)); form.setValue('school', ''); }} value={field.value}>
+                                    <FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl>
+                                    <SelectContent>{dbDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+                                </Select>
+                                <FormMessage />
+                                </FormItem>
+                            )} />
+                            
+                            <FormField control={form.control} name="school" render={({ field }) => (
+                                <FormItem>
+                                <FormLabel>School</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl>
+                                    <SelectContent>{schoolsForEditDistrict.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                                </Select>
+                                <FormMessage />
+                                </FormItem>
+                            )} />
+                            </div>
 
-                    {editDistrict === 'PHARR-SAN JUAN-ALAMO ISD' && (
-                      <FormField control={form.control} name="studentType" render={({ field }) => (
-                        <FormItem className="space-y-3">
-                          <FormLabel>Student Type</FormLabel>
-                          <FormControl><RadioGroup onValueChange={field.onChange} value={field.value || 'independent'} className="flex items-center space-x-4">
-                            <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="independent" /></FormControl><FormLabel className="font-normal">Independent</FormLabel></FormItem>
-                            <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="gt" /></FormControl><FormLabel className="font-normal">GT (Gifted & Talented)</FormLabel></FormItem>
-                          </RadioGroup></FormControl><FormMessage />
-                        </FormItem>
-                      )}/>
-                    )}
-                  </div>
+                            {editDistrict === 'PHARR-SAN JUAN-ALAMO ISD' && (
+                            <FormField control={form.control} name="studentType" render={({ field }) => (
+                                <FormItem className="space-y-3">
+                                <FormLabel>Student Type</FormLabel>
+                                <FormControl><RadioGroup onValueChange={field.onChange} value={field.value || 'independent'} className="flex items-center space-x-4">
+                                    <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="independent" /></FormControl><FormLabel className="font-normal">Independent</FormLabel></FormItem>
+                                    <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="gt" /></FormControl><FormLabel className="font-normal">GT (Gifted & Talented)</FormLabel></FormItem>
+                                </RadioGroup></FormControl><FormMessage />
+                                </FormItem>
+                            )}/>
+                            )}
+                        </div>
 
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold border-b pb-2">Chess Information</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <FormField control={form.control} name="uscfId" render={({ field }) => ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input {...field} /></FormControl><FormDescription>Enter USCF ID number or "NEW".</FormDescription><FormMessage /></FormItem> )} />
-                      <FormField control={form.control} name="regularRating" render={({ field }) => ( <FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="text" placeholder="e.g., 1500, UNR, or NEW" value={field.value?.toString() || ''} onChange={(e) => { const value = e.target.value; if (value === '' || value.toUpperCase() === 'UNR' || value.toUpperCase() === 'NEW') { field.onChange(undefined); } else { field.onChange(value); } }} /></FormControl><FormDescription>Enter rating, UNR, or NEW</FormDescription><FormMessage /></FormItem> )} />
-                    </div>
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                       <FormField control={form.control} name="dob" render={({ field }) => (<FormItem><FormLabel>Date of Birth</FormLabel><FormControl><DateInput value={field.value} onChange={field.onChange} placeholder="MM/DD/YYYY" /></FormControl><FormMessage /></FormItem>)} />
-                       <FormField control={form.control} name="uscfExpiration" render={({ field }) => (<FormItem><FormLabel>USCF Expiration</FormLabel><FormControl><DateInput value={field.value} onChange={field.onChange} placeholder="MM/DD/YYYY"/></FormControl><FormMessage /></FormItem>)} />
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <FormField control={form.control} name="grade" render={({ field }) => ( <FormItem><FormLabel>Grade</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select grade" /></SelectTrigger></FormControl><SelectContent position="item-aligned">{grades.map(grade => <SelectItem key={grade} value={grade}>{grade}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
-                      <FormField control={form.control} name="section" render={({ field }) => ( <FormItem><FormLabel>Section</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select section" /></SelectTrigger></FormControl><SelectContent position="item-aligned">{sections.map(section => <SelectItem key={section} value={section}>{section}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
-                    </div>
+                        <div className="space-y-4">
+                            <h3 className="text-lg font-semibold border-b pb-2">Chess Information</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField control={form.control} name="uscfId" render={({ field }) => ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input {...field} /></FormControl><FormDescription>Enter USCF ID number or "NEW".</FormDescription><FormMessage /></FormItem> )} />
+                            <FormField control={form.control} name="regularRating" render={({ field }) => ( <FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="text" placeholder="e.g., 1500, UNR, or NEW" value={field.value?.toString() || ''} onChange={(e) => { const value = e.target.value; if (value === '' || value.toUpperCase() === 'UNR' || value.toUpperCase() === 'NEW') { field.onChange(undefined); } else { field.onChange(value); } }} /></FormControl><FormDescription>Enter rating, UNR, or NEW</FormDescription><FormMessage /></FormItem> )} />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField control={form.control} name="dob" render={({ field }) => (<FormItem><FormLabel>Date of Birth</FormLabel><FormControl><DateInput value={field.value} onChange={field.onChange} placeholder="MM/DD/YYYY" /></FormControl><FormMessage /></FormItem>)} />
+                            <FormField control={form.control} name="uscfExpiration" render={({ field }) => (<FormItem><FormLabel>USCF Expiration</FormLabel><FormControl><DateInput value={field.value} onChange={field.onChange} placeholder="MM/DD/YYYY"/></FormControl><FormMessage /></FormItem>)} />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField control={form.control} name="grade" render={({ field }) => ( <FormItem><FormLabel>Grade</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select grade" /></SelectTrigger></FormControl><SelectContent position="item-aligned">{grades.map(grade => <SelectItem key={grade} value={grade}>{grade}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
+                            <FormField control={form.control} name="section" render={({ field }) => ( <FormItem><FormLabel>Section</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select section" /></SelectTrigger></FormControl><SelectContent position="item-aligned">{sections.map(section => <SelectItem key={section} value={section}>{section}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
+                            </div>
+                        </div>
+                        
+                        <div className="space-y-4">
+                            <h3 className="text-lg font-semibold border-b pb-2">Contact Information</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email *</FormLabel><FormControl><Input type="email" {...field} value={field.value || ''}/></FormControl><FormMessage /></FormItem>)} />
+                            <FormField control={form.control} name="zipCode" render={({ field }) => ( <FormItem><FormLabel>Zip Code *</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>)} />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField control={form.control} name="state" render={({ field }) => ( <FormItem><FormLabel>State</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>)} />
+                            </div>
+                        </div>
+                      </form>
+                    </Form>
                   </div>
-                  
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold border-b pb-2">Contact Information</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email *</FormLabel><FormControl><Input type="email" {...field} value={field.value || ''}/></FormControl><FormMessage /></FormItem>)} />
-                      <FormField control={form.control} name="zipCode" render={({ field }) => ( <FormItem><FormLabel>Zip Code *</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>)} />
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <FormField control={form.control} name="state" render={({ field }) => ( <FormItem><FormLabel>State</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>)} />
-                    </div>
-                  </div>
+                </TabsContent>
+                <TabsContent value="history" className="mt-0 flex-1 overflow-y-auto">
+                    <ChangeHistorySection player={playerToEdit} />
+                </TabsContent>
+              </ScrollArea>
 
-                  <Separator className="my-6" />
-                  <ChangeHistorySection player={playerToEdit} />
-                </form>
-              </Form>
-            </div>
-          </ScrollArea>
-          <div className="p-6 pt-4 border-t bg-muted/30 shrink-0">
-            <div className="flex justify-between">
-              {playerToEdit ? (
+          <DialogFooter className="p-6 pt-4 border-t bg-muted/30 shrink-0">
+            <div className="flex justify-between w-full">
+              {playerToEdit && profile?.role === 'organizer' ? (
                   <AlertDialog>
                       <AlertDialogTrigger asChild>
                           <Button type="button" variant="destructive">
                               <Trash2 className="h-4 w-4 mr-2" />
-                              {profile?.role === 'individual' ? 'Remove From My List' : 'Remove from Roster'}
+                              Permanently Delete Player
                           </Button>
                       </AlertDialogTrigger>
                       <AlertDialogContent>
                           <AlertDialogHeader>
-                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                               <AlertDialogDescription>
-                                  {profile?.role === 'individual'
-                                      ? `This will remove ${playerToEdit.firstName} from your student list. This action does not delete them from the master database.`
-                                      : `This will remove ${playerToEdit.firstName} from your school's roster by setting their school and district to 'Unassigned'.`
-                                  }
+                                  This will permanently delete {playerToEdit.firstName} {playerToEdit.lastName} from the entire master database. This action CANNOT be undone and will affect all users.
                               </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                               <AlertDialogCancel>Cancel</AlertDialogCancel>
                               <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={() => handleDeletePlayer(playerToEdit)}>
-                                  {profile?.role === 'individual' ? 'Remove Student' : 'Remove from Roster'}
+                                  Yes, Permanently Delete
                               </AlertDialogAction>
                           </AlertDialogFooter>
                       </AlertDialogContent>
@@ -799,35 +800,23 @@ function DistrictRostersPageContent() {
                 </Button>
               </div>
             </div>
-          </div>
+          </DialogFooter>
         </DialogContent>
     </Dialog>
     </>
   );
 }
 
-function RosterPage() {
-    const { profile, isProfileLoaded } = useSponsorProfile();
 
-    if (!isProfileLoaded) {
-        return (
-            <AppLayout>
-                <div>Loading...</div>
-            </AppLayout>
-        );
-    }
-    
+export default function RosterPage() {
     return (
-        <AuthGuard>
-            <AppLayout>
-                {profile?.role === 'organizer' ? (
+        <Suspense fallback={<div>Loading...</div>}>
+            <AuthGuard>
+                <AppLayout>
                     <DistrictRostersPageContent />
-                ) : (
-                    <DistrictRostersPageContent /> // Changed this line
-                )}
-            </AppLayout>
-        </AuthGuard>
+                </AppLayout>
+            </AuthGuard>
+        </Suspense>
     );
 }
 
-export default RosterPage;
