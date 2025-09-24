@@ -42,10 +42,9 @@ import { PlayerSearchDialog } from "@/components/PlayerSearchDialog";
 
 function IndividualDashboardContent() {
   const { events } = useEvents();
-  const { database: allPlayers, isDbLoaded, updatePlayer } = useMasterDb();
+  const { database: allPlayers, isDbLoaded, updatePlayer, refreshDatabase } = useMasterDb();
   const { profile, updateProfile, loading: profileLoading } = useSponsorProfile();
   const { toast } = useToast();
-  const router = useRouter();
   
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
@@ -105,22 +104,21 @@ function IndividualDashboardContent() {
   const handleStudentAdded = useCallback(async (newStudent: MasterPlayer) => {
     if (!profile?.email) return;
 
-    // This check is important. The player might already exist in the master DB,
-    // but not be on this parent's list yet.
     if (!parentStudentIds.includes(newStudent.id)) {
         const updatedIds = [...(profile.studentIds || []), newStudent.id];
         await updateProfile({ studentIds: updatedIds });
         toast({
             title: "Student Added",
-            description: `${newStudent.firstName} ${newStudent.lastName} has been added to your list.`
+            description: `${newStudent.firstName} ${newStudent.lastName} has been added to your student list.`
         });
     } else {
-        // If already on the list, it's just an update, which is handled by the PlayerDetailsDialog's save function.
         toast({
-            title: "Student Updated",
-            description: `${newStudent.firstName} ${newStudent.lastName}'s information has been saved.`
+            title: "Student Already on List",
+            description: `${newStudent.firstName} ${newStudent.lastName} is already on your list.`
         });
     }
+    
+    setIsEditOpen(false); // Close the details dialog
   }, [profile, parentStudentIds, toast, updateProfile]);
 
   const handleAddStudentClick = useCallback(() => {
@@ -141,7 +139,6 @@ function IndividualDashboardContent() {
         uscfId: player.uscf_id,
         firstName: nameParts[1] || '',
         lastName: nameParts[0] || '',
-        // ... (other fields with defaults)
         regularRating: player.rating_regular || undefined,
         uscfExpiration: player.expiration_date ? new Date(player.expiration_date).toISOString() : undefined,
         state: player.state || 'TX',
@@ -150,9 +147,12 @@ function IndividualDashboardContent() {
       };
     }
     
-    // Open the details dialog to review/complete info before adding
-    handleEditPlayer(playerToEdit);
-    setIsSearchOpen(false);
+    setIsSearchOpen(false); // Close search dialog
+    handleEditPlayer(playerToEdit); // Open details dialog
+  };
+  
+  const handlePlayerCreatedOrUpdated = () => {
+    refreshDatabase();
   };
 
   const isLoading = profileLoading || !isDbLoaded;
@@ -330,12 +330,13 @@ function IndividualDashboardContent() {
             onPlayerSelected={handlePlayerSelectedFromSearch}
             excludeIds={parentStudentIds}
             portalType="individual"
+            userProfile={profile}
           />
           <PlayerDetailsDialog
             isOpen={isEditOpen}
             onOpenChange={setIsEditOpen}
             playerToEdit={playerToEdit}
-            onPlayerCreatedOrUpdated={() => {}}
+            onPlayerCreatedOrUpdated={handlePlayerCreatedOrUpdated}
             onAddToRoster={handleStudentAdded}
           />
         </>
