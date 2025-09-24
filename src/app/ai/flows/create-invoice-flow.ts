@@ -83,35 +83,28 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
     const companyName = input.district ? `${input.schoolName} / ${input.district}` : input.schoolName;
     const finalTeamCode = input.teamCode || generateTeamCode({ schoolName: input.schoolName, district: input.district });
     const customerName = input.sponsorName || input.parentName || 'Customer';
-    const phoneNumber = (input.sponsorPhone?.trim() || input.schoolPhone?.trim()) || null;
-
+    
     let customerId: string;
     if (searchCustomersResponse.result.customers?.length) {
       const customer = searchCustomersResponse.result.customers[0];
       customerId = customer.id!;
-      const updatePayload: any = {
+      await customersApi.updateCustomer(customerId, {
         companyName,
         address: { addressLine1: input.schoolAddress },
-      };
-      if (phoneNumber && phoneNumber.length >= 10) {
-        updatePayload.phoneNumber = phoneNumber;
-      }
-      await customersApi.updateCustomer(customerId, updatePayload);
+        // NOTE: Phone number removed per project spec to avoid validation issues
+      });
     } else {
       const [firstName, ...lastNameParts] = customerName.split(' ');
-      const createPayload: any = {
+      const createCustomerResponse = await customersApi.createCustomer({
         idempotencyKey: randomUUID(),
-        givenName: firstName,
-        familyName: lastNameParts.join(' '),
+        givenName: firstName || 'Unknown',
+        familyName: lastNameParts.join(' ') || 'Unknown',
         emailAddress: input.sponsorEmail,
         companyName,
         address: { addressLine1: input.schoolAddress },
         note: `Team Code: ${finalTeamCode}`,
-      };
-      if (phoneNumber && phoneNumber.length >= 10) {
-        createPayload.phoneNumber = phoneNumber;
-      }
-      const createCustomerResponse = await customersApi.createCustomer(createPayload);
+        // NOTE: Phone number removed per project spec
+      });
       customerId = createCustomerResponse.result.customer!.id!;
     }
 
