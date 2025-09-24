@@ -37,10 +37,10 @@ function RosterPage() {
   const handlePlayerSelectedFromSearch = useCallback((player: any) => {
     console.log('🔍 handlePlayerSelectedFromSearch called - START');
     console.log('🔍 Current state - isSearchOpen:', isSearchOpen, 'isEditOpen:', isEditOpen);
-
+    
     const isMasterPlayer = 'uscfId' in player;
     let playerToProcess: MasterPlayer;
-
+  
     if (isMasterPlayer) {
       playerToProcess = player as MasterPlayer;
     } else {
@@ -81,19 +81,31 @@ function RosterPage() {
   const handleAddToRoster = async (player: MasterPlayer) => {
     console.log('📝 handleAddToRoster called');
     if (!profile) return;
-    const updatedPlayer = { 
-      ...player, 
-      school: profile.school, 
-      district: profile.district 
-    };
-    await updatePlayer(updatedPlayer, profile);
-    console.log('📝 Player updated, closing edit dialog');
-    setIsEditOpen(false);
-    console.log('📝 handleAddToRoster complete');
+    
+    try {
+      const updatedPlayer = { 
+        ...player, 
+        school: profile.school, 
+        district: profile.district 
+      };
+      await updatePlayer(updatedPlayer, profile);
+      console.log('📝 Player updated, closing edit dialog');
+      setIsEditOpen(false);
+      
+      // Refresh to show the updated roster
+      setTimeout(() => {
+        refreshDatabase();
+      }, 500);
+      
+      console.log('📝 handleAddToRoster complete');
+    } catch (error) {
+      console.error('Error in handleAddToRoster:', error);
+    }
   };
   
   const handlePlayerCreatedOrUpdated = useCallback(() => {
-    console.log('🔄 handlePlayerCreatedOrUpdated called - doing nothing');
+    console.log('🔄 handlePlayerCreatedOrUpdated called - SKIPPING refresh to prevent loop');
+    // DO NOT call refreshDatabase here
   }, []);
 
   const handleSearchPlayerClick = useCallback(() => {
