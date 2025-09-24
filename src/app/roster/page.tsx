@@ -1,4 +1,6 @@
 
+
+// src/app/roster/page.tsx
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
@@ -228,7 +230,7 @@ function DistrictRostersPageContent() {
   const { toast } = useToast();
   
   const [rosterType, setRosterType] = useState<'real' | 'test'>('real');
-  const [selectedDistrict, setSelectedDistrict] = useState('PHARR-SAN JUAN-ALAMO ISD');
+  const [selectedDistrict, setSelectedDistrict] = useState<string>('');
   const [selectedSchool, setSelectedSchool] = useState('all');
   const [playerType, setPlayerType] = useState('all');
   const [showOnlyWithPlayers, setShowOnlyWithPlayers] = useState(false);
@@ -250,6 +252,16 @@ function DistrictRostersPageContent() {
   });
   
   const editDistrict = form.watch('district');
+
+  useEffect(() => {
+    if (profile && !selectedDistrict) {
+      if (profile.role === 'organizer') {
+        setSelectedDistrict('PHARR-SAN JUAN-ALAMO ISD');
+      } else {
+        setSelectedDistrict(profile.district || 'all');
+      }
+    }
+  }, [profile, selectedDistrict]);
 
   useEffect(() => {
     if (editDistrict) {
@@ -277,9 +289,18 @@ function DistrictRostersPageContent() {
   const schoolRosters = useMemo(() => {
     if (!isDbLoaded) return [];
 
-    let districtPlayers = allPlayers.filter(p => p.district === selectedDistrict);
-
-    if (playerType !== 'all') {
+    let districtPlayers = allPlayers;
+    
+    if (profile?.role === 'sponsor' || profile?.role === 'individual') {
+        const playerIds = profile.studentIds || [];
+        districtPlayers = allPlayers.filter(p => playerIds.includes(p.id));
+    } else if (profile?.role === 'district_coordinator') {
+        districtPlayers = allPlayers.filter(p => p.district === profile.district);
+    } else if (selectedDistrict !== 'all') {
+        districtPlayers = allPlayers.filter(p => p.district === selectedDistrict);
+    }
+    
+    if (playerType !== 'all' && selectedDistrict === 'PHARR-SAN JUAN-ALAMO ISD') {
       districtPlayers = districtPlayers.filter(p => p.studentType === playerType);
     }
 
@@ -309,7 +330,7 @@ function DistrictRostersPageContent() {
       schoolName,
       players: groupedBySchool[schoolName] || [],
     }));
-  }, [allPlayers, isDbLoaded, selectedDistrict, selectedSchool, playerType, showOnlyWithPlayers, rosterType]);
+  }, [allPlayers, isDbLoaded, selectedDistrict, selectedSchool, playerType, showOnlyWithPlayers, rosterType, profile]);
 
   const districtPlayerCounts = useMemo(() => {
     const playersInDistrict = allPlayers.filter(p => p.district === selectedDistrict);
@@ -501,23 +522,27 @@ function DistrictRostersPageContent() {
           </CardHeader>
           <CardContent className="pt-6 space-y-4">
             <div className="flex flex-wrap items-end gap-4">
-              <div>
-                <Label>Roster Type</Label>
-                <RadioGroup value={rosterType} onValueChange={(v) => setRosterType(v as 'real' | 'test')} className="flex items-center space-x-2 pt-2">
-                  <div className="flex items-center space-x-2"><RadioGroupItem value="real" id="real" /><Label htmlFor="real">Real</Label></div>
-                  <div className="flex items-center space-x-2"><RadioGroupItem value="test" id="test" /><Label htmlFor="test">Test</Label></div>
-                </RadioGroup>
-              </div>
-              <div className="flex-1 min-w-[200px]">
-                <Label>Filter by District</Label>
-                <Select value={selectedDistrict} onValueChange={setSelectedDistrict}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{dbDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
+              {profile?.role === 'organizer' && (
+                  <>
+                    <div>
+                        <Label>Roster Type</Label>
+                        <RadioGroup value={rosterType} onValueChange={(v) => setRosterType(v as 'real' | 'test')} className="flex items-center space-x-2 pt-2">
+                        <div className="flex items-center space-x-2"><RadioGroupItem value="real" id="real" /><Label htmlFor="real">Real</Label></div>
+                        <div className="flex items-center space-x-2"><RadioGroupItem value="test" id="test" /><Label htmlFor="test">Test</Label></div>
+                        </RadioGroup>
+                    </div>
+                    <div className="flex-1 min-w-[200px]">
+                        <Label>Filter by District</Label>
+                        <Select value={selectedDistrict} onValueChange={setSelectedDistrict}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>{dbDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+                        </Select>
+                    </div>
+                  </>
+              )}
               <div className="flex-1 min-w-[200px]">
                 <Label>Filter by School</Label>
-                <Select value={selectedSchool} onValueChange={setSelectedSchool}>
+                <Select value={selectedSchool} onValueChange={setSelectedSchool} disabled={profile?.role === 'sponsor'}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Schools</SelectItem>
@@ -537,7 +562,7 @@ function DistrictRostersPageContent() {
               )}
             </div>
             <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t">
-                {selectedDistrict === 'PHARR-SAN JUAN-ALAMO ISD' && (
+                {selectedDistrict === 'PHARR-SAN JUAN-ALAMO ISD' && profile?.role === 'organizer' && (
                     <div className="flex gap-2">
                         <Button variant="outline" size="sm" onClick={() => exportRoster('gt')}><Download className="h-4 w-4 mr-2" />Export GT Roster</Button>
                         <Button variant="outline" size="sm" onClick={() => exportRoster('independent')}><Download className="h-4 w-4 mr-2" />Export Independent Roster</Button>
@@ -644,20 +669,8 @@ function DistrictRostersPageContent() {
             </Collapsible>
           ))}
         </div>
-        
-        <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-              <AlertDialogDescription>This action cannot be undone. This will permanently delete {playerToDelete?.firstName} {playerToDelete?.lastName}.</AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       </div>
+      
       <EnhancedPlayerSearchDialog
         isOpen={isSearchOpen}
         onOpenChange={setIsSearchOpen}
@@ -665,6 +678,7 @@ function DistrictRostersPageContent() {
         userProfile={profile}
         preFilterByUserProfile={false}
       />
+
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent className="sm:max-w-4xl max-h-[95vh] flex flex-col p-0">
           <DialogHeader className="p-6 pb-4 border-b shrink-0">
@@ -673,16 +687,10 @@ function DistrictRostersPageContent() {
               {playerToEdit ? 'Modify the player\'s information below.' : 'Enter the details for the new player.'}
             </DialogDescription>
           </DialogHeader>
-          <Tabs defaultValue="details" className="w-full h-full flex flex-col">
-              <TabsList className="grid w-full grid-cols-2 mt-4 px-6">
-                <TabsTrigger value="details">Player Details</TabsTrigger>
-                <TabsTrigger value="history">Record Information</TabsTrigger>
-              </TabsList>
-              <ScrollArea className="flex-1 overflow-y-auto">
-                <TabsContent value="details" className="mt-0">
-                  <div className='p-6'>
-                    <Form {...form}>
-                      <form id="edit-player-form-user" onSubmit={form.handleSubmit(onEditSubmit)} className="space-y-6">
+          <div className="grid md:grid-cols-2 gap-x-8 flex-1 overflow-y-auto">
+            <div className="p-6">
+                <Form {...form}>
+                    <form id="edit-player-form-user" onSubmit={form.handleSubmit(onEditSubmit)} className="space-y-6">
                         <div className="space-y-4">
                             <h3 className="text-lg font-semibold border-b pb-2">Player Information</h3>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -757,15 +765,13 @@ function DistrictRostersPageContent() {
                             <FormField control={form.control} name="state" render={({ field }) => ( <FormItem><FormLabel>State</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>)} />
                             </div>
                         </div>
-                      </form>
-                    </Form>
-                  </div>
-                </TabsContent>
-                <TabsContent value="history" className="mt-0 flex-1 overflow-y-auto">
-                    <ChangeHistorySection player={playerToEdit} />
-                </TabsContent>
-              </ScrollArea>
-
+                    </form>
+                </Form>
+            </div>
+            <div className="p-6 border-l">
+                <ChangeHistorySection player={playerToEdit} />
+            </div>
+          </div>
           <DialogFooter className="p-6 pt-4 border-t bg-muted/30 shrink-0">
             <div className="flex justify-between w-full">
               {playerToEdit && profile?.role === 'organizer' ? (
@@ -802,7 +808,20 @@ function DistrictRostersPageContent() {
             </div>
           </DialogFooter>
         </DialogContent>
-    </Dialog>
+      </Dialog>
+    
+      <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>This action cannot be undone. This will permanently delete {playerToDelete?.firstName} {playerToDelete?.lastName}.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
