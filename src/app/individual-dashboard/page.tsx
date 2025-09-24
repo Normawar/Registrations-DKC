@@ -104,31 +104,56 @@ function IndividualDashboardContent() {
 
   const handleStudentAdded = useCallback(async (newStudent: MasterPlayer) => {
     if (!profile?.email) return;
-    
-    // Save any updates made in the dialog to the master player record first
-    await updatePlayer(newStudent, profile);
 
-    const existingIds = profile.studentIds || [];
-
-    if (!existingIds.includes(newStudent.id)) {
-      const updatedIds = [...existingIds, newStudent.id];
-      await updateProfile({ studentIds: updatedIds }); // Ensure updateProfile is awaited
-      toast({
-        title: "Student Added",
-        description: `${newStudent.firstName} ${newStudent.lastName} has been added to your list.`
-      });
+    // This check is important. The player might already exist in the master DB,
+    // but not be on this parent's list yet.
+    if (!parentStudentIds.includes(newStudent.id)) {
+        const updatedIds = [...(profile.studentIds || []), newStudent.id];
+        await updateProfile({ studentIds: updatedIds });
+        toast({
+            title: "Student Added",
+            description: `${newStudent.firstName} ${newStudent.lastName} has been added to your list.`
+        });
     } else {
-       toast({
-        variant: 'destructive',
-        title: "Student Already Added",
-        description: `${newStudent.firstName} ${newStudent.lastName} is already on your list.`
-      });
+        // If already on the list, it's just an update, which is handled by the PlayerDetailsDialog's save function.
+        toast({
+            title: "Student Updated",
+            description: `${newStudent.firstName} ${newStudent.lastName}'s information has been saved.`
+        });
     }
-  }, [profile, toast, updateProfile, updatePlayer]);
+  }, [profile, parentStudentIds, toast, updateProfile]);
 
   const handleAddStudentClick = useCallback(() => {
     setIsSearchOpen(true);
   }, []);
+  
+  const handlePlayerSelectedFromSearch = (player: any) => {
+    const isMasterPlayer = 'uscfId' in player;
+    let playerToEdit: MasterPlayer;
+
+    if (isMasterPlayer) {
+      playerToEdit = player as MasterPlayer;
+    } else {
+      // Convert from USCFPlayer to MasterPlayer if needed
+      const nameParts = player.name ? player.name.split(', ') : ['Unknown', 'Player'];
+      playerToEdit = {
+        id: player.uscf_id,
+        uscfId: player.uscf_id,
+        firstName: nameParts[1] || '',
+        lastName: nameParts[0] || '',
+        // ... (other fields with defaults)
+        regularRating: player.rating_regular || undefined,
+        uscfExpiration: player.expiration_date ? new Date(player.expiration_date).toISOString() : undefined,
+        state: player.state || 'TX',
+        school: '', district: '', grade: '', section: '', email: '', zipCode: '',
+        events: 0, eventIds: [],
+      };
+    }
+    
+    // Open the details dialog to review/complete info before adding
+    handleEditPlayer(playerToEdit);
+    setIsSearchOpen(false);
+  };
 
   const isLoading = profileLoading || !isDbLoaded;
   const hasProfile = !!profile?.email;
@@ -302,7 +327,7 @@ function IndividualDashboardContent() {
           <PlayerSearchDialog 
             isOpen={isSearchOpen}
             onOpenChange={setIsSearchOpen}
-            onPlayerSelected={(player) => handleEditPlayer(player as MasterPlayer)}
+            onPlayerSelected={handlePlayerSelectedFromSearch}
             excludeIds={parentStudentIds}
             portalType="individual"
           />

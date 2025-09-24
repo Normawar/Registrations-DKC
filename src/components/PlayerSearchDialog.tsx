@@ -184,7 +184,7 @@ export function PlayerSearchDialog({
               <label className="block text-sm font-medium mb-1">First Name</label>
               <input type="text" value={searchCriteria.firstName || ''} onChange={(e) => updateField('firstName', e.target.value)} placeholder="John" className="w-full border rounded px-3 py-2" />
             </div>
-            <div>
+             <div>
               <label className="block text-sm font-medium mb-1">Middle Name</label>
               <input type="text" value={searchCriteria.middleName || ''} onChange={(e) => updateField('middleName', e.target.value)} placeholder="Michael" className="w-full border rounded px-3 py-2" />
             </div>
@@ -247,7 +247,7 @@ export function PlayerSearchDialog({
                     <tbody>{searchResult.players?.map((player: MasterPlayer) => (<tr key={player.id} className="hover:bg-gray-50">
                       <td className="border border-gray-300 px-4 py-2">{player.firstName} {player.middleName} {player.lastName}</td><td className="border border-gray-300 px-4 py-2">{player.uscfId}</td><td className="border border-gray-300 px-4 py-2">{player.state}</td><td className="border border-gray-300 px-4 py-2">{player.school}</td><td className="border border-gray-300 px-4 py-2">{player.regularRating}</td><td className="border border-gray-300 px-4 py-2">
                         <button onClick={() => handleSelectPlayer(player)} className="bg-green-500 text-white px-2 py-1 rounded text-xs">
-                            Select
+                          Select
                         </button>
                       </td>
                     </tr>))}</tbody>

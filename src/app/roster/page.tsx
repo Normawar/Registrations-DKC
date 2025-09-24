@@ -25,7 +25,7 @@ function RosterPage() {
   };
 
   const handleAddToRoster = async (player: MasterPlayer) => {
-    if (!profile) return;
+    if (!profile || profile.role !== 'sponsor') return;
     const updatedPlayer = { 
       ...player, 
       school: profile.school, 
