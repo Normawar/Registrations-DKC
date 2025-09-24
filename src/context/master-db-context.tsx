@@ -378,17 +378,29 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
 
     const changedFields: { field: string; oldValue: any; newValue: any }[] = [];
     (Object.keys(updatedPlayer) as Array<keyof MasterPlayer>).forEach(key => {
-        if (updatedPlayer[key] !== oldPlayer[key]) {
-            const oldValue = oldPlayer[key] === undefined ? "not avail" : oldPlayer[key];
-            const newValue = updatedPlayer[key] === undefined ? null : updatedPlayer[key];
-            
-            if (String(oldValue) !== String(newValue)) {
-                changedFields.push({
-                    field: key,
-                    oldValue: oldValue,
-                    newValue: newValue,
-                });
+        const oldValue = oldPlayer[key];
+        const newValue = updatedPlayer[key];
+
+        // Stringify to compare consistently, especially for dates
+        const oldString = String(oldValue);
+        const newString = String(newValue);
+
+        if (oldString !== newString) {
+            let finalOldValue = oldValue;
+            if (oldValue === undefined || oldValue === null || oldValue === '') {
+                finalOldValue = "not avail";
             }
+            
+            let finalNewValue = newValue;
+            if (newValue === undefined || newValue === null || newValue === '') {
+                finalNewValue = "deleted";
+            }
+
+            changedFields.push({
+                field: key,
+                oldValue: finalOldValue,
+                newValue: finalNewValue,
+            });
         }
     });
 
