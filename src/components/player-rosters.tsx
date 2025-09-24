@@ -24,7 +24,7 @@ import { format } from 'date-fns';
 
 type SortableColumnKey = 'lastName' | 'teamCode' | 'uscfId' | 'regularRating' | 'grade' | 'section';
 
-export function PlayerRosters({ onEditPlayer: handleEditPlayerProp, onAddToRoster: onAddToRosterProp }: { onEditPlayer: (player: MasterPlayer) => void, onAddToRoster?: (player: MasterPlayer) => void }) {
+export function PlayerRosters({ onEditPlayer: handleEditPlayerProp, onSearchPlayer }: { onEditPlayer: (player: MasterPlayer) => void, onSearchPlayer: () => void }) {
   const { isDbLoaded, dbDistricts, database: allPlayers, getSchoolsForDistrict, deletePlayer, addPlayer, updatePlayer } = useMasterDb();
   const { profile } = useSponsorProfile();
   const { toast } = useToast();
@@ -37,8 +37,6 @@ export function PlayerRosters({ onEditPlayer: handleEditPlayerProp, onAddToRoste
   const [playerToDelete, setPlayerToDelete] = useState<MasterPlayer | null>(null);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-
   useEffect(() => {
     if (profile && !selectedDistrict) {
       if (profile.role === 'organizer') {
@@ -154,49 +152,6 @@ export function PlayerRosters({ onEditPlayer: handleEditPlayerProp, onAddToRoste
     setPlayerToDelete(null);
   };
   
-  const handleAddToRoster = async (player: MasterPlayer) => {
-    if (!profile) return;
-    
-    // Close the search dialog first
-    setIsSearchOpen(false);
-    
-    if (onAddToRosterProp) {
-        onAddToRosterProp(player);
-    } else if (profile.role === 'sponsor' || profile.isDistrictCoordinator) {
-      const updatedPlayer = { 
-        ...player, 
-        school: profile.school, 
-        district: profile.district 
-      };
-      await updatePlayer(updatedPlayer, profile);
-      toast({ title: "Player Added", description: `${player.firstName} ${player.lastName} has been added to your roster.` });
-    }
-  };
-
-  const handlePlayerSelectedFromSearch = (player: any) => {
-      const isMasterPlayer = 'uscfId' in player;
-      let playerToEdit: MasterPlayer;
-
-      if(isMasterPlayer) {
-          playerToEdit = player as MasterPlayer;
-      } else {
-          const nameParts = player.name ? player.name.split(', ') : ['Unknown', 'Player'];
-          playerToEdit = {
-            id: player.uscf_id,
-            uscfId: player.uscf_id,
-            firstName: nameParts[1] || '',
-            lastName: nameParts[0] || '',
-            middleName: nameParts.length > 2 ? nameParts[2] : '',
-            regularRating: player.rating_regular || undefined,
-            uscfExpiration: player.expiration_date ? new Date(player.expiration_date).toISOString() : undefined,
-            state: player.state || 'TX',
-            school: '', district: '', grade: '', section: '', email: '', zipCode: '',
-            events: 0, eventIds: [],
-          };
-      }
-      handleEditPlayerProp(playerToEdit);
-  };
-
   return (
     <>
       <div className="space-y-6">
@@ -212,7 +167,7 @@ export function PlayerRosters({ onEditPlayer: handleEditPlayerProp, onAddToRoste
             <div className="flex justify-between items-center">
               <CardTitle>Roster Management</CardTitle>
               <div className="flex gap-2">
-                <Button onClick={() => setIsSearchOpen(true)}><Search className="mr-2 h-4 w-4"/> Search & Add</Button>
+                <Button onClick={onSearchPlayer}><Search className="mr-2 h-4 w-4"/> Search & Add</Button>
                 <Button onClick={handleCreateNewPlayer}><PlusCircle className="mr-2 h-4 w-4"/> Create New Player</Button>
               </div>
             </div>
@@ -292,14 +247,6 @@ export function PlayerRosters({ onEditPlayer: handleEditPlayerProp, onAddToRoste
           ))}
         </div>
       </div>
-
-      <PlayerSearchDialog
-        isOpen={isSearchOpen}
-        onOpenChange={setIsSearchOpen}
-        onPlayerSelected={handlePlayerSelectedFromSearch}
-        onAddToRoster={handleAddToRoster}
-        portalType={profile?.role || 'individual'}
-      />
 
       <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
         <AlertDialogContent>

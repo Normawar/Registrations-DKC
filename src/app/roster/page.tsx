@@ -36,10 +36,11 @@ function RosterPage() {
   
   const handlePlayerSelectedFromSearch = useCallback((player: any) => {
     console.log('🔍 handlePlayerSelectedFromSearch called - START');
-    
+    console.log('🔍 Current state - isSearchOpen:', isSearchOpen, 'isEditOpen:', isEditOpen);
+
     const isMasterPlayer = 'uscfId' in player;
     let playerToProcess: MasterPlayer;
-  
+
     if (isMasterPlayer) {
       playerToProcess = player as MasterPlayer;
     } else {
@@ -92,8 +93,12 @@ function RosterPage() {
   };
   
   const handlePlayerCreatedOrUpdated = useCallback(() => {
-    console.log('🔄 handlePlayerCreatedOrUpdated called - SKIPPING refresh to prevent loop');
-    // DO NOT call refreshDatabase here
+    console.log('🔄 handlePlayerCreatedOrUpdated called - doing nothing');
+  }, []);
+
+  const handleSearchPlayerClick = useCallback(() => {
+    console.log('🔍 Search button clicked - opening search dialog');
+    setIsSearchOpen(true);
   }, []);
 
   return (
@@ -102,7 +107,7 @@ function RosterPage() {
         <AppLayout>
           <PlayerRosters 
             onEditPlayer={handleEditPlayer} 
-            onSearchPlayer={() => setIsSearchOpen(true)}
+            onSearchPlayer={handleSearchPlayerClick}
           />
           <PlayerDetailsDialog
             isOpen={isEditOpen}
