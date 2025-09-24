@@ -4,6 +4,7 @@
  * @fileOverview Orchestrates the creation of two separate invoices for PSJA district registrations.
  * One invoice is for GT (Gifted & Talented) players, sent to the GT Coordinator.
  * The other is for Independent/Regular players, sent to the Bookkeeper.
+ * This has been converted from a Genkit flow to a standard Server Action to avoid unnecessary AI SDK initialization.
  */
 
 import { createInvoice, type CreateInvoiceInput } from './create-invoice-flow';
@@ -35,9 +36,13 @@ export async function createPsjaSplitInvoice(
         waiveLateFee: true, // Always waive late fee on the GT invoice itself
       }));
 
+      const sponsorName = input.sponsorName || 'PSJA GT Coordinator';
+      const gtCoordinatorEmail = input.gtCoordinatorEmail || input.sponsorEmail;
+      
       gtInvoice = await createInvoice({
-        sponsorName: input.sponsorName,
-        sponsorEmail: input.gtCoordinatorEmail || input.sponsorEmail,
+        sponsorName: sponsorName,
+        parentName: sponsorName,
+        sponsorEmail: gtCoordinatorEmail,
         sponsorPhone: input.schoolPhone,
         bookkeeperEmail: input.gtCoordinatorEmail,
         schoolName: input.schoolName,
@@ -50,6 +55,7 @@ export async function createPsjaSplitInvoice(
         uscfFee: input.uscfFee,
         players: gtPlayersForInvoice,
         description: `GT students only. USCF memberships covered under district bulk plan. Late fees billed separately to school.`,
+        revisionMessage: input.revisionMessage
       });
     }
 
@@ -76,6 +82,7 @@ export async function createPsjaSplitInvoice(
 
       independentInvoice = await createInvoice({
         sponsorName: input.sponsorName,
+        parentName: input.sponsorName,
         sponsorEmail: input.sponsorEmail,
         sponsorPhone: input.schoolPhone,
         bookkeeperEmail: input.bookkeeperEmail,
@@ -91,6 +98,7 @@ export async function createPsjaSplitInvoice(
         description: gtLateFeePlayers.length > 0 
           ? `Invoice for independent students and all applicable late fees (including for ${gtLateFeePlayers.length} GT program students).`
           : `Invoice for independent students only.`,
+        revisionMessage: input.revisionMessage,
       });
     }
 
