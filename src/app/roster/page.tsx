@@ -4,12 +4,11 @@
 import { Suspense, useState } from 'react';
 import { AuthGuard } from '@/components/auth-guard';
 import { AppLayout } from '@/components/app-layout';
-import { PlayerRosters } from '@/components/player-rosters'; // Import the new global component
+import { PlayerRosters } from '@/components/player-rosters';
 import { PlayerDetailsDialog } from '@/components/player-details-dialog';
 import { type MasterPlayer } from '@/lib/data/full-master-player-data';
 
 function RosterPage() {
-  // Hoist state here to manage dialogs from the page level
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [playerToEdit, setPlayerToEdit] = useState<MasterPlayer | null>(null);
 
@@ -22,7 +21,6 @@ function RosterPage() {
     // This could trigger a refresh if needed
   };
 
-  // This function was missing, causing the error.
   const handlePlayerSelected = (player: any) => {
       const isMasterPlayer = 'uscfId' in player;
       const nameParts = player.name ? player.name.split(', ') : ['Unknown', 'Player'];
@@ -47,7 +45,6 @@ function RosterPage() {
       setPlayerToEdit(playerToEditObj);
       setIsEditOpen(true);
   };
-
 
   return (
     <Suspense fallback={<div>Loading...</div>}>

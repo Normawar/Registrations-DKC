@@ -2,10 +2,6 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, Suspense } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { format, isValid, parse } from 'date-fns';
 import { useSearchParams, useRouter } from 'next/navigation';
 
 import { AppLayout } from '@/components/app-layout';
@@ -121,7 +117,7 @@ function PlayersPageContent() {
         <PlayerSearchDialog
           isOpen={isSearchOpen}
           onOpenChange={setIsSearchOpen}
-          onSelectPlayer={handlePlayerSelected}
+          onPlayerSelected={handlePlayerSelected}
           portalType="organizer"
         />
 

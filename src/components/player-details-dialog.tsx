@@ -206,7 +206,7 @@ export function PlayerDetailsDialog({ isOpen, onOpenChange, playerToEdit, onPlay
       return;
     }
     
-    if (playerToEdit) {
+    if (playerToEdit && playerToEdit.id) {
       const updatedPlayer: MasterPlayer = { ...playerToEdit, ...values, dob: values.dob?.toISOString(), uscfExpiration: values.uscfExpiration?.toISOString() };
       await updatePlayer(updatedPlayer, profile);
       toast({ title: "Player Updated" });
@@ -232,8 +232,8 @@ export function PlayerDetailsDialog({ isOpen, onOpenChange, playerToEdit, onPlay
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-4xl max-h-[95vh] flex flex-col p-0">
         <DialogHeader className="p-6 pb-4 border-b shrink-0">
-          <DialogTitle>{playerToEdit ? `Player Details: ${playerToEdit.firstName} ${playerToEdit.lastName}` : 'Create New Player'}</DialogTitle>
-          <DialogDescription>{playerToEdit ? 'Modify the player\'s information below.' : 'Enter the details for the new player.'}</DialogDescription>
+          <DialogTitle>{playerToEdit?.id ? `Player Details: ${playerToEdit.firstName} ${playerToEdit.lastName}` : 'Create New Player'}</DialogTitle>
+          <DialogDescription>{playerToEdit?.id ? 'Modify the player\'s information below.' : 'Enter the details for the new player.'}</DialogDescription>
         </DialogHeader>
         <ScrollArea className="flex-1 overflow-y-auto">
           <div className="p-6 space-y-8">
@@ -246,10 +246,10 @@ export function PlayerDetailsDialog({ isOpen, onOpenChange, playerToEdit, onPlay
                     <FormField control={form.control} name="lastName" render={({ field }) => (<FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
                     <FormField control={form.control} name="middleName" render={({ field }) => (<FormItem><FormLabel>Middle Name (Optional)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField control={form.control} name="dob" render={({ field }) => (<FormItem><FormLabel>Date of Birth</FormLabel><FormControl><DateInput value={field.value} onChange={field.onChange} /></FormControl><FormMessage /></FormItem>)} />
-                    <FormField control={form.control} name="email" render={({ field }) => (<FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                  </div>
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField control={form.control} name="dob" render={({ field }) => (<FormItem><FormLabel>Date of Birth</FormLabel><FormControl><DateInput value={field.value} onChange={field.onChange} /></FormControl><FormMessage /></FormItem>)} />
+                      <FormField control={form.control} name="email" render={({ field }) => (<FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                   </div>
                 </div>
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold border-b pb-2">School Information</h3>
@@ -272,10 +272,10 @@ export function PlayerDetailsDialog({ isOpen, onOpenChange, playerToEdit, onPlay
                   <FormField control={form.control} name="section" render={({ field }) => (<FormItem><FormLabel>Section</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select section" /></SelectTrigger></FormControl><SelectContent>{sections.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
                 </div>
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold border-b pb-2">Contact Information (Optional)</h3>
+                  <h3 className="text-lg font-semibold border-b pb-2">Contact Information</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField control={form.control} name="zipCode" render={({ field }) => (<FormItem><FormLabel>Zip Code</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
-                    <FormField control={form.control} name="state" render={({ field }) => (<FormItem><FormLabel>State (Defaults to TX)</FormLabel><Select onValueChange={field.onChange} defaultValue="TX" value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{states.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
+                    <FormField control={form.control} name="state" render={({ field }) => (<FormItem><FormLabel>State</FormLabel><Select onValueChange={field.onChange} defaultValue="TX" value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{states.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
                   </div>
                 </div>
                 <Separator className="my-8" />
@@ -286,10 +286,10 @@ export function PlayerDetailsDialog({ isOpen, onOpenChange, playerToEdit, onPlay
         </ScrollArea>
         <div className="p-6 pt-4 border-t bg-muted/30 shrink-0">
           <div className="flex justify-between">
-            {playerToEdit ? (<Button type="button" variant="destructive" onClick={handleDelete}><Trash2 className="h-4 w-4 mr-2" />Delete Player</Button>) : (<div></div>)}
+            {playerToEdit?.id ? (<Button type="button" variant="destructive" onClick={handleDelete}><Trash2 className="h-4 w-4 mr-2" />Delete Player</Button>) : (<div></div>)}
             <div className="flex gap-3">
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-              <Button type="submit" form="player-details-form">{playerToEdit ? 'Save Changes' : 'Add to Roster'}</Button>
+              <Button type="submit" form="player-details-form">{playerToEdit?.id ? 'Save Changes' : 'Create Player'}</Button>
             </div>
           </div>
         </div>
