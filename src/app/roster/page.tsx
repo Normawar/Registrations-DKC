@@ -13,6 +13,7 @@ import { PlayerSearchDialog } from '@/components/PlayerSearchDialog';
 function RosterPage() {
   console.log('🏠 RosterPage rendering...');
   
+  // Add this to track what's causing renders
   const renderCount = useRef(0);
   renderCount.current += 1;
   console.log('Render count:', renderCount.current);
@@ -23,6 +24,7 @@ function RosterPage() {
   const { updatePlayer, refreshDatabase } = useMasterDb();
   const { profile } = useSponsorProfile();
 
+  // Track if refreshDatabase is being called accidentally
   useEffect(() => {
     console.log('RosterPage useEffect - refreshDatabase reference changed');
   }, [refreshDatabase]);
@@ -34,17 +36,10 @@ function RosterPage() {
   
   const handlePlayerSelectedFromSearch = useCallback((player: any) => {
     console.log('🔍 handlePlayerSelectedFromSearch called - START');
-    console.log('🔍 Current state - isSearchOpen:', isSearchOpen, 'isEditOpen:', isEditOpen);
-    
-    // Prevent multiple rapid calls
-    if (!isSearchOpen) {
-      console.log('⚠️ Search not open, ignoring call');
-      return;
-    }
     
     const isMasterPlayer = 'uscfId' in player;
     let playerToProcess: MasterPlayer;
-
+  
     if (isMasterPlayer) {
       playerToProcess = player as MasterPlayer;
     } else {
@@ -80,8 +75,8 @@ function RosterPage() {
     setIsEditOpen(true);
     
     console.log('🔍 handlePlayerSelectedFromSearch - END');
-  }, [isSearchOpen, profile, isEditOpen, handleEditPlayer]);
-
+  }, [profile]);
+  
   const handleAddToRoster = async (player: MasterPlayer) => {
     console.log('📝 handleAddToRoster called');
     if (!profile) return;
@@ -97,7 +92,8 @@ function RosterPage() {
   };
   
   const handlePlayerCreatedOrUpdated = useCallback(() => {
-    console.log('🔄 handlePlayerCreatedOrUpdated called - doing nothing');
+    console.log('🔄 handlePlayerCreatedOrUpdated called - SKIPPING refresh to prevent loop');
+    // DO NOT call refreshDatabase here
   }, []);
 
   return (
