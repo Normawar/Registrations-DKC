@@ -14,7 +14,7 @@ import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { Search, PlusCircle, Trash2, Edit, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Check, FilePenLine, History, UserPlus, Download } from 'lucide-react';
@@ -771,14 +771,38 @@ function DistrictRostersPageContent() {
             <div className="p-6 pt-4 border-t bg-muted/30 shrink-0">
               <div className="flex justify-between">
                 {playerToEdit ? (
-                    <Button type="button" variant="destructive" onClick={() => handleDeletePlayer(playerToEdit)}>
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete Player
-                    </Button>
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button type="button" variant="destructive">
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                {profile?.role === 'individual' ? 'Remove From My List' : 'Remove from Roster'}
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    {profile?.role === 'individual'
+                                        ? `This will remove ${playerToEdit.firstName} from your student list. This action does not delete them from the master database.`
+                                        : `This will remove ${playerToEdit.firstName} from your school's roster by setting their school and district to 'Unassigned'.`
+                                    }
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={() => handleDeletePlayer(playerToEdit)}>
+                                    {profile?.role === 'individual' ? 'Remove Student' : 'Remove from Roster'}
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
                 ) : ( <div></div> )}
+                
                 <div className="flex gap-3">
                   <Button type="button" variant="ghost" onClick={() => setIsEditOpen(false)}>Cancel</Button>
-                  <Button type="submit" form="edit-player-form-user">{playerToEdit ? 'Save Changes' : 'Create Player'}</Button>
+                   <Button onClick={form.handleSubmit(onEditSubmit)}>
+                      {playerToEdit ? 'Save Changes' : 'Save and Add to Roster'}
+                  </Button>
                 </div>
               </div>
             </div>
@@ -788,387 +812,7 @@ function DistrictRostersPageContent() {
   );
 }
 
-function UserRosterPageContent() {
-    const { profile, updateProfile } = useSponsorProfile();
-    const { database: allPlayers, isDbLoaded, addPlayer, updatePlayer, deletePlayer, dbDistricts, getSchoolsForDistrict } = useMasterDb();
-    const [isEditOpen, setIsEditOpen] = useState(false);
-    const [isSearchOpen, setIsSearchOpen] = useState(false);
-    const [playerToEdit, setPlayerToEdit] = useState<MasterPlayer | null>(null);
-    const [playerToDelete, setPlayerToDelete] = useState<MasterPlayer | null>(null);
-    const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
-    const { toast } = useToast();
-    const [schoolsForEditDistrict, setSchoolsForEditDistrict] = useState<string[]>([]);
-    
-    const roster = useMemo(() => {
-        if (!profile || !isDbLoaded) return [];
-        if (profile.role === 'sponsor' || profile.role === 'district_coordinator') {
-            return allPlayers.filter(p => p.district === profile.district && p.school === profile.school);
-        }
-        if (profile.role === 'individual' && profile.studentIds) {
-             return allPlayers.filter(p => profile.studentIds?.includes(p.id));
-        }
-        return [];
-    }, [profile, allPlayers, isDbLoaded]);
-
-    const form = useForm<PlayerFormValues>({
-        resolver: zodResolver(playerFormSchema)
-    });
-    
-    const editDistrict = form.watch('district');
-
-    useEffect(() => {
-        if (editDistrict) {
-            setSchoolsForEditDistrict(getSchoolsForDistrict(editDistrict));
-        }
-    }, [editDistrict, getSchoolsForDistrict]);
-
-    useEffect(() => {
-        if (playerToEdit) {
-            form.reset({
-                ...playerToEdit,
-                dob: playerToEdit.dob ? new Date(playerToEdit.dob) : undefined,
-                uscfExpiration: playerToEdit.uscfExpiration ? new Date(playerToEdit.uscfExpiration) : undefined,
-            });
-             if (playerToEdit.district) {
-                setSchoolsForEditDistrict(getSchoolsForDistrict(playerToEdit.district));
-            }
-        }
-    }, [playerToEdit, form, getSchoolsForDistrict]);
-
-    const handleEditPlayer = (player: MasterPlayer) => {
-        setPlayerToEdit(player);
-        setIsEditOpen(true);
-    };
-
-    const handleCreateNewPlayer = () => {
-        setPlayerToEdit(null);
-        form.reset({
-            id: `temp_${Date.now()}`,
-            firstName: '',
-            lastName: '',
-            uscfId: 'NEW'
-        });
-        setIsEditOpen(true);
-    };
-
-    const handlePlayerSelectedFromSearch = (player: any) => {
-        handleEditPlayer(player);
-        setIsSearchOpen(false);
-    };
-    
-    const onEditSubmit = async (values: PlayerFormValues) => {
-      if (!profile) return;
-      
-      const isNewPlayer = !playerToEdit || !allPlayers.some(p => p.id === playerToEdit.id);
-      
-      let playerToSave: MasterPlayer;
-
-      if(isNewPlayer) {
-          playerToSave = {
-              ...values,
-              id: values.id || `temp_${Date.now()}`,
-              events: 0,
-              eventIds: [],
-               dob: values.dob?.toISOString(),
-              uscfExpiration: values.uscfExpiration?.toISOString()
-          } as MasterPlayer;
-          await addPlayer(playerToSave, profile);
-          toast({ title: 'Player Created' });
-      } else {
-          playerToSave = { ...playerToEdit!, ...values, dob: values.dob?.toISOString(), uscfExpiration: values.uscfExpiration?.toISOString() };
-          await updatePlayer(playerToSave, profile);
-          toast({ title: 'Player Updated' });
-      }
-      
-      setIsEditOpen(false);
-      setPlayerToEdit(null);
-    };
-
-    const handleSaveAndAddToRoster = async (values: PlayerFormValues) => {
-      if (!profile) return;
-      
-      const isNewPlayer = !playerToEdit || !allPlayers.some(p => p.id === playerToEdit.id);
-      
-      let playerToSave: MasterPlayer;
-
-      if(isNewPlayer) {
-          playerToSave = {
-              ...values,
-              id: values.id || `temp_${Date.now()}`,
-              events: 0,
-              eventIds: [],
-               dob: values.dob?.toISOString(),
-              uscfExpiration: values.uscfExpiration?.toISOString()
-          } as MasterPlayer;
-          await addPlayer(playerToSave, profile);
-          toast({ title: 'Player Created' });
-      } else {
-          playerToSave = { ...playerToEdit!, ...values, dob: values.dob?.toISOString(), uscfExpiration: values.uscfExpiration?.toISOString() };
-          await updatePlayer(playerToSave, profile);
-          toast({ title: 'Player Updated' });
-      }
-
-      if (profile.role === 'individual' && !roster.some(p => p.id === playerToSave.id)) {
-        const updatedStudentIds = [...(profile.studentIds || []), playerToSave.id];
-        await updateProfile({ studentIds: updatedStudentIds });
-        toast({ title: "Player Added to Your Roster" });
-      } else if(profile.role === 'sponsor' && !roster.some(p => p.id === playerToSave.id)) {
-          toast({ title: "Player Added to Roster" });
-      }
-
-
-      setIsEditOpen(false);
-    };
-
-    const handleDeletePlayer = async (player: MasterPlayer) => {
-        if (profile?.role === 'individual') {
-            setPlayerToDelete(player);
-            setIsDeleteAlertOpen(true);
-        } else if (profile?.role === 'sponsor') {
-            await updatePlayer({ ...player, school: 'Unassigned', district: 'Unassigned' }, profile);
-            toast({
-                title: 'Player Unassigned',
-                description: `${player.firstName} ${player.lastName} has been removed from your school's roster.`
-            });
-        }
-    };
-    
-    const confirmDeletePlayer = async () => {
-        if (playerToDelete && profile?.role === 'individual') {
-            const updatedStudentIds = profile.studentIds?.filter(id => id !== playerToDelete.id);
-            await updateProfile({ studentIds: updatedStudentIds });
-            toast({ title: 'Student Removed', description: `${playerToDelete.firstName} ${playerToDelete.lastName} has been removed from your list.` });
-        }
-        setIsDeleteAlertOpen(false);
-        setPlayerToDelete(null);
-    };
-
-    return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <div>
-                <h1 className="text-3xl font-bold font-headline">My Roster</h1>
-                <p className="text-muted-foreground">Manage your players and students.</p>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setIsSearchOpen(true)}><UserPlus className="mr-2 h-4 w-4"/> Add Player</Button>
-                <Button onClick={handleCreateNewPlayer}><UserPlus className="mr-2 h-4 w-4"/> Create New Player</Button>
-              </div>
-            </div>
-            <Card className="mt-4">
-                <CardHeader>
-                    <CardTitle>{profile?.role === 'individual' ? 'My Students' : 'School Roster'}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Name</TableHead>
-                                <TableHead>USCF ID</TableHead>
-                                <TableHead>Grade</TableHead>
-                                <TableHead>Actions</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {roster.length === 0 ? (
-                            <TableRow>
-                              <TableCell colSpan={4} className="text-center h-24">No players on this roster yet. Click "Add Player" to start.</TableCell>
-                            </TableRow>
-                          ) : (
-                            roster.map(player => (
-                                <TableRow key={player.id}>
-                                    <TableCell>{player.firstName} {player.lastName}</TableCell>
-                                    <TableCell>{player.uscfId}</TableCell>
-                                    <TableCell>{player.grade}</TableCell>
-                                    <TableCell>
-                                        <Button variant="ghost" size="sm" onClick={() => handleEditPlayer(player)}>
-                                            <Edit className="h-4 w-4" />
-                                        </Button>
-                                         <AlertDialog open={isDeleteAlertOpen && playerToDelete?.id === player.id} onOpenChange={(open) => {
-                                            if (!open) setPlayerToDelete(null);
-                                            setIsDeleteAlertOpen(open);
-                                        }}>
-                                            <AlertDialogTrigger asChild>
-                                                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setPlayerToDelete(player)}>
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
-                                            </AlertDialogTrigger>
-                                            <AlertDialogContent>
-                                                <AlertDialogHeader>
-                                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                                    <AlertDialogDescription>
-                                                        {profile?.role === 'individual'
-                                                            ? `This will remove ${player.firstName} ${player.lastName} from your student list.`
-                                                            : `This will remove ${player.firstName} ${player.lastName} from your school's roster by setting their school and district to 'Unassigned'.`
-                                                        }
-                                                    </AlertDialogDescription>
-                                                </AlertDialogHeader>
-                                                <AlertDialogFooter>
-                                                    <AlertDialogCancel onClick={() => setPlayerToDelete(null)}>Cancel</AlertDialogCancel>
-                                                    <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={confirmDeletePlayer}>
-                                                        {profile?.role === 'individual' ? 'Remove Student' : 'Remove from Roster'}
-                                                    </AlertDialogAction>
-                                                </AlertDialogFooter>
-                                            </AlertDialogContent>
-                                        </AlertDialog>
-                                    </TableCell>
-                                </TableRow>
-                            ))
-                          )}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
-            
-            <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-                 <DialogContent className="sm:max-w-4xl max-h-[95vh] flex flex-col p-0">
-                    <DialogHeader className="p-6 pb-4 border-b shrink-0">
-                        <DialogTitle>{playerToEdit ? 'Edit Player' : 'Create New Player'}</DialogTitle>
-                        <DialogDescription>
-                            {playerToEdit ? 'Modify the player\'s information below.' : 'Enter the details for the new player.'}
-                        </DialogDescription>
-                    </DialogHeader>
-                    
-                    <ScrollArea className="flex-1 overflow-y-auto">
-                      <div className="p-6 space-y-6">
-                        <Form {...form}>
-                          <form id="edit-player-form-user" onSubmit={form.handleSubmit(onEditSubmit)} className="space-y-6">
-                            
-                            <div className="space-y-4">
-                              <h3 className="text-lg font-semibold border-b pb-2">Player Information</h3>
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <FormField control={form.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )}/>
-                                <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )}/>
-                                <FormField control={form.control} name="middleName" render={({ field }) => ( <FormItem><FormLabel>Middle Name (Optional)</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )}/>
-                              </div>
-                            </div>
-
-                            <div className="space-y-4">
-                              <h3 className="text-lg font-semibold border-b pb-2">School Information</h3>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <FormField control={form.control} name="district" render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>District</FormLabel>
-                                    <Select onValueChange={(v) => { field.onChange(v); setSchoolsForEditDistrict(getSchoolsForDistrict(v)); form.setValue('school', ''); }} value={field.value}>
-                                      <FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl>
-                                      <SelectContent>{dbDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                  </FormItem>
-                                )} />
-                                
-                                <FormField control={form.control} name="school" render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>School</FormLabel>
-                                    <Select onValueChange={field.onChange} value={field.value}>
-                                      <FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl>
-                                      <SelectContent>{schoolsForEditDistrict.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                  </FormItem>
-                                )} />
-                              </div>
-
-                              {editDistrict === 'PHARR-SAN JUAN-ALAMO ISD' && (
-                                <FormField control={form.control} name="studentType" render={({ field }) => (
-                                  <FormItem className="space-y-3">
-                                    <FormLabel>Student Type</FormLabel>
-                                    <FormControl><RadioGroup onValueChange={field.onChange} value={field.value || 'independent'} className="flex items-center space-x-4">
-                                      <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="independent" /></FormControl><FormLabel className="font-normal">Independent</FormLabel></FormItem>
-                                      <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="gt" /></FormControl><FormLabel className="font-normal">GT (Gifted & Talented)</FormLabel></FormItem>
-                                    </RadioGroup></FormControl><FormMessage />
-                                  </FormItem>
-                                )}/>
-                              )}
-                            </div>
-
-                            <div className="space-y-4">
-                              <h3 className="text-lg font-semibold border-b pb-2">Chess Information</h3>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <FormField control={form.control} name="uscfId" render={({ field }) => ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input {...field} /></FormControl><FormDescription>Enter USCF ID number or "NEW".</FormDescription><FormMessage /></FormItem> )} />
-                                <FormField control={form.control} name="regularRating" render={({ field }) => ( <FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="text" placeholder="e.g., 1500, UNR, or NEW" value={field.value?.toString() || ''} onChange={(e) => { const value = e.target.value; if (value === '' || value.toUpperCase() === 'UNR' || value.toUpperCase() === 'NEW') { field.onChange(undefined); } else { field.onChange(value); } }} /></FormControl><FormDescription>Enter rating, UNR, or NEW</FormDescription><FormMessage /></FormItem> )} />
-                              </div>
-                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                 <FormField control={form.control} name="dob" render={({ field }) => (<FormItem><FormLabel>Date of Birth</FormLabel><FormControl><DateInput value={field.value} onChange={field.onChange} placeholder="MM/DD/YYYY" /></FormControl><FormMessage /></FormItem>)} />
-                                 <FormField control={form.control} name="uscfExpiration" render={({ field }) => (<FormItem><FormLabel>USCF Expiration</FormLabel><FormControl><DateInput value={field.value} onChange={field.onChange} placeholder="MM/DD/YYYY"/></FormControl><FormMessage /></FormItem>)} />
-                              </div>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <FormField control={form.control} name="grade" render={({ field }) => ( <FormItem><FormLabel>Grade</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select grade" /></SelectTrigger></FormControl><SelectContent position="item-aligned">{grades.map(grade => <SelectItem key={grade} value={grade}>{grade}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
-                                <FormField control={form.control} name="section" render={({ field }) => ( <FormItem><FormLabel>Section</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select section" /></SelectTrigger></FormControl><SelectContent position="item-aligned">{sections.map(section => <SelectItem key={section} value={section}>{section}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
-                              </div>
-                            </div>
-                            
-                            <div className="space-y-4">
-                              <h3 className="text-lg font-semibold border-b pb-2">Contact Information</h3>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email *</FormLabel><FormControl><Input type="email" {...field} value={field.value || ''}/></FormControl><FormMessage /></FormItem>)} />
-                                <FormField control={form.control} name="zipCode" render={({ field }) => ( <FormItem><FormLabel>Zip Code *</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>)} />
-                              </div>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <FormField control={form.control} name="state" render={({ field }) => ( <FormItem><FormLabel>State</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>)} />
-                              </div>
-                            </div>
-
-                            <Separator className="my-6" />
-                            <ChangeHistorySection player={playerToEdit} />
-                          </form>
-                        </Form>
-                      </div>
-                    </ScrollArea>
-
-                    <div className="p-6 pt-4 border-t bg-muted/30 shrink-0">
-                      <div className="flex justify-between">
-                        {playerToEdit ? (
-                            <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                    <Button type="button" variant="destructive">
-                                        <Trash2 className="h-4 w-4 mr-2" />
-                                        {profile?.role === 'individual' ? 'Remove From My List' : 'Remove from Roster'}
-                                    </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                            {profile?.role === 'individual'
-                                                ? `This will remove ${playerToEdit.firstName} from your student list. This action does not delete them from the master database.`
-                                                : `This will remove ${playerToEdit.firstName} from your school's roster by setting their school and district to 'Unassigned'.`
-                                            }
-                                        </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                        <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={() => handleDeletePlayer(playerToEdit)}>
-                                            {profile?.role === 'individual' ? 'Remove Student' : 'Remove from Roster'}
-                                        </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
-                        ) : ( <div></div> )}
-                        
-                        <div className="flex gap-3">
-                          <Button type="button" variant="ghost" onClick={() => setIsEditOpen(false)}>Cancel</Button>
-                           <Button onClick={form.handleSubmit(handleSaveAndAddToRoster)}>
-                              {roster.some(p => p.id === playerToEdit?.id) ? 'Save Changes' : 'Save and Add to Roster'}
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                </DialogContent>
-            </Dialog>
-
-            <EnhancedPlayerSearchDialog
-                isOpen={isSearchOpen}
-                onOpenChange={setIsSearchOpen}
-                onPlayerSelected={handlePlayerSelectedFromSearch}
-                userProfile={profile}
-                preFilterByUserProfile={true}
-            />
-        </div>
-    );
-}
-
-export default function RosterPage() {
+function RosterPage() {
     const { profile, isProfileLoaded } = useSponsorProfile();
 
     if (!isProfileLoaded) {
@@ -1191,3 +835,5 @@ export default function RosterPage() {
         </AuthGuard>
     );
 }
+
+export default RosterPage;
