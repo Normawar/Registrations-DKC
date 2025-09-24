@@ -292,7 +292,7 @@ function IndividualDashboardContent() {
           <PlayerSearchDialog 
             isOpen={isAddStudentDialogOpen}
             onOpenChange={setIsAddStudentDialogOpen}
-            onSelectPlayer={handleStudentAdded}
+            onPlayerSelected={handleStudentAdded}
             excludeIds={parentStudentIds}
             portalType="individual"
           />
