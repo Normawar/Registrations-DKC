@@ -16,8 +16,7 @@ import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { School, User, DollarSign, CheckCircle, Lock, AlertCircle, Clock } from "lucide-react";
 import { format, differenceInHours, isSameDay, startOfDay } from "date-fns";
 import { InvoiceDetailsDialog } from '@/components/invoice-details-dialog';
-import { createInvoice } from '@/ai/flows/create-invoice-flow';
-import { createPsjaSplitInvoice } from '@/ai/flows/create-psja-split-invoice-flow';
+import { createSponsorInvoice } from '@/app/ai/flows/create-sponsor-invoice-flow';
 import { generateTeamCode } from '@/lib/school-utils';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { Checkbox } from './ui/checkbox';
@@ -204,7 +203,8 @@ export function SponsorRegistrationDialog({
     
     const gtRegistrationFees = gtStudents.length * event.regularFee;
     const indRegistrationFees = independentStudents.length * event.regularFee;
-
+    const indUscfFees = independentStudents.filter(([_, details]) => details.uscfStatus !== 'current').length * uscfFee;
+  
     return {
       registrationFees: baseTotal,
       lateFees: lateFeeTotal,
@@ -212,7 +212,7 @@ export function SponsorRegistrationDialog({
       total: total,
       feeType: feeType,
       gtBreakdown: { registrationFees: gtRegistrationFees, lateFees: 0 },
-      schoolBreakdown: { registrationFees: indRegistrationFees, lateFees: lateFeeTotal, uscfFees: uscfTotal }
+      schoolBreakdown: { registrationFees: indRegistrationFees, lateFees: lateFeeTotal, uscfFees: indUscfFees }
     };
   };
 
@@ -235,45 +235,25 @@ export function SponsorRegistrationDialog({
   
     setIsSubmitting(true);
     
-    const isPsjaDistrict = profile.district === 'PHARR-SAN JUAN-ALAMO ISD';
-    const allSelectedPlayers = Object.entries(selectedStudents).map(([playerId, details]) => ({
-      player: rosterPlayers.find(p => p.id === playerId),
-      details
-    }));
-  
-    const hasGt = allSelectedPlayers.some(p => p.player?.studentType === 'gt');
-    const hasIndependent = allSelectedPlayers.some(p => p.player?.studentType !== 'gt');
-  
-    if (isPsjaDistrict && hasGt && hasIndependent) {
-      await handlePsjaSplitInvoice();
-    } else if (splitUscfFees) {
-      await handleSplitInvoices();
-    } else {
-      await handleStandardInvoice();
-    }
-  };
-
-  const handleStandardInvoice = async () => {
-    if (!profile || !event) return;
-
     const { fee: currentFee } = getFeeForEvent();
     const lateFeeAmount = currentFee - event.regularFee;
 
     const playersToInvoice = Object.entries(selectedStudents).map(([playerId, details]) => {
       const student = rosterPlayers.find(p => p.id === playerId);
+      if (!student) throw new Error('Selected student not found in roster');
       return {
-        playerName: `${student?.firstName} ${student?.lastName}`,
-        uscfId: student?.uscfId || '',
+        playerName: `${student.firstName} ${student.lastName}`,
+        uscfId: student.uscfId || 'NEW',
         baseRegistrationFee: event.regularFee,
         lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0,
         uscfAction: details.uscfStatus !== 'current',
-        isGtPlayer: student?.studentType === 'gt',
+        isGtPlayer: student.studentType === 'gt',
         section: details.section,
       };
     });
 
     try {
-      const result = await createInvoice({
+      const result = await createSponsorInvoice({
           sponsorName: `${profile.firstName} ${profile.lastName}`,
           parentName: `${profile.firstName} ${profile.lastName}`,
           sponsorEmail: profile.email || '',
@@ -291,162 +271,31 @@ export function SponsorRegistrationDialog({
           district: profile.district,
       });
 
-      await saveConfirmation(result.invoiceId, result, playersToInvoice, feeBreakdown.total);
+      const processAndSaveInvoice = async (invoiceResult: any, playersForThisInvoice: any[], totalForThisInvoice: number, type?: string) => {
+        if (!invoiceResult) return null;
+        await saveConfirmation(invoiceResult.invoiceId, invoiceResult, playersForThisInvoice, totalForThisInvoice, type);
+        return invoiceResult.invoiceId;
+      };
+      
+      const gtPlayers = playersToInvoice.filter(p => p.isGtPlayer);
+      const indPlayers = playersToInvoice.filter(p => !p.isGtPlayer);
+      
+      const gtInvoiceId = await processAndSaveInvoice(result.gtInvoice, gtPlayers, feeBreakdown.gtBreakdown.registrationFees, "GT");
+      const indInvoiceId = await processAndSaveInvoice(result.independentInvoice, indPlayers, feeBreakdown.schoolBreakdown.registrationFees + feeBreakdown.schoolBreakdown.lateFees + feeBreakdown.schoolBreakdown.uscfFees, "Independent");
+
+      setCreatedInvoiceId(indInvoiceId || gtInvoiceId);
+      setShowInvoiceModal(true);
+      
+      toast({ title: "Registration Successful", description: `Invoice(s) have been created for ${playersToInvoice.length} student(s).` });
+      resetState();
       
     } catch (error) {
-        handleInvoiceError(error, "Invoice Creation Failed");
+      handleInvoiceError(error, "Invoice Creation Failed");
     } finally {
         setIsSubmitting(false);
     }
   };
   
-  const handleSplitInvoices = async () => {
-    if (!profile || !event) return;
-  
-    // 1. Create invoice for registrations
-    const registrationPlayers = Object.entries(selectedStudents).map(([playerId, details]) => {
-      const student = rosterPlayers.find(p => p.id === playerId);
-      const { fee: currentFee } = getFeeForEvent();
-      const lateFeeAmount = currentFee - event.regularFee;
-      return {
-        playerName: `${student?.firstName} ${student?.lastName}`,
-        uscfId: student?.uscfId || '',
-        baseRegistrationFee: event.regularFee,
-        lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0,
-        uscfAction: false, // USCF fees handled separately
-        isGtPlayer: student?.studentType === 'gt',
-        section: details.section,
-      };
-    });
-  
-    // 2. Create invoice for USCF fees
-    const uscfPlayers = Object.entries(selectedStudents)
-      .filter(([_, details]) => details.uscfStatus !== 'current')
-      .map(([playerId, details]) => {
-        const student = rosterPlayers.find(p => p.id === playerId);
-        return {
-          playerName: `${student?.firstName} ${student?.lastName}`,
-          uscfId: student?.uscfId || '',
-          baseRegistrationFee: 0,
-          lateFee: 0,
-          uscfAction: true,
-          isGtPlayer: student?.studentType === 'gt',
-          section: details.section,
-        };
-      });
-  
-    try {
-      if (registrationPlayers.length > 0) {
-        const regResult = await createInvoice({
-          sponsorName: `${profile.firstName} ${profile.lastName}`,
-          parentName: `${profile.firstName} ${profile.lastName}`,
-          sponsorEmail: profile.email || '',
-          schoolName: profile.school,
-          teamCode: generateTeamCode({ schoolName: profile.school, district: profile.district }),
-          eventName: `${event.name} - Registration`,
-          eventDate: event.date,
-          uscfFee: 24,
-          players: registrationPlayers,
-          bookkeeperEmail: profile.bookkeeperEmail,
-          gtCoordinatorEmail: profile.gtCoordinatorEmail,
-          schoolAddress: profile.schoolAddress,
-          schoolPhone: profile.schoolPhone,
-          district: profile.district,
-        });
-        await saveConfirmation(regResult.invoiceId, regResult, registrationPlayers, feeBreakdown.registrationFees + feeBreakdown.lateFees, "Registration");
-      }
-  
-      if (uscfPlayers.length > 0) {
-        const uscfResult = await createInvoice({
-          sponsorName: `${profile.firstName} ${profile.lastName}`,
-          parentName: `${profile.firstName} ${profile.lastName}`,
-          sponsorEmail: profile.email || '',
-          schoolName: profile.school,
-          teamCode: generateTeamCode({ schoolName: profile.school, district: profile.district }),
-          eventName: `${event.name} - USCF Fees`,
-          eventDate: event.date,
-          uscfFee: 24,
-          players: uscfPlayers,
-          bookkeeperEmail: profile.bookkeeperEmail,
-          gtCoordinatorEmail: profile.gtCoordinatorEmail,
-          schoolAddress: profile.schoolAddress,
-          schoolPhone: profile.schoolPhone,
-          district: profile.district,
-        });
-        await saveConfirmation(uscfResult.invoiceId, uscfResult, uscfPlayers, feeBreakdown.uscfFees, "USCF");
-      }
-      toast({ title: "Split Invoices Created", description: "Separate invoices for registration and USCF fees have been generated." });
-      resetState();
-    } catch (error) {
-      handleInvoiceError(error, "Split Invoice Creation Failed");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handlePsjaSplitInvoice = async () => {
-    if (!profile || !event) return;
-  
-    setIsSubmitting(true);
-    const { fee: currentFee } = getFeeForEvent();
-    const lateFeeAmount = currentFee - event.regularFee;
-  
-    const playersToInvoice = Object.entries(selectedStudents).map(([playerId, details]) => {
-      const student = rosterPlayers.find(p => p.id === playerId);
-      return {
-        playerName: `${student?.firstName} ${student?.lastName}`,
-        uscfId: student?.uscfId || '',
-        baseRegistrationFee: event.regularFee,
-        lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0,
-        uscfAction: details.uscfStatus !== 'current',
-        isGtPlayer: student?.studentType === 'gt',
-        section: details.section,
-      };
-    });
-  
-    try {
-      const result = await createPsjaSplitInvoice({
-        sponsorName: `${profile.firstName} ${profile.lastName}`,
-        sponsorEmail: profile.email,
-        bookkeeperEmail: profile.bookkeeperEmail,
-        gtCoordinatorEmail: profile.gtCoordinatorEmail,
-        schoolName: profile.school,
-        schoolAddress: profile.schoolAddress,
-        schoolPhone: profile.schoolPhone,
-        district: 'PHARR-SAN JUAN-ALAMO ISD',
-        teamCode: generateTeamCode({ schoolName: profile.school, district: profile.district }),
-        eventName: event.name,
-        eventDate: event.date,
-        uscfFee: 24,
-        players: playersToInvoice
-      });
-  
-      // Save confirmations for both invoices
-      if (result.gtInvoice) {
-        const gtPlayers = playersToInvoice.filter(p => p.isGtPlayer);
-        await saveConfirmation(result.gtInvoice.invoiceId, result.gtInvoice, gtPlayers, 0, "GT");
-      }
-  
-      if (result.independentInvoice) {
-        const indPlayers = playersToInvoice.filter(p => !p.isGtPlayer);
-        await saveConfirmation(result.independentInvoice.invoiceId, result.independentInvoice, indPlayers, 0, "Independent");
-      }
-      
-      toast({ 
-        title: "PSJA Split Invoices Created!", 
-        description: "GT program and school invoices created with correct fee allocation."
-      });
-      setCreatedInvoiceId(result.independentInvoice?.invoiceId || result.gtInvoice?.invoiceId);
-      setShowInvoiceModal(true);
-      resetState();
-      
-    } catch (error) {
-      handleInvoiceError(error, "PSJA Split Invoice Creation Failed");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   const saveConfirmation = async (invoiceId: string, result: any, playersInInvoice: any[], total: number, type?: "Registration" | "USCF" | "GT" | "Independent") => {
     if(!profile || !event || !db) return;
     
@@ -490,8 +339,8 @@ export function SponsorRegistrationDialog({
       teamCode: teamCode,
       invoiceTitle: `${teamCode} @ ${format(new Date(event.date), 'MM/dd/yyyy')} ${eventName}`,
       selections: validatedSelections,
-      totalInvoiced: result.newTotalAmount || total,
-      totalAmount: result.newTotalAmount || total,
+      totalInvoiced: total,
+      totalAmount: total,
       invoiceStatus: result.status,
       status: result.status,
       invoiceUrl: result.invoiceUrl,
@@ -504,13 +353,6 @@ export function SponsorRegistrationDialog({
     
     const invoiceDocRef = doc(db, 'invoices', invoiceId);
     await setDoc(invoiceDocRef, newConfirmation);
-    
-    if(!splitUscfFees) {
-        setCreatedInvoiceId(invoiceId);
-        setShowInvoiceModal(true);
-        toast({title: `Invoice #${result.invoiceNumber} created successfully!`});
-        resetState();
-    }
   };
   
   const handleInvoiceError = (error: any, title: string) => {
