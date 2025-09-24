@@ -112,7 +112,7 @@ function IndividualDashboardContent() {
 
     if (!existingIds.includes(newStudent.id)) {
       const updatedIds = [...existingIds, newStudent.id];
-      updateProfile({ studentIds: updatedIds });
+      await updateProfile({ studentIds: updatedIds }); // Ensure updateProfile is awaited
       toast({
         title: "Student Added",
         description: `${newStudent.firstName} ${newStudent.lastName} has been added to your list.`

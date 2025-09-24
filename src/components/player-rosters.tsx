@@ -156,13 +156,21 @@ export function PlayerRosters({ onEditPlayer: handleEditPlayerProp, onAddToRoste
   
   const handleAddToRoster = async (player: MasterPlayer) => {
     if (!profile) return;
-    const updatedPlayer = { 
-      ...player, 
-      school: profile.school, 
-      district: profile.district 
-    };
-    await updatePlayer(updatedPlayer, profile);
-    toast({ title: "Player Added", description: `${player.firstName} ${player.lastName} has been added to your roster.` });
+    
+    // Close the search dialog first
+    setIsSearchOpen(false);
+
+    if (profile.role === 'sponsor' || profile.isDistrictCoordinator) {
+      const updatedPlayer = { 
+        ...player, 
+        school: profile.school, 
+        district: profile.district 
+      };
+      await updatePlayer(updatedPlayer, profile);
+      toast({ title: "Player Added", description: `${player.firstName} ${player.lastName} has been added to your roster.` });
+    } else if (profile.role === 'individual' && onAddToRosterProp) {
+        onAddToRosterProp(player); // This is handled in the individual dashboard now
+    }
   };
 
   const handlePlayerSelectedFromSearch = (player: any) => {
@@ -289,7 +297,7 @@ export function PlayerRosters({ onEditPlayer: handleEditPlayerProp, onAddToRoste
         isOpen={isSearchOpen}
         onOpenChange={setIsSearchOpen}
         onPlayerSelected={handlePlayerSelectedFromSearch}
-        onAddToRoster={onAddToRosterProp}
+        onAddToRoster={handleAddToRoster}
         portalType={profile?.role || 'individual'}
       />
 

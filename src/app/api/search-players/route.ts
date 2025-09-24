@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
@@ -107,6 +108,15 @@ export async function POST(request: Request) {
         const searchFirst = criteria.firstName.toLowerCase().trim();
         if (!firstName.includes(searchFirst)) {
           return false;
+        }
+      }
+
+      // Additional middleName filtering
+      if (criteria.middleName?.trim()) {
+        const middleName = (player.middleName || '').toLowerCase();
+        const searchMiddle = criteria.middleName.toLowerCase().trim();
+        if (!middleName.includes(searchMiddle)) {
+            return false;
         }
       }
       

@@ -185,6 +185,10 @@ export function PlayerSearchDialog({
               <input type="text" value={searchCriteria.firstName || ''} onChange={(e) => updateField('firstName', e.target.value)} placeholder="John" className="w-full border rounded px-3 py-2" />
             </div>
             <div>
+              <label className="block text-sm font-medium mb-1">Middle Name</label>
+              <input type="text" value={searchCriteria.middleName || ''} onChange={(e) => updateField('middleName', e.target.value)} placeholder="Michael" className="w-full border rounded px-3 py-2" />
+            </div>
+            <div>
               <label className="block text-sm font-medium mb-1">Last Name</label>
               <input type="text" value={searchCriteria.lastName || ''} onChange={(e) => updateField('lastName', e.target.value)} placeholder="Smith" className="w-full border rounded px-3 py-2" />
             </div>
