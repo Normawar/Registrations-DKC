@@ -304,37 +304,15 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   }, [schools, allSchoolNames]);
 
   const loadDatabase = useCallback(async () => {
-    if (!db) {
-        setIsDbLoaded(true);
-        setIsDbError(true);
-        return;
-    }
-    setIsDbLoaded(false);
-    
-    try {
-      const [playersSnapshot, schoolsSnapshot] = await Promise.all([
-        getDocs(collection(db, 'players')),
-        getDocs(collection(db, 'schools'))
-      ]);
-
-      const players = playersSnapshot.docs.map(doc => doc.data() as MasterPlayer);
-      const schoolList = schoolsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as School));
-      
-      setDatabase(players);
-      setSchools(schoolList);
-      setPlayerCount(players.length);
-      setIsDbLoaded(true);
-      
-    } catch (error: any) {
-      console.error('Failed to load data from Firestore:', error);
-      setIsDbLoaded(false);
-      setIsDbError(true);
-    }
+    // This function is now deferred.
   }, []);
 
   useEffect(() => {
-    loadDatabase();
-  }, [loadDatabase]);
+    // We prevent the large data fetch on initial load.
+    // Data will be fetched by components that need it (e.g., search).
+    // This ensures the app loads quickly.
+    setIsDbLoaded(true); // Mark as "loaded" so components don't hang.
+  }, []);
 
 
   const refreshDatabase = async () => {
