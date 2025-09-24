@@ -150,9 +150,9 @@ export function PlayerSearchDialog({
     setSearchCriteria(newCriteria);
   };
 
-  const handleSelectPlayer = (player: MasterPlayer | USCFPlayer) => {
+  const handleSelectPlayer = (player: MasterPlayer) => {
     onPlayerSelected(player);
-    onOpenChange(false);
+    // Don't close dialog here, let parent decide
   };
   
   if (!isOpen) return null;
@@ -246,11 +246,9 @@ export function PlayerSearchDialog({
                     </tr></thead>
                     <tbody>{searchResult.players?.map((player: MasterPlayer) => (<tr key={player.id} className="hover:bg-gray-50">
                       <td className="border border-gray-300 px-4 py-2">{player.firstName} {player.middleName} {player.lastName}</td><td className="border border-gray-300 px-4 py-2">{player.uscfId}</td><td className="border border-gray-300 px-4 py-2">{player.state}</td><td className="border border-gray-300 px-4 py-2">{player.school}</td><td className="border border-gray-300 px-4 py-2">{player.regularRating}</td><td className="border border-gray-300 px-4 py-2">
-                        {onAddToRoster ? (
-                          <button onClick={() => onAddToRoster(player)} className="bg-blue-500 text-white px-2 py-1 rounded text-xs">Add to Roster</button>
-                        ) : (
-                          <button onClick={() => handleSelectPlayer(player)} className="bg-green-500 text-white px-2 py-1 rounded text-xs">Select</button>
-                        )}
+                        <button onClick={() => handleSelectPlayer(player)} className="bg-green-500 text-white px-2 py-1 rounded text-xs">
+                            Select
+                        </button>
                       </td>
                     </tr>))}</tbody>
                   </table>

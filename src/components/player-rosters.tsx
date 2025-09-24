@@ -159,8 +159,10 @@ export function PlayerRosters({ onEditPlayer: handleEditPlayerProp, onAddToRoste
     
     // Close the search dialog first
     setIsSearchOpen(false);
-
-    if (profile.role === 'sponsor' || profile.isDistrictCoordinator) {
+    
+    if (onAddToRosterProp) {
+        onAddToRosterProp(player);
+    } else if (profile.role === 'sponsor' || profile.isDistrictCoordinator) {
       const updatedPlayer = { 
         ...player, 
         school: profile.school, 
@@ -168,8 +170,6 @@ export function PlayerRosters({ onEditPlayer: handleEditPlayerProp, onAddToRoste
       };
       await updatePlayer(updatedPlayer, profile);
       toast({ title: "Player Added", description: `${player.firstName} ${player.lastName} has been added to your roster.` });
-    } else if (profile.role === 'individual' && onAddToRosterProp) {
-        onAddToRosterProp(player); // This is handled in the individual dashboard now
     }
   };
 

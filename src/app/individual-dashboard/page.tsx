@@ -303,7 +303,6 @@ function IndividualDashboardContent() {
             isOpen={isSearchOpen}
             onOpenChange={setIsSearchOpen}
             onPlayerSelected={(player) => handleEditPlayer(player as MasterPlayer)}
-            onAddToRoster={handleStudentAdded}
             excludeIds={parentStudentIds}
             portalType="individual"
           />
