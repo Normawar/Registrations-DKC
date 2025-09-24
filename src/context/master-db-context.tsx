@@ -239,6 +239,14 @@ const flagPotentialMatches = (uscfPlayers: any[], tempPlayers: MasterPlayer[]) =
 
 // --- Provider Component ---
 
+// Extend the window interface for the global throttle flag
+declare global {
+    interface Window {
+        lastRefreshTime?: number;
+    }
+}
+
+
 export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   const [database, setDatabase] = useState<MasterPlayer[]>([]);
   const [schools, setSchools] = useState<School[]>([]);
@@ -246,7 +254,6 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   const [isDbError, setIsDbError] = useState(false);
   const { toast } = useToast();
   const [playerCount, setPlayerCount] = useState(0);
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const dbSchools = useMemo(() => {
     return [...new Set(schools.map(s => s.schoolName).filter(Boolean))].sort();
@@ -315,23 +322,10 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     loadDatabase();
   }, [loadDatabase]);
 
-
   const refreshDatabase = useCallback(async () => {
-    console.log('🔄 refreshDatabase called from:', new Error().stack?.split('\n')[1]);
-    
-    if (isRefreshing) {
-      console.log('Already refreshing, skipping...');
-      return;
-    }
-    
-    setIsRefreshing(true);
-    try {
-        await loadDatabase();
-        toast({ title: 'Database Refreshed', description: 'Fetched the latest player and school data from the server.' });
-    } finally {
-        setIsRefreshing(false);
-    }
-  }, [loadDatabase, toast, isRefreshing]);
+    console.log('refreshDatabase called - DISABLED to break infinite loop');
+    return; // Do nothing
+  }, []);
 
   const addPlayer = async (player: MasterPlayer, editingProfile: SponsorProfile | null) => {
     if (!db) return;
@@ -341,9 +335,10 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
 
         const newPlayer: MasterPlayer = {
             ...player,
-            dateCreated: now,
-            createdBy: creatorName,
-            updatedAt: now, // Also set updatedAt on creation
+            createdAt: player.createdAt || now,
+            dateCreated: player.dateCreated || now,
+            createdBy: player.createdBy || creatorName,
+            updatedAt: now,
             dateUpdated: now,
             updatedBy: creatorName,
         };
@@ -351,41 +346,47 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
         const playerRef = doc(db, 'players', cleanedPlayer.id!);
         await setDoc(playerRef, cleanedPlayer, { merge: true });
         
-        setDatabase(prev => [...prev.filter(p => p.id !== cleanedPlayer.id), cleanedPlayer]);
-        setPlayerCount(prev => prev + (database.some(p => p.id === cleanedPlayer.id) ? 0 : 1));
-
+        setDatabase(prev => {
+            const exists = prev.some(p => p.id === cleanedPlayer.id);
+            if(exists) {
+                return prev.map(p => p.id === cleanedPlayer.id ? cleanedPlayer : p);
+            }
+            return [...prev, cleanedPlayer];
+        });
+        setPlayerCount(prev => (database.some(p => p.id === cleanedPlayer.id) ? prev : prev + 1));
+  
     } catch (error) {
         console.error("Error adding player:", error);
         throw error;
     }
   };
-
+  
   const updatePlayer = async (updatedPlayer: MasterPlayer, editingProfile: SponsorProfile | null) => {
     if (!db) return;
     
     const oldPlayerDoc = await getDoc(doc(db, 'players', updatedPlayer.id));
     const oldPlayer = oldPlayerDoc.exists() ? oldPlayerDoc.data() as MasterPlayer : null;
-
+  
     if (!oldPlayer) {
         return addPlayer(updatedPlayer, editingProfile);
     }
-
+  
     const changedFields: { field: string; oldValue: any; newValue: any }[] = [];
     (Object.keys(updatedPlayer) as Array<keyof MasterPlayer>).forEach(key => {
         const oldValue = oldPlayer[key];
         const newValue = updatedPlayer[key];
         const oldString = String(oldValue);
         const newString = String(newValue);
-
+  
         if (oldString !== newString) {
             let finalOldValue = oldValue === undefined || oldValue === null || oldValue === '' ? "not avail" : oldValue;
             let finalNewValue = newValue === undefined || newValue === null || newValue === '' ? "deleted" : newValue;
             changedFields.push({ field: key, oldValue: finalOldValue, newValue: finalNewValue });
         }
     });
-
+  
     let finalPlayer = { ...updatedPlayer };
-
+  
     if (changedFields.length > 0 && editingProfile) {
         const now = new Date().toISOString();
         const updaterName = `${editingProfile.firstName} ${editingProfile.lastName}`.trim();
@@ -395,7 +396,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
             userName: updaterName || editingProfile?.email || 'Unknown User',
             changes: changedFields,
         };
-
+  
         finalPlayer = {
             ...updatedPlayer,
             changeHistory: [...(oldPlayer.changeHistory || []), newHistoryEntry],
@@ -412,7 +413,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     
     setDatabase(prev => prev.map(p => p.id === cleanedPlayer.id ? cleanedPlayer : p));
   };
-
+  
   const deletePlayer = async (playerId: string) => {
     if (!db) return;
     await deleteDoc(doc(db, 'players', playerId));
@@ -434,7 +435,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     
     setSchools(prev => [...prev, newSchool]);
   };
-
+  
   const updateSchool = async (school: School) => {
       if (!db) return;
       const schoolWithCode = { ...school, teamCode: school.teamCode || generateTeamCode(school) };
@@ -442,7 +443,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
       
       setSchools(prev => prev.map(s => s.id === school.id ? schoolWithCode : s));
   };
-
+  
   const deleteSchool = async (schoolId: string) => {
       if (!db) return;
       await deleteDoc(doc(db, 'schools', schoolId));
@@ -480,7 +481,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
         return null;
       }
     }).filter(Boolean);
-
+  
     if (newSchools.length > 0) {
       const batch = writeBatch(db);
       newSchools.forEach(school => {
@@ -495,7 +496,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     }
     return { uploaded: newSchools.length, errors };
   };
-
+  
   const renameDistrict = async (oldDistrict: string, newDistrict: string) => {
       if (!db) return;
       const batch = writeBatch(db);

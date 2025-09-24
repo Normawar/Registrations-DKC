@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { Suspense, useState, useCallback } from 'react';
+import React, { Suspense, useState, useCallback, useRef, useEffect } from 'react';
 import { AuthGuard } from '@/components/auth-guard';
 import { AppLayout } from '@/components/app-layout';
 import { PlayerRosters } from '@/components/player-rosters';
@@ -13,6 +13,11 @@ import { PlayerSearchDialog } from '@/components/PlayerSearchDialog';
 
 function RosterPage() {
   console.log('🏠 RosterPage rendering...');
+  
+  const renderCount = useRef(0);
+  renderCount.current += 1;
+  console.log('Render count:', renderCount.current);
+
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [playerToEdit, setPlayerToEdit] = useState<MasterPlayer | null>(null);
@@ -95,6 +100,10 @@ function RosterPage() {
     // DO NOT call refreshDatabase here
   }, []);
 
+  useEffect(() => {
+    console.log('RosterPage useEffect - refreshDatabase reference changed');
+  }, [refreshDatabase]);
+
 
   return (
     <Suspense fallback={<div>Loading...</div>}>
@@ -126,4 +135,3 @@ function RosterPage() {
 }
 
 export default RosterPage;
-
