@@ -379,7 +379,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     const changedFields: { field: string; oldValue: any; newValue: any }[] = [];
     (Object.keys(updatedPlayer) as Array<keyof MasterPlayer>).forEach(key => {
         if (updatedPlayer[key] !== oldPlayer[key]) {
-            const oldValue = oldPlayer[key] === undefined ? "EMPTY (undefined)" : oldPlayer[key];
+            const oldValue = oldPlayer[key] === undefined ? "not avail" : oldPlayer[key];
             const newValue = updatedPlayer[key] === undefined ? null : updatedPlayer[key];
             
             if (String(oldValue) !== String(newValue)) {
