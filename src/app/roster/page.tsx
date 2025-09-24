@@ -9,6 +9,7 @@ import { PlayerDetailsDialog } from '@/components/player-details-dialog';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { PlayerSearchDialog } from '@/components/PlayerSearchDialog';
+import { useToast } from '@/hooks/use-toast';
 
 function RosterPage() {
   console.log('🏠 RosterPage rendering...');
@@ -23,6 +24,7 @@ function RosterPage() {
   const [playerToEdit, setPlayerToEdit] = useState<MasterPlayer | null>(null);
   const { updatePlayer, refreshDatabase } = useMasterDb();
   const { profile } = useSponsorProfile();
+  const { toast } = useToast();
 
   // Track if refreshDatabase is being called accidentally
   useEffect(() => {
@@ -36,7 +38,6 @@ function RosterPage() {
   
   const handlePlayerSelectedFromSearch = useCallback((player: any) => {
     console.log('🔍 handlePlayerSelectedFromSearch called - START');
-    console.log('🔍 Current state - isSearchOpen:', isSearchOpen, 'isEditOpen:', isEditOpen);
     
     const isMasterPlayer = 'uscfId' in player;
     let playerToProcess: MasterPlayer;
@@ -88,18 +89,29 @@ function RosterPage() {
         school: profile.school, 
         district: profile.district 
       };
-      await updatePlayer(updatedPlayer, profile);
-      console.log('📝 Player updated, closing edit dialog');
-      setIsEditOpen(false);
       
-      // Refresh to show the updated roster
-      setTimeout(() => {
-        refreshDatabase();
-      }, 500);
+      // Update the player in Firebase
+      await updatePlayer(updatedPlayer, profile);
+      console.log('📝 Player updated successfully');
+      
+      // Close the dialog
+      setIsEditOpen(false);
+      setPlayerToEdit(null);
+      
+      // Show success message without triggering database refresh
+      toast({
+        title: "Player Added to Roster",
+        description: `${player.firstName} ${player.lastName} has been added to your roster.`
+      });
       
       console.log('📝 handleAddToRoster complete');
     } catch (error) {
       console.error('Error in handleAddToRoster:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add player to roster. Please try again.",
+        variant: "destructive"
+      });
     }
   };
   

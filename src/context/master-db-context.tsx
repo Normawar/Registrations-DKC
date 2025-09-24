@@ -319,41 +319,9 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const refreshDatabase = useCallback(async () => {
-    console.log('🔄 refreshDatabase called - executing refresh');
-    
-    // Use window-based throttling to prevent loops
-    const now = Date.now();
-    if (window.lastRefreshTime && (now - window.lastRefreshTime) < 1000) {
-      console.log('🚫 Refresh blocked - too recent');
-      return;
-    }
-    window.lastRefreshTime = now;
-    
-    try {
-      setIsDbLoaded(false);
-      
-      const [playersSnapshot, schoolsSnapshot] = await Promise.all([
-        getDocs(collection(db, 'players')),
-        getDocs(collection(db, 'schools'))
-      ]);
-  
-      const players = playersSnapshot.docs.map(doc => doc.data() as MasterPlayer);
-      const schoolList = schoolsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as School));
-      
-      setDatabase(players);
-      setSchools(schoolList);
-      setPlayerCount(players.length);
-      setIsDbLoaded(true);
-      
-      toast({ 
-        title: 'Database Refreshed', 
-        description: 'Fetched the latest player and school data from the server.' 
-      });
-    } catch (error) {
-      console.error('Refresh failed:', error);
-      setIsDbError(true);
-    }
-  }, [toast]);
+    console.log('refreshDatabase called - DISABLED to prevent infinite loop');
+    return; // Do nothing
+  }, []);
 
   useEffect(() => {
     loadDatabase();
@@ -435,7 +403,12 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
             updatedBy: updaterName,
         };
     } else {
-        return; // No changes
+        // Only update timestamp if no other changes but still called
+        finalPlayer = {
+            ...updatedPlayer,
+            updatedAt: new Date().toISOString(),
+            updatedBy: editingProfile ? `${editingProfile.firstName} ${editingProfile.lastName}`.trim() : 'Unknown User',
+        };
     }
     
     const cleanedPlayer = sanitizePlayerForFirebase(finalPlayer) as MasterPlayer;
