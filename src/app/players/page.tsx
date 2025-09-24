@@ -18,6 +18,8 @@ import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { CSVUploadComponent } from '@/components/csv-upload';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { OrganizerGuard } from '@/components/auth-guard';
+import { PlayerSearchDialog } from '@/components/PlayerSearchDialog';
+
 
 function PlayersPageContent() {
   const { database } = useMasterDb();
@@ -55,7 +57,7 @@ function PlayersPageContent() {
     
     setEditingPlayer(playerToEdit);
     setIsEditOpen(true);
-    setIsSearchOpen(false); // Close search when a player is selected
+    setIsSearchOpen(false);
   };
   
   useEffect(() => {
@@ -116,15 +118,12 @@ function PlayersPageContent() {
             </p>
         </div>
 
-        {/* This dialog is now deprecated, its functionality is inside PlayerDetailsDialog */}
-        {/* <EnhancedPlayerSearchDialog
+        <PlayerSearchDialog
           isOpen={isSearchOpen}
           onOpenChange={setIsSearchOpen}
-          onPlayerSelected={handlePlayerSelected}
-          title="Search and Add Players"
-          userProfile={profile}
-          preFilterByUserProfile={true}
-        /> */}
+          onSelectPlayer={handlePlayerSelected}
+          portalType="organizer"
+        />
 
         <PlayerDetailsDialog
           isOpen={isEditOpen}

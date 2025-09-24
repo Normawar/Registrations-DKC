@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -19,7 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { History, Trash2 } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
 
-// Reusable DateInput component
+// Reusable DateInput component for MM/DD/YYYY format
 const DateInput = React.forwardRef<HTMLInputElement, {
   value?: Date;
   onChange?: (date: Date | undefined) => void;
@@ -69,12 +69,12 @@ const DateInput = React.forwardRef<HTMLInputElement, {
 });
 DateInput.displayName = 'DateInput';
 
-// Grade and Section constants
+
 const grades = ['Kindergarten', '1st Grade', '2nd Grade', '3rd Grade', '4th Grade', '5th Grade', '6th Grade', '7th Grade', '8th Grade', '9th Grade', '10th Grade', '11th Grade', '12th Grade'];
 const sections = ['Kinder-1st', 'Primary K-3', 'Elementary K-5', 'Middle School K-8', 'High School K-12', 'Championship'];
 const states = ["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"];
 
-// Zod Schema with all validations
+// Zod Schema with all new validations
 const playerFormSchema = z.object({
   id: z.string().optional(),
   firstName: z.string().min(1, "First Name is required."),
@@ -123,7 +123,7 @@ const ChangeHistorySection = ({ player }: { player: MasterPlayer | null }) => {
           <div><h4 className="font-medium text-sm text-muted-foreground mb-2">RECORD CREATED</h4><p className="text-sm font-semibold">{player.createdAt ? format(new Date(player.createdAt), 'PPP p') : 'Unknown'}</p><p className="text-xs text-muted-foreground">By: {player.createdBy || 'Unknown'}</p></div>
           <div><h4 className="font-medium text-sm text-muted-foreground mb-2">LAST UPDATED</h4><p className="text-sm font-semibold">{player.updatedAt ? format(new Date(player.updatedAt), 'PPP p') : 'Never'}</p><p className="text-xs text-muted-foreground">By: {player.updatedBy || 'Unknown'}</p></div>
         </div>
-        {player.changeHistory && player.changeHistory.length > 0 && (
+        {player.changeHistory && player.changeHistory.length > 0 ? (
           <div>
             <h4 className="font-medium text-sm text-muted-foreground mb-3">CHANGE HISTORY</h4>
             <div className="space-y-3 border rounded-md p-4 max-h-64 overflow-y-auto bg-background">
@@ -137,6 +137,13 @@ const ChangeHistorySection = ({ player }: { player: MasterPlayer | null }) => {
               ))}
             </div>
           </div>
+        ) : (
+            <div>
+                <h4 className="font-medium text-sm text-muted-foreground mb-3">CHANGE HISTORY</h4>
+                <div className="p-4 text-center text-xs text-muted-foreground border rounded-md bg-muted/20">
+                    No changes recorded for this player.
+                </div>
+            </div>
         )}
       </div>
     );
@@ -193,7 +200,6 @@ export function PlayerDetailsDialog({ isOpen, onOpenChange, playerToEdit, onPlay
   const onEditSubmit = async (values: PlayerFormValues) => {
     if (!profile) return;
     
-    // Email uniqueness check
     const isEmailInUse = database.some(p => p.email === values.email && p.id !== (playerToEdit?.id || values.id));
     if (isEmailInUse) {
       form.setError("email", { type: "manual", message: "This email is already used by another player." });
@@ -237,8 +243,8 @@ export function PlayerDetailsDialog({ isOpen, onOpenChange, playerToEdit, onPlay
                   <h3 className="text-lg font-semibold border-b pb-2">Player Information</h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <FormField control={form.control} name="firstName" render={({ field }) => (<FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
-                    <FormField control={form.control} name="middleName" render={({ field }) => (<FormItem><FormLabel>Middle Name (Optional)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
                     <FormField control={form.control} name="lastName" render={({ field }) => (<FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={form.control} name="middleName" render={({ field }) => (<FormItem><FormLabel>Middle Name (Optional)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField control={form.control} name="dob" render={({ field }) => (<FormItem><FormLabel>Date of Birth</FormLabel><FormControl><DateInput value={field.value} onChange={field.onChange} /></FormControl><FormMessage /></FormItem>)} />

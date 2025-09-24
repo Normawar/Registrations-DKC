@@ -1,11 +1,3 @@
-
-'use client';
-
 // This component has been deprecated and its functionality has been replaced 
-// by the more robust `PlayerSearchDialog`. The logic for adding students is now
-// handled directly within the `roster` page.
+// by the more robust `PlayerSearchDialog` and the new global `PlayerDetailsDialog`.
 // This file can be safely deleted.
-
-export function AddStudentDialog() {
-  return null;
-}

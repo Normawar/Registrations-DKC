@@ -9,12 +9,12 @@ import { AuthGuard } from '@/components/auth-guard';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import { Button } from '@/components/ui/button';
 import { PlayerDetailsDialog } from '@/components/player-details-dialog';
+import { PlayerSearchDialog } from '@/components/PlayerSearchDialog';
 import { useToast } from '@/hooks/use-toast';
 import { Search, PlusCircle, Trash2, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, FilePenLine, UserPlus, Download, Check } from 'lucide-react';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -29,34 +29,7 @@ import { format } from 'date-fns';
 
 type SortableColumnKey = 'lastName' | 'teamCode' | 'uscfId' | 'regularRating' | 'grade' | 'section';
 
-
-// Hook to prevent body scroll and layout shift when dialogs are open
-const useNoLayoutShift = (isOpen: boolean) => {
-  useEffect(() => {
-    if (isOpen) {
-      const scrollY = window.scrollY;
-      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
-      
-      document.body.style.position = 'fixed';
-      document.body.style.top = `-${scrollY}px`;
-      document.body.style.left = '0';
-      document.body.style.right = '0';
-      document.body.style.paddingRight = `${scrollbarWidth}px`;
-      
-      return () => {
-        document.body.style.position = '';
-        document.body.style.top = '';
-        document.body.style.left = '';
-        document.body.style.right = '';
-        document.body.style.paddingRight = '';
-        window.scrollTo(0, scrollY);
-      };
-    }
-  }, [isOpen]);
-};
-
-
-function DistrictRostersPageContent() {
+function RosterPageContent() {
   const { isDbLoaded, dbDistricts, database: allPlayers, getSchoolsForDistrict, deletePlayer } = useMasterDb();
   const { profile } = useSponsorProfile();
   const { toast } = useToast();
@@ -75,8 +48,7 @@ function DistrictRostersPageContent() {
   
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [playerToEdit, setPlayerToEdit] = useState<MasterPlayer | null>(null);
-  
-  useNoLayoutShift(isEditOpen);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   useEffect(() => {
     if (profile && !selectedDistrict) {
@@ -228,6 +200,35 @@ function DistrictRostersPageContent() {
     setPlayerToEdit(null);
     setIsEditOpen(true);
   };
+
+  const handlePlayerSelectedFromSearch = (player: any) => {
+    const isMasterPlayer = 'uscfId' in player;
+    
+    const nameParts = player.name ? player.name.split(', ') : ['Unknown', 'Player'];
+
+    const playerToEdit: MasterPlayer = isMasterPlayer ? player : {
+      id: player.uscf_id,
+      uscfId: player.uscf_id,
+      firstName: nameParts[1] || '',
+      lastName: nameParts[0] || '',
+      middleName: nameParts.length > 2 ? nameParts[2] : '',
+      regularRating: player.rating_regular || undefined,
+      uscfExpiration: player.expiration_date ? new Date(player.expiration_date).toISOString() : undefined,
+      state: player.state || 'TX',
+      school: '',
+      district: '',
+      grade: '',
+      section: '',
+      email: '',
+      zipCode: '',
+      events: 0,
+      eventIds: [],
+    };
+    
+    setPlayerToEdit(playerToEdit);
+    setIsEditOpen(true);
+    setIsSearchOpen(false);
+  };
   
   const handleDeletePlayer = (player: MasterPlayer) => {
     setPlayerToDelete(player);
@@ -285,6 +286,7 @@ function DistrictRostersPageContent() {
             <div className="flex justify-between items-center">
               <CardTitle>Roster Management</CardTitle>
               <div className="flex gap-2">
+                <Button onClick={() => setIsSearchOpen(true)}><Search className="mr-2 h-4 w-4"/> Search & Add</Button>
                 <Button onClick={handleCreateNewPlayer}><UserPlus className="mr-2 h-4 w-4"/> Create New Player</Button>
               </div>
             </div>
@@ -440,13 +442,18 @@ function DistrictRostersPageContent() {
         </div>
       </div>
 
+      <PlayerSearchDialog
+        isOpen={isSearchOpen}
+        onOpenChange={setIsSearchOpen}
+        onSelectPlayer={handlePlayerSelectedFromSearch}
+        portalType="organizer"
+      />
+
       <PlayerDetailsDialog
         isOpen={isEditOpen}
         onOpenChange={setIsEditOpen}
         playerToEdit={playerToEdit}
-        onPlayerCreatedOrUpdated={() => {
-          // This callback can trigger a data refresh if needed
-        }}
+        onPlayerCreatedOrUpdated={() => {}}
       />
 
       <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
@@ -470,7 +477,9 @@ export default function RosterPage() {
     return (
         <Suspense fallback={<div>Loading...</div>}>
             <AuthGuard>
-                <DistrictRostersPageContent />
+                <AppLayout>
+                    <RosterPageContent />
+                </AppLayout>
             </AuthGuard>
         </Suspense>
     );
