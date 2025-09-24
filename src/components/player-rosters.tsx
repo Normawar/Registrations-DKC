@@ -1,6 +1,7 @@
+
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import { Button } from '@/components/ui/button';
 import { PlayerDetailsDialog } from '@/components/player-details-dialog';
@@ -8,7 +9,7 @@ import { PlayerSearchDialog } from '@/components/PlayerSearchDialog';
 import { useToast } from '@/hooks/use-toast';
 import { Search, PlusCircle, Trash2, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, FilePenLine } from 'lucide-react';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -23,7 +24,7 @@ import { format } from 'date-fns';
 
 type SortableColumnKey = 'lastName' | 'teamCode' | 'uscfId' | 'regularRating' | 'grade' | 'section';
 
-export function PlayerRosters() {
+export function PlayerRosters({ onEditPlayer, onPlayerSelected }: { onEditPlayer: (player: MasterPlayer) => void, onPlayerSelected: (player: any) => void }) {
   const { isDbLoaded, dbDistricts, database: allPlayers, getSchoolsForDistrict, deletePlayer, addPlayer } = useMasterDb();
   const { profile } = useSponsorProfile();
   const { toast } = useToast();
@@ -33,12 +34,9 @@ export function PlayerRosters() {
   const [openSchools, setOpenSchools] = useState<Record<string, boolean>>({});
   const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' }>({ key: 'lastName', direction: 'ascending' });
 
-  const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
   const [playerToDelete, setPlayerToDelete] = useState<MasterPlayer | null>(null);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   
-  const [isEditOpen, setIsEditOpen] = useState(false);
-  const [playerToEdit, setPlayerToEdit] = useState<MasterPlayer | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   useEffect(() => {
@@ -137,46 +135,11 @@ export function PlayerRosters() {
     if (!sortConfig || sortConfig.key !== columnKey) return <ArrowUpDown className="h-4 w-4" />;
     return sortConfig.direction === 'ascending' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />;
   };
-  
-  const handleEditPlayer = (player: MasterPlayer) => {
-    setPlayerToEdit(player);
-    setIsEditOpen(true);
-  };
 
   const handleCreateNewPlayer = () => {
-    setPlayerToEdit(null);
-    setIsEditOpen(true);
+    onEditPlayer({} as MasterPlayer); // Pass empty object to signify creation
   };
-  
-  const handlePlayerSelectedFromSearch = (player: any) => {
-    const isMasterPlayer = 'uscfId' in player;
-    
-    const nameParts = player.name ? player.name.split(', ') : ['Unknown', 'Player'];
 
-    const playerToEdit: MasterPlayer = isMasterPlayer ? player : {
-      id: player.uscf_id,
-      uscfId: player.uscf_id,
-      firstName: nameParts[1] || '',
-      lastName: nameParts[0] || '',
-      middleName: nameParts.length > 2 ? nameParts[2] : '',
-      regularRating: player.rating_regular || undefined,
-      uscfExpiration: player.expiration_date ? new Date(player.expiration_date).toISOString() : undefined,
-      state: player.state || 'TX',
-      school: '',
-      district: '',
-      grade: '',
-      section: '',
-      email: '',
-      zipCode: '',
-      events: 0,
-      eventIds: [],
-    };
-    
-    setPlayerToEdit(playerToEdit);
-    setIsEditOpen(true);
-    setIsSearchOpen(false);
-  };
-  
   const handleDeletePlayer = (player: MasterPlayer) => {
     setPlayerToDelete(player);
     setIsAlertOpen(true);
@@ -189,10 +152,6 @@ export function PlayerRosters() {
     }
     setIsAlertOpen(false);
     setPlayerToDelete(null);
-  };
-  
-  const handlePlayerCreatedOrUpdated = () => {
-    // This can be used to trigger a data refresh if needed
   };
 
   return (
@@ -278,7 +237,7 @@ export function PlayerRosters() {
                           <TableCell>{p.grade}</TableCell>
                           <TableCell>{p.section}</TableCell>
                           <TableCell>
-                            <Button variant="ghost" size="sm" onClick={() => handleEditPlayer(p)}>Edit</Button>
+                            <Button variant="ghost" size="sm" onClick={() => onEditPlayer(p)}>Edit</Button>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -294,15 +253,8 @@ export function PlayerRosters() {
       <PlayerSearchDialog
         isOpen={isSearchOpen}
         onOpenChange={setIsSearchOpen}
-        onSelectPlayer={handlePlayerSelectedFromSearch}
+        onPlayerSelected={onPlayerSelected}
         portalType={profile?.role || 'individual'}
-      />
-
-      <PlayerDetailsDialog
-        isOpen={isEditOpen}
-        onOpenChange={setIsEditOpen}
-        playerToEdit={playerToEdit}
-        onPlayerCreatedOrUpdated={handlePlayerCreatedOrUpdated}
       />
 
       <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
