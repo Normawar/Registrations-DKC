@@ -304,20 +304,36 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   }, [schools, allSchoolNames]);
 
   const loadDatabase = useCallback(async () => {
-    // This function is now deferred.
+    // This function now only fetches schools, as players are fetched via API.
+    if (!db) {
+        setIsDbLoaded(true);
+        setIsDbError(true);
+        return;
+    }
+    setIsDbLoaded(false);
+    
+    try {
+      const schoolsSnapshot = await getDocs(collection(db, 'schools'));
+      const schoolList = schoolsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as School));
+      
+      setSchools(schoolList);
+      setIsDbLoaded(true);
+      
+    } catch (error: any) {
+      console.error('Failed to load school data from Firestore:', error);
+      setIsDbLoaded(false);
+      setIsDbError(true);
+    }
   }, []);
 
   useEffect(() => {
-    // We prevent the large data fetch on initial load.
-    // Data will be fetched by components that need it (e.g., search).
-    // This ensures the app loads quickly.
-    setIsDbLoaded(true); // Mark as "loaded" so components don't hang.
-  }, []);
+    loadDatabase();
+  }, [loadDatabase]);
 
 
   const refreshDatabase = async () => {
     await loadDatabase();
-    toast({ title: 'Database Refreshed', description: 'Fetched the latest player and school data from the server.' });
+    toast({ title: 'Database Refreshed', description: 'Fetched the latest school data from the server.' });
   };
 
   const addPlayer = async (player: MasterPlayer, editingProfile: SponsorProfile | null) => {
@@ -337,7 +353,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
         const cleanedPlayer = removeUndefined(newPlayer);
         const playerRef = doc(db, 'players', cleanedPlayer.id);
         await setDoc(playerRef, cleanedPlayer, { merge: true });
-        await loadDatabase();
+        // No local database refresh needed, data is fetched via API.
     } catch (error) {
         console.error("Error adding player:", error);
         throw error;
@@ -395,13 +411,13 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     
     const cleanedPlayer = removeUndefined(finalPlayer);
     await setDoc(doc(db, 'players', finalPlayer.id), cleanedPlayer, { merge: true });
-    await loadDatabase(); // Refresh data
+    // No local database refresh needed.
   };
 
   const deletePlayer = async (playerId: string) => {
     if (!db) return;
     await deleteDoc(doc(db, 'players', playerId));
-    await loadDatabase(); // Refresh data
+    // No local database refresh needed.
   };
   
   const addSchool = async (school: Omit<School, 'id' | 'teamCode' | 'notes'>) => {
@@ -490,10 +506,6 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const searchPlayers = async (criteria: Partial<SearchCriteria>): Promise<SearchResult> => {
-    if (!isDbLoaded) {
-      return { players: [], hasMore: false, totalFound: 0, message: 'Database is still loading...' };
-    }
-
     try {
         const response = await fetch('/api/search-players', {
             method: 'POST',
