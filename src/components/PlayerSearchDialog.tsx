@@ -151,8 +151,15 @@ export function PlayerSearchDialog({
   };
 
   const handleSelectPlayer = (player: MasterPlayer) => {
+    // Check if player is already excluded (already on roster)
+    if (excludeIds.includes(player.id)) {
+      alert(`${player.firstName} ${player.lastName} is already on your roster.`);
+      return;
+    }
+
+    // Call the parent's onPlayerSelected callback
+    // This will close the search dialog and open the player details dialog
     onPlayerSelected(player);
-    // Don't close dialog here, let parent decide
   };
   
   if (!isOpen) return null;
@@ -244,9 +251,30 @@ export function PlayerSearchDialog({
                     <thead><tr className="bg-gray-50">
                       <th className="border border-gray-300 px-4 py-2 text-left">Name</th><th className="border border-gray-300 px-4 py-2 text-left">USCF ID</th><th className="border border-gray-300 px-4 py-2 text-left">State</th><th className="border border-gray-300 px-4 py-2 text-left">School</th><th className="border border-gray-300 px-4 py-2 text-left">Rating</th><th className="border border-gray-300 px-4 py-2 text-left">Action</th>
                     </tr></thead>
-                    <tbody>{searchResult.players?.map((player: MasterPlayer) => (<tr key={player.id} className="hover:bg-gray-50">
-                      <td className="border border-gray-300 px-4 py-2">{player.firstName} {player.middleName} {player.lastName}</td><td className="border border-gray-300 px-4 py-2">{player.uscfId}</td><td className="border border-gray-300 px-4 py-2">{player.state}</td><td className="border border-gray-300 px-4 py-2">{player.school}</td><td className="border border-gray-300 px-4 py-2">{player.regularRating}</td><td className="border border-gray-300 px-4 py-2"><button onClick={() => handleSelectPlayer(player)} className="bg-green-500 text-white px-2 py-1 rounded text-xs">Select</button></td>
-                    </tr>))}</tbody>
+                    <tbody>{searchResult.players?.map((player: MasterPlayer) => {
+                      const isAlreadyOnRoster = excludeIds.includes(player.id);
+                      return (
+                        <tr key={player.id} className="hover:bg-gray-50">
+                          <td className="border border-gray-300 px-4 py-2">{player.firstName} {player.middleName} {player.lastName}</td>
+                          <td className="border border-gray-300 px-4 py-2">{player.uscfId}</td>
+                          <td className="border border-gray-300 px-4 py-2">{player.state}</td>
+                          <td className="border border-gray-300 px-4 py-2">{player.school}</td>
+                          <td className="border border-gray-300 px-4 py-2">{player.regularRating}</td>
+                          <td className="border border-gray-300 px-4 py-2">
+                            {isAlreadyOnRoster ? (
+                              <span className="text-gray-500 text-xs">Already Added</span>
+                            ) : (
+                              <button 
+                                onClick={() => handleSelectPlayer(player)} 
+                                className="bg-green-500 text-white px-2 py-1 rounded text-xs hover:bg-green-600"
+                              >
+                                Select
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}</tbody>
                   </table>
                 </div>
               ) : null}

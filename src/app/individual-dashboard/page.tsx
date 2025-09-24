@@ -126,29 +126,8 @@ function IndividualDashboardContent() {
   }, []);
   
   const handlePlayerSelectedFromSearch = (player: any) => {
-    const isMasterPlayer = 'uscfId' in player;
-    let playerToEdit: MasterPlayer;
-
-    if (isMasterPlayer) {
-      playerToEdit = player as MasterPlayer;
-    } else {
-      // Convert from USCFPlayer to MasterPlayer if needed
-      const nameParts = player.name ? player.name.split(', ') : ['Unknown', 'Player'];
-      playerToEdit = {
-        id: player.uscf_id,
-        uscfId: player.uscf_id,
-        firstName: nameParts[1] || '',
-        lastName: nameParts[0] || '',
-        regularRating: player.rating_regular || undefined,
-        uscfExpiration: player.expiration_date ? new Date(player.expiration_date).toISOString() : undefined,
-        state: player.state || 'TX',
-        school: '', district: '', grade: '', section: '', email: '', zipCode: '',
-        events: 0, eventIds: [],
-      };
-    }
-    
     setIsSearchOpen(false); // Close search dialog
-    handleEditPlayer(playerToEdit); // Open details dialog
+    handleEditPlayer(player); // Open details dialog
   };
   
   const handlePlayerCreatedOrUpdated = () => {

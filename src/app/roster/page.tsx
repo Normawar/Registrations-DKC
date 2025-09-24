@@ -24,37 +24,10 @@ function RosterPage() {
   };
   
   const handlePlayerSelectedFromSearch = (player: any) => {
-    const isMasterPlayer = 'uscfId' in player;
-    let playerToProcess: MasterPlayer;
-
-    if (isMasterPlayer) {
-      playerToProcess = player as MasterPlayer;
-    } else {
-      // This is a USCFPlayer object, map it to a MasterPlayer
-      const nameParts = player.name ? player.name.split(', ') : ['Unknown', 'Player'];
-      playerToProcess = {
-        id: player.uscf_id,
-        uscfId: player.uscf_id,
-        firstName: nameParts[1] || '',
-        lastName: nameParts[0] || '',
-        middleName: nameParts.length > 2 ? nameParts[2] : '',
-        regularRating: player.rating_regular || undefined,
-        uscfExpiration: player.expiration_date ? new Date(player.expiration_date).toISOString() : undefined,
-        state: player.state || 'TX',
-        school: profile?.school || '', 
-        district: profile?.district || '', 
-        grade: '', 
-        section: '', 
-        email: '', 
-        zipCode: '',
-        events: 0,
-        eventIds: [],
-      };
-    }
-    // Close the search dialog
+    // This function is called when a player is selected from the search dialog.
+    // It should close the search dialog and open the details dialog.
     setIsSearchOpen(false);
-    // Open the details dialog with the selected player
-    handleEditPlayer(playerToProcess);
+    handleEditPlayer(player);
   };
 
   const handleAddToRoster = async (player: MasterPlayer) => {
