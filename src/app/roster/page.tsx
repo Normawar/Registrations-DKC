@@ -1,5 +1,4 @@
 
-
 // src/app/roster/page.tsx
 'use client';
 
@@ -677,15 +676,16 @@ function DistrictRostersPageContent() {
         preFilterByUserProfile={false}
       />
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col p-0">
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col p-0">
           <DialogHeader className="p-6 pb-4 border-b shrink-0">
             <DialogTitle>{playerToEdit ? 'Edit Player' : 'Create New Player'}</DialogTitle>
             <DialogDescription>
               {playerToEdit ? 'Modify the player\'s information below.' : 'Enter the details for the new player.'}
             </DialogDescription>
           </DialogHeader>
-            <div className="grid md:grid-cols-2 gap-x-8 flex-1 overflow-y-auto">
-              <ScrollArea className="p-6 pr-3">
+            <ScrollArea className="flex-1 overflow-y-auto">
+              <div className="p-6 grid grid-cols-1 md:grid-cols-[2fr,1fr] gap-x-8">
+                <div className='pr-6'>
                   <Form {...form}>
                       <form id="edit-player-form-user" onSubmit={form.handleSubmit(onEditSubmit)} className="space-y-6">
                           <div className="space-y-4">
@@ -764,11 +764,12 @@ function DistrictRostersPageContent() {
                           </div>
                       </form>
                   </Form>
-              </ScrollArea>
-              <ScrollArea className="p-6 border-l pr-3">
-                  <ChangeHistorySection player={playerToEdit} />
-              </ScrollArea>
-            </div>
+                </div>
+                <div className="border-l md:pl-6">
+                    <ChangeHistorySection player={playerToEdit} />
+                </div>
+              </div>
+            </ScrollArea>
             <DialogFooter className="p-6 pt-4 border-t bg-muted/30 shrink-0">
               <div className="flex justify-between w-full">
                 {playerToEdit && profile?.role === 'organizer' ? (
@@ -833,3 +834,4 @@ export default function RosterPage() {
     );
 }
 
+    
