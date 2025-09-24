@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -325,7 +326,7 @@ export function PlayerDetailsDialog({ isOpen, onOpenChange, playerToEdit, onPlay
         </ScrollArea>
         <DialogFooter className="p-6 pt-4 border-t bg-muted/30 shrink-0">
           <div className="flex justify-between w-full">
-            {playerToEdit?.id ? (<Button type="button" variant="destructive" onClick={handleDelete}><Trash2 className="h-4 w-4 mr-2" />Delete Player</Button>) : (<div></div>)}
+            {playerToEdit?.id && profile?.role === 'organizer' ? (<Button type="button" variant="destructive" onClick={handleDelete}><Trash2 className="h-4 w-4 mr-2" />Delete Player</Button>) : (<div></div>)}
             <div className="flex gap-3">
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
               {onAddToRoster && (
