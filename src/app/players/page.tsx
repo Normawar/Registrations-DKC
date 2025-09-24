@@ -1,35 +1,28 @@
 
 'use client';
 
-import React, { useState, useEffect, useCallback, Suspense } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
-
+import React, { useState, Suspense } from 'react';
 import { AppLayout } from '@/components/app-layout';
 import { PlayerDetailsDialog } from '@/components/player-details-dialog'; 
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
 import { Search } from 'lucide-react';
-import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { CSVUploadComponent } from '@/components/csv-upload';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { OrganizerGuard } from '@/components/auth-guard';
 import { PlayerSearchDialog } from '@/components/PlayerSearchDialog';
-
+import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 
 function PlayersPageContent() {
   const { database } = useMasterDb();
+  const { profile } = useSponsorProfile();
+
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState<MasterPlayer | null>(null);
-  const { toast } = useToast();
-  const { profile } = useSponsorProfile();
-  const searchParams = useSearchParams();
-  const router = useRouter();
 
   const handlePlayerSelected = (player: any) => {
     const isMasterPlayer = 'uscfId' in player;
-    
     const nameParts = player.name ? player.name.split(', ') : ['Unknown', 'Player'];
 
     const playerToEdit: MasterPlayer = isMasterPlayer ? player : {
@@ -56,23 +49,6 @@ function PlayersPageContent() {
     setIsSearchOpen(false);
   };
   
-  useEffect(() => {
-    const editId = searchParams.get('edit');
-    if (editId && database.length > 0) {
-      const playerToEdit = database.find(p => p.id === editId);
-      if (playerToEdit) {
-        handlePlayerSelected(playerToEdit);
-        router.replace('/players', { scroll: false });
-      } else {
-        toast({
-          variant: 'destructive',
-          title: 'Player Not Found',
-          description: `Could not find a player with ID: ${editId}`,
-        });
-      }
-    }
-  }, [searchParams, database, router, toast]);
-
   return (
     <AppLayout>
       <div className="container mx-auto p-6 space-y-6">
@@ -119,6 +95,7 @@ function PlayersPageContent() {
           onOpenChange={setIsSearchOpen}
           onPlayerSelected={handlePlayerSelected}
           portalType="organizer"
+          userProfile={profile}
         />
 
         <PlayerDetailsDialog
@@ -133,7 +110,6 @@ function PlayersPageContent() {
     </AppLayout>
   );
 }
-
 
 function PlayersPage() {
   return (

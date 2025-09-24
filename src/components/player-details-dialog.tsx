@@ -113,47 +113,72 @@ const ChangeHistorySection = ({ player }: { player: MasterPlayer | null }) => {
           </div>
         );
     }
+
     return (
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <History className="h-5 w-5 text-muted-foreground" />
-          Record Information
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-md bg-muted/30">
-          <div><h4 className="font-medium text-sm text-muted-foreground mb-2">RECORD CREATED</h4><p className="text-sm font-semibold">{player.createdAt ? format(new Date(player.createdAt), 'PPP p') : 'Unknown'}</p><p className="text-xs text-muted-foreground">By: {player.createdBy || 'Unknown'}</p></div>
-          <div><h4 className="font-medium text-sm text-muted-foreground mb-2">LAST UPDATED</h4><p className="text-sm font-semibold">{player.updatedAt ? format(new Date(player.updatedAt), 'PPP p') : 'Never'}</p><p className="text-xs text-muted-foreground">By: {player.updatedBy || 'Unknown'}</p></div>
+        <div className="space-y-4">
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <History className="h-5 w-5 text-muted-foreground" />
+              Record Information
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-md bg-muted/30">
+                <div>
+                    <h4 className="font-medium text-sm text-muted-foreground mb-2">RECORD CREATED</h4>
+                    <p className="text-sm font-semibold">
+                        {player.createdAt ? format(new Date(player.createdAt), 'PPP p') : 'Unknown Date'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                        By: {player.createdBy || 'Unknown User'}
+                    </p>
+                </div>
+                <div>
+                    <h4 className="font-medium text-sm text-muted-foreground mb-2">LAST UPDATED</h4>
+                    <p className="text-sm font-semibold">
+                        {player.updatedAt 
+                            ? format(new Date(player.updatedAt), 'PPP p') 
+                            : (player.createdAt ? format(new Date(player.createdAt), 'PPP p') : 'Unknown Date')
+                        }
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                        Updated by: {player.updatedBy || player.createdBy || 'Unknown User'}
+                    </p>
+                </div>
+            </div>
+
+            {player.changeHistory && player.changeHistory.length > 0 ? (
+                <div>
+                    <h4 className="font-medium text-sm text-muted-foreground mb-3">CHANGE HISTORY</h4>
+                    <div className="space-y-3 border rounded-md p-4 max-h-64 overflow-y-auto bg-background">
+                        {player.changeHistory.slice().reverse().map((entry, index) => (
+                            <div key={entry.timestamp || index} className="text-sm border-l-2 border-muted-foreground pl-4 pb-3 last:pb-0">
+                                <p className="font-medium text-foreground">
+                                    {format(new Date(entry.timestamp), 'PPP p')} by {entry.userName}
+                                </p>
+                                <ul className="list-disc pl-5 mt-2 space-y-1">
+                                    {entry.changes.map((change, i) => <li key={i} className="text-xs text-muted-foreground">Field <span className="font-semibold text-foreground">{change.field}</span> changed from <span className="italic text-red-600 mx-1">'{String(change.oldValue)}'</span> to <span className="italic text-green-600 mx-1">'{String(change.newValue)}'</span></li>)}
+                                </ul>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            ) : (
+                <div>
+                    <h4 className="font-medium text-sm text-muted-foreground mb-3">CHANGE HISTORY</h4>
+                    <div className="p-4 text-center text-xs text-muted-foreground border rounded-md bg-muted/20">
+                        No changes recorded for this player.
+                    </div>
+                </div>
+            )}
         </div>
-        {player.changeHistory && player.changeHistory.length > 0 ? (
-          <div>
-            <h4 className="font-medium text-sm text-muted-foreground mb-3">CHANGE HISTORY</h4>
-            <div className="space-y-3 border rounded-md p-4 max-h-64 overflow-y-auto bg-background">
-              {player.changeHistory.slice().reverse().map((entry, index) => (
-                <div key={entry.timestamp || index} className="text-sm border-l-2 border-muted-foreground pl-4 pb-3 last:pb-0">
-                  <p className="font-medium text-foreground">{format(new Date(entry.timestamp), 'PPP p')} by {entry.userName}</p>
-                  <ul className="list-disc pl-5 mt-2 space-y-1">
-                    {entry.changes.map((change, i) => <li key={i} className="text-xs text-muted-foreground">Field <span className="font-semibold text-foreground">{change.field}</span> changed from <span className="italic text-red-600 mx-1">'{String(change.oldValue)}'</span> to <span className="italic text-green-600 mx-1">'{String(change.newValue)}'</span></li>)}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : (
-            <div>
-                <h4 className="font-medium text-sm text-muted-foreground mb-3">CHANGE HISTORY</h4>
-                <div className="p-4 text-center text-xs text-muted-foreground border rounded-md bg-muted/20">
-                    No changes recorded for this player.
-                </div>
-            </div>
-        )}
-      </div>
     );
 };
 
-export function PlayerDetailsDialog({ isOpen, onOpenChange, playerToEdit, onPlayerCreatedOrUpdated }: {
+export function PlayerDetailsDialog({ isOpen, onOpenChange, playerToEdit, onPlayerCreatedOrUpdated, onAddToRoster }: {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   playerToEdit: MasterPlayer | null;
   onPlayerCreatedOrUpdated: () => void;
+  onAddToRoster?: (player: MasterPlayer) => void;
 }) {
   const { addPlayer, updatePlayer, deletePlayer, dbDistricts, getSchoolsForDistrict, database } = useMasterDb();
   const { profile } = useSponsorProfile();
@@ -206,7 +231,7 @@ export function PlayerDetailsDialog({ isOpen, onOpenChange, playerToEdit, onPlay
       return;
     }
     
-    if (playerToEdit && playerToEdit.id) {
+    if (playerToEdit?.id) {
       const updatedPlayer: MasterPlayer = { ...playerToEdit, ...values, dob: values.dob?.toISOString(), uscfExpiration: values.uscfExpiration?.toISOString() };
       await updatePlayer(updatedPlayer, profile);
       toast({ title: "Player Updated" });
@@ -216,6 +241,23 @@ export function PlayerDetailsDialog({ isOpen, onOpenChange, playerToEdit, onPlay
       toast({ title: "Player Created" });
     }
     onPlayerCreatedOrUpdated();
+    onOpenChange(false);
+  };
+  
+  const handleAddToRoster = async () => {
+    const values = form.getValues();
+    const result = playerFormSchema.safeParse(values);
+    if (!result.success) {
+      // Trigger validation to show errors
+      form.trigger();
+      toast({ variant: 'destructive', title: "Validation Error", description: "Please fix the errors before adding to roster."});
+      return;
+    }
+
+    if (onAddToRoster) {
+        const player = { ...playerToEdit, ...result.data } as MasterPlayer;
+        onAddToRoster(player);
+    }
     onOpenChange(false);
   };
 
@@ -243,13 +285,9 @@ export function PlayerDetailsDialog({ isOpen, onOpenChange, playerToEdit, onPlay
                   <h3 className="text-lg font-semibold border-b pb-2">Player Information</h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <FormField control={form.control} name="firstName" render={({ field }) => (<FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
-                    <FormField control={form.control} name="lastName" render={({ field }) => (<FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
                     <FormField control={form.control} name="middleName" render={({ field }) => (<FormItem><FormLabel>Middle Name (Optional)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={form.control} name="lastName" render={({ field }) => (<FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
                   </div>
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <FormField control={form.control} name="dob" render={({ field }) => (<FormItem><FormLabel>Date of Birth</FormLabel><FormControl><DateInput value={field.value} onChange={field.onChange} /></FormControl><FormMessage /></FormItem>)} />
-                      <FormField control={form.control} name="email" render={({ field }) => (<FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                   </div>
                 </div>
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold border-b pb-2">School Information</h3>
@@ -273,9 +311,10 @@ export function PlayerDetailsDialog({ isOpen, onOpenChange, playerToEdit, onPlay
                 </div>
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold border-b pb-2">Contact Information</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <FormField control={form.control} name="email" render={({ field }) => (<FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={form.control} name="state" render={({ field }) => (<FormItem><FormLabel>State (Optional)</FormLabel><Select onValueChange={field.onChange} defaultValue="TX" value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{states.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
                     <FormField control={form.control} name="zipCode" render={({ field }) => (<FormItem><FormLabel>Zip Code</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
-                    <FormField control={form.control} name="state" render={({ field }) => (<FormItem><FormLabel>State</FormLabel><Select onValueChange={field.onChange} defaultValue="TX" value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{states.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
                   </div>
                 </div>
                 <Separator className="my-8" />
@@ -289,6 +328,9 @@ export function PlayerDetailsDialog({ isOpen, onOpenChange, playerToEdit, onPlay
             {playerToEdit?.id ? (<Button type="button" variant="destructive" onClick={handleDelete}><Trash2 className="h-4 w-4 mr-2" />Delete Player</Button>) : (<div></div>)}
             <div className="flex gap-3">
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+              {onAddToRoster && !playerToEdit?.id && (
+                <Button type="button" onClick={handleAddToRoster}>Add to Roster</Button>
+              )}
               <Button type="submit" form="player-details-form">{playerToEdit?.id ? 'Save Changes' : 'Create Player'}</Button>
             </div>
           </div>
