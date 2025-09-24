@@ -16,7 +16,7 @@ import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { School, User, DollarSign, CheckCircle, Lock, AlertCircle, Clock } from "lucide-react";
 import { format, differenceInHours, isSameDay, startOfDay } from "date-fns";
 import { InvoiceDetailsDialog } from '@/components/invoice-details-dialog';
-import { createSponsorInvoice } from '@/app/ai/flows/create-sponsor-invoice-flow';
+import { createSponsorInvoice } from '@/ai/flows/create-sponsor-invoice-flow';
 import { generateTeamCode } from '@/lib/school-utils';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { Checkbox } from './ui/checkbox';

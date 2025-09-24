@@ -9,7 +9,7 @@ import { randomUUID } from 'crypto';
 import { ApiError, type OrderLineItem, type InvoiceRecipient, Client, Environment } from 'square';
 import { format } from 'date-fns';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { getDb } from '@/lib/firebase-admin'; // USING ADMIN SDK
+import { getDb } from '@/lib/firebase-admin'; // USING ADMIN SDK GETTER
 import { generateTeamCode } from '@/lib/school-utils';
 import { type CreateInvoiceInput, type CreateInvoiceOutput } from './schemas';
 

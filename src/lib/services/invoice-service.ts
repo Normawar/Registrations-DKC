@@ -1,3 +1,4 @@
+
 'use server';
 
 import { 
@@ -16,7 +17,8 @@ export async function recreateInvoiceFromRoster(input: any): Promise<RecreateInv
     }
 
     // Now, call the actual Genkit flow with the cleaned data
-    return await recreateInvoiceFromRosterFlow(cleanedInput);
+    const flowInput = cleanedInput as RecreateInvoiceInput;
+    return await recreateInvoiceFromRosterFlow(flowInput);
 }
 
 // Keep the analysis function for debugging if needed

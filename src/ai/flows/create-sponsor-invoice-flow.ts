@@ -6,9 +6,9 @@
  * It determines whether to create a standard invoice or a split PSJA invoice based on the input.
  */
 
-import { createInvoice } from './create-invoice-flow';
-import { createPsjaSplitInvoice } from './create-psja-split-invoice-flow';
-import type { CreateInvoiceInput, CreateInvoiceOutput, CreatePsjaSplitInvoiceInput, CreatePsjaSplitInvoiceOutput } from './schemas';
+import { createInvoice } from '@/ai/flows/create-invoice-flow';
+import { createPsjaSplitInvoice } from '@/ai/flows/create-psja-split-invoice-flow';
+import type { CreateInvoiceInput, CreateInvoiceOutput, CreatePsjaSplitInvoiceInput, CreatePsjaSplitInvoiceOutput } from '@/ai/flows/schemas';
 
 
 export async function createSponsorInvoice(input: CreateInvoiceInput): Promise<CreatePsjaSplitInvoiceOutput> {
