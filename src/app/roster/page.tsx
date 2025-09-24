@@ -32,12 +32,19 @@ function RosterPage() {
 
   const handleAddToRoster = async (player: MasterPlayer) => {
     if (!profile) return;
-    const updatedPlayer = { 
-      ...player, 
-      school: profile.school, 
-      district: profile.district 
-    };
-    await updatePlayer(updatedPlayer, profile);
+    
+    // Close the search dialog first
+    setIsSearchOpen(false);
+
+    if (profile.role === 'sponsor' || profile.isDistrictCoordinator) {
+      const updatedPlayer = { 
+        ...player, 
+        school: profile.school, 
+        district: profile.district 
+      };
+      await updatePlayer(updatedPlayer, profile);
+    }
+    
     setIsEditOpen(false); // Close the details dialog
     refreshDatabase(); // Refresh data to show the new player
   };
@@ -66,6 +73,7 @@ function RosterPage() {
             isOpen={isSearchOpen}
             onOpenChange={setIsSearchOpen}
             onPlayerSelected={handlePlayerSelectedFromSearch}
+            onAddToRoster={handleAddToRoster}
             portalType={profile?.role || 'individual'}
             userProfile={profile}
           />

@@ -103,36 +103,87 @@ function IndividualDashboardContent() {
 
   const handleStudentAdded = useCallback(async (newStudent: MasterPlayer) => {
     if (!profile?.email) return;
-
-    if (!parentStudentIds.includes(newStudent.id)) {
+  
+    try {
+      if (!parentStudentIds.includes(newStudent.id)) {
         const updatedIds = [...(profile.studentIds || []), newStudent.id];
         await updateProfile({ studentIds: updatedIds });
+        
         toast({
-            title: "Student Added",
-            description: `${newStudent.firstName} ${newStudent.lastName} has been added to your student list.`
+          title: "Student Added",
+          description: `${newStudent.firstName} ${newStudent.lastName} has been added to your student list.`
         });
-    } else {
+        
+        // Close the edit dialog
+        setIsEditOpen(false);
+        setPlayerToEdit(null);
+        
+        // Only refresh database after successful addition
+        refreshDatabase();
+      } else {
         toast({
-            title: "Student Already on List",
-            description: `${newStudent.firstName} ${newStudent.lastName} is already on your list.`
+          title: "Student Already on List",
+          description: `${newStudent.firstName} ${newStudent.lastName} is already on your list.`
         });
+      }
+    } catch (error) {
+      console.error('Error adding student:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add student. Please try again.",
+        variant: "destructive"
+      });
     }
-    
-    setIsEditOpen(false); // Close the details dialog
-  }, [profile, parentStudentIds, toast, updateProfile]);
+  }, [profile, parentStudentIds, toast, updateProfile, refreshDatabase]);
 
   const handleAddStudentClick = useCallback(() => {
     setIsSearchOpen(true);
   }, []);
   
-  const handlePlayerSelectedFromSearch = (player: any) => {
-    setIsSearchOpen(false); // Close search dialog
-    handleEditPlayer(player); // Open details dialog
-  };
+  const handlePlayerSelectedFromSearch = useCallback((player: any) => {
+    const isMasterPlayer = 'uscfId' in player;
+    let playerToProcess: MasterPlayer;
+
+    if (isMasterPlayer) {
+        playerToProcess = player as MasterPlayer;
+    } else {
+        // Convert USCFPlayer to MasterPlayer
+        const nameParts = player.name ? player.name.split(', ') : ['Unknown', 'Player'];
+        playerToProcess = {
+        id: player.uscf_id,
+        uscfId: player.uscf_id,
+        firstName: nameParts[1] || '',
+        lastName: nameParts[0] || '',
+        middleName: '',
+        regularRating: player.rating_regular || undefined,
+        uscfExpiration: player.expiration_date ? new Date(player.expiration_date).toISOString() : undefined,
+        state: player.state || 'TX',
+        school: '', 
+        district: '', 
+        grade: '', 
+        section: '', 
+        email: '', 
+        zipCode: '',
+        dob: undefined,
+        events: 0,
+        eventIds: [],
+        };
+    }
+    
+    // Close search dialog first
+    setIsSearchOpen(false);
+    
+    // Then open edit dialog with the player
+    setPlayerToEdit(playerToProcess);
+    setIsEditOpen(true);
+    }, []);
   
-  const handlePlayerCreatedOrUpdated = () => {
-    refreshDatabase();
-  };
+  const handlePlayerCreatedOrUpdated = useCallback(() => {
+    // Only refresh if we're not in the middle of adding to roster
+    // The refresh should happen in handleStudentAdded after successful addition
+    console.log('Player created or updated - refresh will happen after roster addition');
+  }, []);
+
 
   const isLoading = profileLoading || !isDbLoaded;
   const hasProfile = !!profile?.email;

@@ -151,14 +151,8 @@ export function PlayerSearchDialog({
   };
 
   const handleSelectPlayer = (player: MasterPlayer) => {
-    // Check if player is already excluded (already on roster)
-    if (excludeIds.includes(player.id)) {
-      alert(`${player.firstName} ${player.lastName} is already on your roster.`);
-      return;
-    }
-
-    // Call the parent's onPlayerSelected callback
-    // This will close the search dialog and open the player details dialog
+    // This is the correct function for the "Select" button.
+    // It calls the parent's onPlayerSelected callback.
     onPlayerSelected(player);
   };
   
@@ -261,16 +255,22 @@ export function PlayerSearchDialog({
                           <td className="border border-gray-300 px-4 py-2">{player.school}</td>
                           <td className="border border-gray-300 px-4 py-2">{player.regularRating}</td>
                           <td className="border border-gray-300 px-4 py-2">
-                            {isAlreadyOnRoster ? (
-                              <span className="text-gray-500 text-xs">Already Added</span>
-                            ) : (
-                              <button 
-                                onClick={() => handleSelectPlayer(player)} 
-                                className="bg-green-500 text-white px-2 py-1 rounded text-xs hover:bg-green-600"
-                              >
-                                Select
-                              </button>
-                            )}
+                             {onAddToRoster ? (
+                                <button 
+                                  onClick={() => handleSelectPlayer(player)} 
+                                  disabled={isAlreadyOnRoster}
+                                  className={`px-2 py-1 rounded text-xs ${isAlreadyOnRoster ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-green-500 text-white hover:bg-green-600'}`}
+                                >
+                                  {isAlreadyOnRoster ? 'On Roster' : 'Add to Roster'}
+                                </button>
+                              ) : (
+                                <button 
+                                  onClick={() => handleSelectPlayer(player)} 
+                                  className="bg-green-500 text-white px-2 py-1 rounded text-xs hover:bg-green-600"
+                                >
+                                  Select
+                                </button>
+                              )}
                           </td>
                         </tr>
                       );
