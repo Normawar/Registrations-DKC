@@ -241,7 +241,7 @@ export function PlayerDetailsDialog({ isOpen, onOpenChange, playerToEdit, onPlay
       uscfExpiration: values.uscfExpiration?.toISOString(),
     }) as MasterPlayer;
     
-    if (playerToEdit?.id) {
+    if (playerToEdit?.id && !playerToEdit.id.startsWith('temp_')) {
       await updatePlayer(playerToSave, profile);
       toast({ title: "Player Updated" });
     } else {
@@ -263,6 +263,10 @@ export function PlayerDetailsDialog({ isOpen, onOpenChange, playerToEdit, onPlay
 
     if (onAddToRoster) {
         const player = sanitizePlayerForFirebase({ ...playerToEdit, ...result.data }) as MasterPlayer;
+        if (!player.id || player.id.startsWith('temp_')) {
+          player.id = player.uscfId.toUpperCase() === 'NEW' ? `temp_${Date.now()}` : player.uscfId;
+        }
+        await addPlayer(player, profile);
         onAddToRoster(player);
     }
     onOpenChange(false);
@@ -281,7 +285,7 @@ export function PlayerDetailsDialog({ isOpen, onOpenChange, playerToEdit, onPlay
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-4xl max-h-[95vh] flex flex-col p-0">
         <DialogHeader className="p-6 pb-4 border-b shrink-0">
-          <DialogTitle>{playerToEdit?.id ? `Player Details: ${playerToEdit.firstName} ${playerToEdit.lastName}` : 'Create New Player'}</DialogTitle>
+          <DialogTitle>{playerToEdit?.id && !playerToEdit.id.startsWith('temp_') ? `Player Details: ${playerToEdit.firstName} ${playerToEdit.lastName}` : 'Create New Player'}</DialogTitle>
           <DialogDescription>{playerToEdit?.id ? 'Modify the player\'s information below.' : 'Enter the details for the new player.'}</DialogDescription>
         </DialogHeader>
         <ScrollArea className="flex-1 overflow-y-auto">
@@ -339,7 +343,7 @@ export function PlayerDetailsDialog({ isOpen, onOpenChange, playerToEdit, onPlay
               {onAddToRoster ? (
                 <Button type="button" onClick={handleAddToRoster}>Add to Roster</Button>
               ) : null}
-              <Button type="submit" form="player-details-form">{playerToEdit?.id ? 'Save Changes' : 'Create Player'}</Button>
+              <Button type="submit" form="player-details-form">{playerToEdit?.id && !playerToEdit.id.startsWith('temp_') ? 'Save Changes' : 'Create Player'}</Button>
             </div>
           </div>
         </DialogFooter>

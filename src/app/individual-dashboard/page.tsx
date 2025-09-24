@@ -143,13 +143,13 @@ function IndividualDashboardContent() {
   const handlePlayerSelectedFromSearch = useCallback((player: any) => {
     const isMasterPlayer = 'uscfId' in player;
     let playerToProcess: MasterPlayer;
-
+  
     if (isMasterPlayer) {
-        playerToProcess = player as MasterPlayer;
+      playerToProcess = player as MasterPlayer;
     } else {
-        // Convert USCFPlayer to MasterPlayer
-        const nameParts = player.name ? player.name.split(', ') : ['Unknown', 'Player'];
-        playerToProcess = {
+      // Convert USCFPlayer to MasterPlayer
+      const nameParts = player.name ? player.name.split(', ') : ['Unknown', 'Player'];
+      playerToProcess = {
         id: player.uscf_id,
         uscfId: player.uscf_id,
         firstName: nameParts[1] || '',
@@ -167,7 +167,7 @@ function IndividualDashboardContent() {
         dob: undefined,
         events: 0,
         eventIds: [],
-        };
+      };
     }
     
     // Close search dialog first
@@ -176,7 +176,7 @@ function IndividualDashboardContent() {
     // Then open edit dialog with the player
     setPlayerToEdit(playerToProcess);
     setIsEditOpen(true);
-    }, []);
+  }, []);
   
   const handlePlayerCreatedOrUpdated = useCallback(() => {
     // Only refresh if we're not in the middle of adding to roster
