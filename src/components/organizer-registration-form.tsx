@@ -358,12 +358,19 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         if (!event) return { registrationFees: 0, uscfFees: 0, lateFees: 0, total: 0, feeType: 'Regular Registration' };
         const { fee: currentFee, type: feeType } = getFeeForEvent();
         const uscfFee = 24;
+        let uscfPlayersToCharge = stagedPlayers.filter(p => p.uscfStatus !== 'current');
+
+        if (selectedDistrict === 'PHARR-SAN JUAN-ALAMO ISD') {
+            uscfPlayersToCharge = uscfPlayersToCharge.filter(p => p.studentType !== 'gt');
+        }
+
         const registrationFees = stagedPlayers.length * event.regularFee;
         const lateFees = stagedPlayers.length * (currentFee - event.regularFee);
-        const uscfFees = stagedPlayers.filter(p => p.uscfStatus !== 'current' && p.studentType !== 'gt').length * uscfFee;
+        const uscfFees = uscfPlayersToCharge.length * uscfFee;
         const total = registrationFees + lateFees + uscfFees;
+        
         return { registrationFees, uscfFees, lateFees, total, feeType };
-    }, [stagedPlayers, event, getFeeForEvent]);
+    }, [stagedPlayers, event, getFeeForEvent, selectedDistrict]);
 
     const handleFinalize = async () => {
         const usersRef = collection(db, 'users');
@@ -667,7 +674,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         const selections = Object.fromEntries(
             stagedPlayers
               .filter(player => {
-                return playersInInvoice.some(pl => pl.playerName === `${player.firstName} ${player.lastName}`);
+                return playersInInvoice.some(p => p.playerName === `${player.firstName} ${player.lastName}`);
               })
               .map(player => [
                 player.id!,
@@ -790,7 +797,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         const showPsjaSplitView = isPsja && hasGt && hasIndependent;
 
         const renderPsjaFeeBreakdown = () => {
-            const breakdown = feeBreakdown; // It already contains the logic
+            const breakdown = feeBreakdown; 
             return (
               <div className="border rounded-lg p-4 space-y-3">
                 <h3 className="font-semibold">PSJA Split Invoice Breakdown</h3>
@@ -857,16 +864,15 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                     </div>
 
                     {showPsjaSplitView ? renderPsjaFeeBreakdown() : (
-                        <div className="border rounded-lg p-4 space-y-3">
-                            <h3 className="font-semibold">Charge Breakdown</h3>
-                            {/* Standard breakdown logic */}
-                            <div className="space-y-2 text-sm">
-                                <div className="flex justify-between"><span>Registration Fees ({stagedPlayers.length} × ${event.regularFee})</span><span>${feeBreakdown.registrationFees.toFixed(2)}</span></div>
-                                {feeBreakdown.lateFees > 0 && (<div className="flex justify-between text-amber-600"><span>{feeBreakdown.feeType} ({stagedPlayers.length} × ${(feeBreakdown.lateFees / stagedPlayers.length).toFixed(2)})</span><span>${feeBreakdown.lateFees.toFixed(2)}</span></div>)}
-                                {feeBreakdown.uscfFees > 0 && (<div className="flex justify-between"><span>USCF Fees ({stagedPlayers.filter(s => s.uscfStatus !== 'current').length} × $24)</span><span>${feeBreakdown.uscfFees.toFixed(2)}</span></div>)}
-                                <div className="border-t pt-2 flex justify-between font-semibold"><span>Total Amount</span><span>${feeBreakdown.total.toFixed(2)}</span></div>
-                            </div>
-                        </div>
+                      <div className="border rounded-lg p-4 space-y-3">
+                          <h3 className="font-semibold">Charge Breakdown</h3>
+                          <div className="space-y-2 text-sm">
+                              <div className="flex justify-between"><span>Registration Fees ({stagedPlayers.length} × ${event.regularFee})</span><span>${feeBreakdown.registrationFees.toFixed(2)}</span></div>
+                              {feeBreakdown.lateFees > 0 && (<div className="flex justify-between text-amber-600"><span>{feeBreakdown.feeType} ({stagedPlayers.length} × ${(feeBreakdown.lateFees / stagedPlayers.length).toFixed(2)})</span><span>${feeBreakdown.lateFees.toFixed(2)}</span></div>)}
+                              {feeBreakdown.uscfFees > 0 && (<div className="flex justify-between"><span>USCF Fees ({stagedPlayers.filter(s => s.uscfStatus !== 'current' && s.studentType !== 'gt').length} × $24)</span><span>${feeBreakdown.uscfFees.toFixed(2)}</span></div>)}
+                              <div className="border-t pt-2 flex justify-between font-semibold"><span>Total Amount</span><span>${feeBreakdown.total.toFixed(2)}</span></div>
+                          </div>
+                      </div>
                     )}
                     
                     {!showPsjaSplitView && (
@@ -1130,15 +1136,5 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                 </DialogContent>
             </Dialog>
         </div>
-    );
-}
-
-export default function OrganizerRegistrationPage() {
-    return (
-        <OrganizerGuard>
-            <AppLayout>
-                <OrganizerRegistrationForm eventId={useSearchParams().get('eventId')} />
-            </AppLayout>
-        </OrganizerGuard>
     );
 }

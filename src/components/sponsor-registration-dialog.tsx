@@ -74,9 +74,9 @@ export function SponsorRegistrationDialog({
   // Load existing registrations from Firestore
   useEffect(() => {
     const loadRegistrations = async () => {
-      if (isOpen && db) {
+      if (isOpen && db && event?.id) {
         const invoicesCol = collection(db, 'invoices');
-        const q = query(invoicesCol, where('eventId', '==', event?.id));
+        const q = query(invoicesCol, where('eventId', '==', event.id));
         const invoiceSnapshot = await getDocs(q);
         const eventRegistrations = invoiceSnapshot.docs.map(doc => doc.data());
         setRegistrations(eventRegistrations);
@@ -161,7 +161,7 @@ export function SponsorRegistrationDialog({
   };
 
   const calculateFeeBreakdown = () => {
-    if (!event) return { 
+    if (!event || !profile) return { 
       registrationFees: 0, 
       lateFees: 0, 
       uscfFees: 0, 
@@ -177,6 +177,21 @@ export function SponsorRegistrationDialog({
     const lateFeePerStudent = currentFee - event.regularFee;
     const lateFeeTotal = selectedCount * lateFeePerStudent;
     
+    let uscfPlayersToCharge = Object.entries(selectedStudents).filter(([_, details]) => details.uscfStatus !== 'current');
+
+    // PSJA Special Rule: GT players' USCF fees are covered by the district
+    if (profile.district === 'PHARR-SAN JUAN-ALAMO ISD') {
+      uscfPlayersToCharge = uscfPlayersToCharge.filter(([playerId]) => {
+        const player = rosterPlayers.find(p => p.id === playerId);
+        return player?.studentType !== 'gt';
+      });
+    }
+
+    const uscfFee = 24;
+    const uscfTotal = uscfPlayersToCharge.length * uscfFee;
+    const total = baseTotal + lateFeeTotal + uscfTotal;
+
+    // For PSJA split view
     const gtStudents = Object.entries(selectedStudents).filter(([playerId]) => {
       const player = rosterPlayers.find(p => p.id === playerId);
       return player?.studentType === 'gt';
@@ -186,17 +201,9 @@ export function SponsorRegistrationDialog({
       const player = rosterPlayers.find(p => p.id === playerId);
       return player?.studentType !== 'gt';
     });
-
+    
     const gtRegistrationFees = gtStudents.length * event.regularFee;
-
     const indRegistrationFees = independentStudents.length * event.regularFee;
-    const allLateFees = lateFeeTotal;
-    
-    const uscfFee = 24;
-    const uscfPlayersToCharge = independentStudents.filter(([_, details]) => details.uscfStatus !== 'current');
-    const uscfTotal = uscfPlayersToCharge.length * uscfFee;
-    
-    const total = baseTotal + lateFeeTotal + uscfTotal;
 
     return {
       registrationFees: baseTotal,
@@ -205,7 +212,7 @@ export function SponsorRegistrationDialog({
       total: total,
       feeType: feeType,
       gtBreakdown: { registrationFees: gtRegistrationFees, lateFees: 0 },
-      schoolBreakdown: { registrationFees: indRegistrationFees, lateFees: allLateFees, uscfFees: uscfTotal }
+      schoolBreakdown: { registrationFees: indRegistrationFees, lateFees: lateFeeTotal, uscfFees: uscfTotal }
     };
   };
 
@@ -268,6 +275,7 @@ export function SponsorRegistrationDialog({
     try {
       const result = await createInvoice({
           sponsorName: `${profile.firstName} ${profile.lastName}`,
+          parentName: `${profile.firstName} ${profile.lastName}`,
           sponsorEmail: profile.email || '',
           sponsorPhone: profile.phone || '',
           schoolName: profile.school,
@@ -331,6 +339,7 @@ export function SponsorRegistrationDialog({
       if (registrationPlayers.length > 0) {
         const regResult = await createInvoice({
           sponsorName: `${profile.firstName} ${profile.lastName}`,
+          parentName: `${profile.firstName} ${profile.lastName}`,
           sponsorEmail: profile.email || '',
           schoolName: profile.school,
           teamCode: generateTeamCode({ schoolName: profile.school, district: profile.district }),
@@ -350,6 +359,7 @@ export function SponsorRegistrationDialog({
       if (uscfPlayers.length > 0) {
         const uscfResult = await createInvoice({
           sponsorName: `${profile.firstName} ${profile.lastName}`,
+          parentName: `${profile.firstName} ${profile.lastName}`,
           sponsorEmail: profile.email || '',
           schoolName: profile.school,
           teamCode: generateTeamCode({ schoolName: profile.school, district: profile.district }),
@@ -546,7 +556,7 @@ export function SponsorRegistrationDialog({
     if (status === 'renewing') return <Badge variant="destructive">Expired (+$24)</Badge>;
     return <Badge variant="outline">{status}</Badge>;
   };
-
+  
   const renderStandardFeeBreakdown = () => (
     <div className="border rounded-lg p-4 space-y-3">
       <h3 className="font-semibold">Charge Breakdown</h3>
@@ -563,7 +573,7 @@ export function SponsorRegistrationDialog({
         )}
         {feeBreakdown.uscfFees > 0 && (
           <div className="flex justify-between">
-            <span>USCF Fees ({Object.values(selectedStudents).filter(s => s.uscfStatus !== 'current').length} × $24)</span>
+            <span>USCF Fees ({Object.values(selectedStudents).filter(s => s.uscfStatus !== 'current' && rosterPlayers.find(p => p.id === Object.keys(selectedStudents).find(key => selectedStudents[key] === s))?.studentType !== 'gt').length} × $24)</span>
             <span>${feeBreakdown.uscfFees.toFixed(2)}</span>
           </div>
         )}
@@ -640,13 +650,12 @@ export function SponsorRegistrationDialog({
       </div>
     );
   };
-
-
-  if (!event) return null;
   
-  const isPsjaRestricted = event.isPsjaOnly && profile?.district !== 'PHARR-SAN JUAN-ALAMO ISD';
+  if (!event || !profile) return null;
+  
+  const isRestrictedEvent = event.isPsjaOnly && profile.district !== 'PHARR-SAN JUAN-ALAMO ISD';
 
-  if (event.isClosed || isPsjaRestricted) {
+  if (event.isClosed || isRestrictedEvent) {
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent>
@@ -672,6 +681,14 @@ export function SponsorRegistrationDialog({
     );
   }
 
+  const allSelectedPlayers = Object.entries(selectedStudents).map(([playerId, details]) => ({
+    player: rosterPlayers.find(p => p.id === playerId),
+    details
+  }));
+  const hasGt = allSelectedPlayers.some(p => p.player?.studentType === 'gt');
+  const hasIndependent = allSelectedPlayers.some(p => p.player?.studentType !== 'gt');
+  const showPsjaSplitView = profile.district === 'PHARR-SAN JUAN-ALAMO ISD' && hasGt && hasIndependent;
+
   return (
     <>
       <Dialog open={isOpen && !showConfirmation} onOpenChange={(open) => {
@@ -689,7 +706,7 @@ export function SponsorRegistrationDialog({
               {format(new Date(event.date), 'PPP')} • {event.location}
             </p>
           </DialogHeader>
-           {profile?.district === 'PHARR-SAN JUAN-ALAMO ISD' && (
+           {profile.district === 'PHARR-SAN JUAN-ALAMO ISD' && (
               <Alert>
                   <AlertTitle>PSJA District Notice</AlertTitle>
                   <AlertDescription>
@@ -708,7 +725,7 @@ export function SponsorRegistrationDialog({
               <div className="text-center p-8 text-muted-foreground">
                 <User className="h-12 w-12 mx-auto mb-4 opacity-50" />
                 <p className="text-lg font-medium">No Students Found</p>
-                <p>No students found for {profile?.district}/{profile?.school}</p>
+                <p>No students found for {profile.school}</p>
               </div>
             ) : (
               <div className="grid gap-4">
@@ -734,7 +751,7 @@ export function SponsorRegistrationDialog({
                   const status = getStudentRegistrationStatus(student);
                   const isSelected = !!selectedStudents[student.id];
                   const uscfStatus = isSelected ? selectedStudents[student.id].uscfStatus : getUscfStatusForPlayer(student);
-                  const isPsjaGt = profile?.district === 'PHARR-SAN JUAN-ALAMO ISD' && student.studentType === 'gt';
+                  const isPsjaGt = profile.district === 'PHARR-SAN JUAN-ALAMO ISD' && student.studentType === 'gt';
                   
                   return (
                     <Card 
@@ -880,9 +897,9 @@ export function SponsorRegistrationDialog({
               </div>
             </div>
 
-            {profile?.district === 'PHARR-SAN JUAN-ALAMO ISD' ? renderPsjaFeeBreakdown() : renderStandardFeeBreakdown()}
+            {showPsjaSplitView ? renderPsjaFeeBreakdown() : renderStandardFeeBreakdown()}
             
-            {profile?.district !== 'PHARR-SAN JUAN-ALAMO ISD' && (
+            {!showPsjaSplitView && (
               <div className="flex items-center space-x-2 pt-4">
                 <Checkbox
                   id="split-uscf-fees"
