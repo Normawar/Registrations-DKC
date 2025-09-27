@@ -13,7 +13,7 @@ import { type MasterPlayer } from '@/lib/data/full-master-player-data';
 import {
   type ProcessBatchInput,
   type ProcessBatchOutput,
-} from './schemas';
+} from './schemas.js';
 
 // Define the Event type directly in the server-side flow to avoid client-side imports.
 type Event = {
