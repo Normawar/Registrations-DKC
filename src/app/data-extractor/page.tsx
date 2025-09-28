@@ -45,6 +45,18 @@ export default function DeZavalaTournamentExtractor() {
   // Specific event ID for the 10/04/2025 De Zavala Tournament
   const EVENT_ID = 'evt-1757125186611-0.05756934987789575';
 
+  // Debug Firebase configuration
+  useEffect(() => {
+    console.log('Firebase Environment Variables:', {
+      apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || 'MISSING',
+      authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || 'MISSING',
+      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'MISSING',
+      messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || 'MISSING',
+      appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || 'MISSING'
+    });
+    console.log('Firebase db instance:', db);
+  }, []);
+
   useEffect(() => {
     async function fetchTournamentData() {
       setIsLoading(true);
