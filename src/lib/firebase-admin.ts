@@ -1,6 +1,5 @@
-
 // src/lib/firebase-admin.ts
-import { initializeApp, getApps, cert, type App } from 'firebase-admin/app';
+import { initializeApp, getApps, type App } from 'firebase-admin/app';
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';
 import { getAuth, type Auth } from 'firebase-admin/auth';
 
@@ -19,31 +18,15 @@ function initializeAdminApp() {
     return;
   }
 
-  console.log('[[DEBUG]] First-time Firebase Admin SDK initialization...');
+  console.log('[[DEBUG]] Attempting first-time Firebase Admin SDK initialization...');
   
-  // Hard-coded service account credentials with properly escaped private key.
-const serviceAccount = {
-  projectId: process.env.FIREBASE_ADMIN_PROJECT_ID || "chessmate-w17oa",
-  clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
-  privateKey: process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-};
-  
-  // Explicitly check for credentials.
-  if (!serviceAccount.projectId || !serviceAccount.clientEmail || !serviceAccount.privateKey.includes('PRIVATE KEY')) {
-    console.error('[[DEBUG]] CRITICAL: Firebase Admin SDK service account credentials are not fully configured.');
-    // Do not proceed if config is bad. getDb/getAdminAuth will throw an error.
-    return;
-  }
-  
-  console.log('[[DEBUG]] Service account credentials appear to be present.');
-
   try {
-    app = initializeApp({
-      credential: cert(serviceAccount),
-    });
+    // Use Firebase App Hosting's automatic service account credentials
+    // No manual configuration needed - Firebase App Hosting provides credentials automatically
+    app = initializeApp();
     dbInstance = getFirestore(app);
     authInstance = getAuth(app);
-    console.log('[[DEBUG]] Firebase Admin SDK initialized successfully.');
+    console.log('[[DEBUG]] Firebase Admin SDK initialized successfully with automatic credentials.');
   } catch (error: any) {
     console.error('[[DEBUG]] CRITICAL: Firebase Admin SDK initializeApp failed.', error.message);
     // Ensure instances remain undefined on failure.
