@@ -28,7 +28,16 @@ function initializeAdminApp() {
     authInstance = getAuth(app);
     console.log('[[DEBUG]] Firebase Admin SDK initialized successfully with automatic credentials.');
   } catch (error: any) {
-    console.error('[[DEBUG]] CRITICAL: Firebase Admin SDK initializeApp failed.', error.message);
+    console.error('[[DEBUG]] CRITICAL: Firebase Admin SDK initializeApp failed.');
+    console.error('[[DEBUG]] Error details:', error);
+    console.error('[[DEBUG]] Error code:', error.code);
+    console.error('[[DEBUG]] Error message:', error.message);
+    console.error('[[DEBUG]] Available environment:', {
+      NODE_ENV: process.env.NODE_ENV,
+      hasGoogleCredentials: !!process.env.GOOGLE_APPLICATION_CREDENTIALS,
+      hasFirebaseProject: !!process.env.FIREBASE_PROJECT_ID,
+      projectFromGCP: process.env.GCP_PROJECT || process.env.GOOGLE_CLOUD_PROJECT
+    });
     // Ensure instances remain undefined on failure.
     app = undefined;
     dbInstance = undefined;
