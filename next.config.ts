@@ -2,6 +2,8 @@
 import 'dotenv/config';
 import type {NextConfig} from 'next';
 
+console.log("Checking Firebase API Key:", process.env.NEXT_PUBLIC_FIREBASE_API_KEY);
+
 const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,

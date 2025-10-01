@@ -2,6 +2,7 @@
 'use client';
 
 import { AppLayout } from "@/components/app-layout";
+import { getUserRole } from '@/lib/role-utils';
 import {
   Card,
   CardHeader,
@@ -32,7 +33,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SponsorRegistrationDialog } from "@/components/sponsor-registration-dialog";
-import { SponsorGuard } from "@/components/auth-guard";
+import { SponsorGuard } from "@/app/auth-guard";
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { MasterPlayer } from "@/lib/data/full-master-player-data";
@@ -63,9 +64,9 @@ function DashboardContent() {
       const allPlayersSnapshotPromise = getDocs(collection(db, 'players'));
       
       let invoicesQuery = query(collection(db, 'invoices'));
-      if (profile.role === 'sponsor' || profile.role === 'district_coordinator') {
+      if (getUserRole(profile) === 'sponsor' || getUserRole(profile) === 'district_coordinator') {
         invoicesQuery = query(invoicesQuery, where('district', '==', profile.district), where('schoolName', '==', profile.school));
-      } else if (profile.role === 'individual') {
+      } else if (getUserRole(profile) === 'individual') {
           invoicesQuery = query(invoicesQuery, where('parentEmail', '==', profile.email));
       }
 

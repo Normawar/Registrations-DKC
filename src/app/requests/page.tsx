@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { getUserRole } from '@/lib/role-utils';
 import { collection, getDocs, query, where, orderBy, limit, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { AppLayout } from "@/components/app-layout";
@@ -53,7 +54,7 @@ export default function RequestsPage() {
             let q = collection(db, 'requests');
             let queries: any[] = [orderBy('submitted', 'desc'), limit(200)];
             
-            if (profile.role !== 'organizer') {
+            if (getUserRole(profile) !== 'organizer') {
                 queries.unshift(where('submittedBy', '==', `${profile.firstName} ${profile.lastName}`));
             }
 
@@ -180,7 +181,7 @@ export default function RequestsPage() {
         setIsReviewDialogOpen(true);
     };
     
-    const isOrganizer = profile?.role === 'organizer';
+    const isOrganizer = getUserRole(profile) === 'organizer';
 
     return (
         <>

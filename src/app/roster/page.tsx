@@ -3,6 +3,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
+import { getUserRole } from '@/lib/role-utils';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -10,7 +11,7 @@ import { format, isValid, parse } from 'date-fns';
 import { useSearchParams, useRouter } from 'next/navigation';
 
 import { AppLayout } from '@/components/app-layout';
-import { AuthGuard, OrganizerGuard } from '@/components/auth-guard';
+import { AuthGuard, OrganizerGuard } from '@/app/auth-guard';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,7 +19,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Search, PlusCircle, Trash2, Edit, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Check, FilePenLine, History, UserPlus } from 'lucide-react';
+import { Search, PlusCircle, Trash2, Edit, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Check, FilePenLine, History, UserPlus, Download } from 'lucide-react';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { CSVUploadComponent } from '@/components/csv-upload';
@@ -684,10 +685,10 @@ function UserRosterPageContent() {
     
     const roster = useMemo(() => {
         if (!profile || !isDbLoaded) return [];
-        if (profile.role === 'sponsor' || profile.role === 'district_coordinator') {
+        if (getUserRole(profile) === 'sponsor' || getUserRole(profile) === 'district_coordinator') {
             return allPlayers.filter(p => p.district === profile.district && p.school === profile.school);
         }
-        if (profile.role === 'individual' && profile.studentIds) {
+        if (getUserRole(profile) === 'individual' && profile.studentIds) {
              return allPlayers.filter(p => profile.studentIds?.includes(p.id));
         }
         return [];
@@ -787,11 +788,11 @@ function UserRosterPageContent() {
           toast({ title: 'Player Updated' });
       }
 
-      if (profile.role === 'individual' && !roster.some(p => p.id === playerToSave.id)) {
+      if (getUserRole(profile) === 'individual' && !roster.some(p => p.id === playerToSave.id)) {
         const updatedStudentIds = [...(profile.studentIds || []), playerToSave.id];
         await updateProfile({ studentIds: updatedStudentIds });
         toast({ title: "Player Added to Your Roster" });
-      } else if(profile.role === 'sponsor' && !roster.some(p => p.id === playerToSave.id)) {
+      } else if(getUserRole(profile) === 'sponsor' && !roster.some(p => p.id === playerToSave.id)) {
           // Sponsor adding a player who might be from another school in their district, but should be on their roster.
           // The updatePlayer/addPlayer logic already handles setting the school/district if it's new.
           // We just need to refresh the roster view.
@@ -804,7 +805,7 @@ function UserRosterPageContent() {
 
     const handleDeletePlayer = async (player: MasterPlayer) => {
         if (window.confirm(`Are you sure you want to remove ${player.firstName} ${player.lastName} from your roster?`)) {
-            if (profile?.role === 'individual') {
+            if (getUserRole(profile) === 'individual') {
                 const updatedStudentIds = profile.studentIds?.filter(id => id !== player.id);
                 await updateProfile({ studentIds: updatedStudentIds });
                 toast({ title: 'Student Removed', description: `${player.firstName} has been removed from your list.` });
@@ -828,7 +829,7 @@ function UserRosterPageContent() {
             </div>
             <Card className="mt-4">
                 <CardHeader>
-                    <CardTitle>{profile?.role === 'individual' ? 'My Students' : 'School Roster'}</CardTitle>
+                    <CardTitle>{getUserRole(profile) === 'individual' ? 'My Students' : 'School Roster'}</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <Table>
@@ -855,7 +856,7 @@ function UserRosterPageContent() {
                                         <Button variant="ghost" size="sm" onClick={() => handleEditPlayer(player)}>
                                             <Edit className="h-4 w-4" />
                                         </Button>
-                                         {profile?.role === 'individual' && (
+                                         {getUserRole(profile) === 'individual' && (
                                             <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeletePlayer(player)}>
                                                 <Trash2 className="h-4 w-4" />
                                             </Button>
@@ -1088,7 +1089,7 @@ function UserRosterPageContent() {
                             }}
                           >
                             <Trash2 className="h-4 w-4 mr-2" />
-                            {profile?.role === 'individual' ? 'Remove From My List' : 'Delete Player'}
+                            {getUserRole(profile) === 'individual' ? 'Remove From My List' : 'Delete Player'}
                           </Button>
                         ) : (
                           <div></div>
@@ -1132,7 +1133,7 @@ export default function RosterPage() {
     return (
         <AuthGuard>
             <AppLayout>
-                {profile?.role === 'organizer' ? (
+                {getUserRole(profile) === 'organizer' ? (
                     <DistrictRostersPageContent />
                 ) : (
                     <UserRosterPageContent />

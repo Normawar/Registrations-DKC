@@ -3,7 +3,7 @@
 
 import { useMemo } from 'react';
 import { AppLayout } from '@/components/app-layout';
-import { OrganizerGuard } from '@/components/auth-guard';
+import { OrganizerGuard } from '@/app/auth-guard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useMasterDb } from '@/context/master-db-context';

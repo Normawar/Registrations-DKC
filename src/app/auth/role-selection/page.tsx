@@ -2,6 +2,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { getUserRole } from '@/lib/role-utils';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -39,9 +40,9 @@ export default function RoleSelectionPage() {
         if (!profile) {
             // Not logged in, send to home.
             router.push('/');
-        } else if (profile.role !== 'organizer' && !profile.isDistrictCoordinator) {
+        } else if (getUserRole(profile) !== 'organizer' && !profile.isDistrictCoordinator) {
             // User has a single, non-selectable role, send them to their dashboard.
-            const dashboardPath = profile.role === 'sponsor' ? '/dashboard' : '/individual-dashboard';
+            const dashboardPath = getUserRole(profile) === 'sponsor' ? '/dashboard' : '/individual-dashboard';
             router.push(dashboardPath);
         }
         // If the user is an organizer or a district coordinator, they are allowed to be on this page.
@@ -65,7 +66,7 @@ export default function RoleSelectionPage() {
           id: doc.id,
           ...doc.data()
         })).filter(user => 
-          user.role === 'sponsor' || user.role === 'district_coordinator'
+          getUserRole(user) === 'sponsor' || getUserRole(user) === 'district_coordinator'
         );
         setUsers(loadedUsers as any);
       } catch (error) {
@@ -131,7 +132,7 @@ export default function RoleSelectionPage() {
     setView('role-select');
   };
 
-  const isOrganizer = profile.role === 'organizer';
+  const isOrganizer = getUserRole(profile) === 'organizer';
   const isImpersonating = profile.isImpersonating;
   const isDistrictCoordinator = profile.isDistrictCoordinator;
 
@@ -190,7 +191,7 @@ export default function RoleSelectionPage() {
               >
                 <CardContent className="flex items-center justify-between p-4">
                   <div className="flex items-center gap-4">
-                    {user.role === 'sponsor' ? 
+                    {getUserRole(user) === 'sponsor' ? 
                       <User className="h-8 w-8 text-blue-500" /> : 
                       <Building className="h-8 w-8 text-green-500" />
                     }
@@ -203,8 +204,8 @@ export default function RoleSelectionPage() {
                       <p className="text-sm">{user.school} • {user.district}</p>
                     </div>
                   </div>
-                  <Badge variant={user.role === 'sponsor' ? 'default' : 'secondary'}>
-                    {user.role === 'sponsor' ? 'Sponsor' : 'District Coordinator'}
+                  <Badge variant={getUserRole(user) === 'sponsor' ? 'default' : 'secondary'}>
+                    {getUserRole(user) === 'sponsor' ? 'Sponsor' : 'District Coordinator'}
                   </Badge>
                 </CardContent>
               </Card>

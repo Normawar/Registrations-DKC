@@ -3,6 +3,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef, type ChangeEvent, useCallback } from 'react';
+import { getUserRole } from '@/lib/role-utils';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -101,7 +102,7 @@ import { generateTeamCode } from '@/lib/school-utils';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import { canConsolidateGtInvoices, consolidateGtInvoices } from '@/ai/flows/consolidate-gt-invoices-flow';
-import { OrganizerGuard } from '@/components/auth-guard';
+import { OrganizerGuard } from '@/app/auth-guard';
 
 const eventFormSchema = z.object({
   id: z.string().optional(),
@@ -239,7 +240,7 @@ function ManageEventsContent() {
   };
   
   const handleConsolidateGt = async (event: Event) => {
-    if (!profile || profile.role !== 'organizer') return;
+    if (!profile || getUserRole(profile) !== 'organizer') return;
     
     setIsConsolidating(event.id);
     try {
@@ -787,7 +788,7 @@ function ManageEventsContent() {
               Create, edit, and manage your tournament events and fees.
             </p>
           </div>
-          {profile?.role === 'organizer' && (
+          {getUserRole(profile) === 'organizer' && (
             <div className="flex items-center gap-2">
               <input 
                 type="file" 
@@ -960,7 +961,7 @@ function ManageEventsContent() {
                             <DropdownMenuItem onClick={() => handleViewRegistrations(event)}>
                               <Users className="mr-2 h-4 w-4" />View Registrations
                             </DropdownMenuItem>
-                            {profile?.role === 'organizer' && (
+                            {getUserRole(profile) === 'organizer' && (
                               <>
                                 <DropdownMenuItem onClick={() => handleEditEvent(event)}>
                                   <FilePenLine className="mr-2 h-4 w-4" />Edit
@@ -1108,7 +1109,7 @@ function ManageEventsContent() {
             </div>
           </DialogHeader>
           <div className="space-y-4">
-              {profile?.role === 'organizer' && (
+              {getUserRole(profile) === 'organizer' && (
                 <div className="border border-amber-500 bg-amber-50 rounded-lg p-4 inline-block">
                     <p className="text-sm font-medium italic text-amber-800 mb-2">For SwissSys only:</p>
                     <div className='flex items-center gap-2'>
@@ -1125,7 +1126,7 @@ function ManageEventsContent() {
               )}
               <div className='flex items-center gap-4 mt-2'>
                 <Button onClick={() => handleDownload(registrations, 'all')} size="sm" variant="outline">Download All Registrations ({registrations.length})</Button>
-                {profile?.role === 'organizer' && (
+                {getUserRole(profile) === 'organizer' && (
                     <Button variant="link" size="sm" onClick={handleResetAll} className="text-xs">Reset All Player Statuses</Button>
                 )}
             </div>

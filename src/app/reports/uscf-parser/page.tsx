@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Upload, Download, ClipboardCheck, FileText, AlertCircle, Database } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AppLayout } from '@/components/app-layout';
-import { OrganizerGuard } from '@/components/auth-guard';
+import { OrganizerGuard } from '@/app/auth-guard';
 import { useMasterDb } from '@/context/master-db-context';
 import { useToast } from '@/hooks/use-toast';
 

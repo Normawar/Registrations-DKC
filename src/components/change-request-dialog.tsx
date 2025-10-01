@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { getUserRole } from '@/lib/role-utils';
 import { doc, setDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -53,14 +54,14 @@ export function ChangeRequestDialog({ isOpen, onOpenChange, profile, onRequestCr
 
           let userConfirmations: any[] = [];
           
-          if (profile.role === 'organizer') {
+          if (getUserRole(profile) === 'organizer') {
             userConfirmations = allConfirmations;
-          } else if (profile.role === 'district_coordinator') {
+          } else if (getUserRole(profile) === 'district_coordinator') {
             userConfirmations = allConfirmations.filter((c: any) => c.district === profile.district);
-          } else if (profile.role === 'sponsor') {
+          } else if (getUserRole(profile) === 'sponsor') {
             // A sponsor should only see invoices they personally created
             userConfirmations = allConfirmations.filter((c: any) => c.sponsorEmail === profile.email);
-          } else if (profile.role === 'individual') {
+          } else if (getUserRole(profile) === 'individual') {
             userConfirmations = allConfirmations.filter((c: any) => c.parentEmail === profile.email);
           }
           
@@ -98,7 +99,7 @@ export function ChangeRequestDialog({ isOpen, onOpenChange, profile, onRequestCr
   const availableRosterPlayers = useMemo(() => {
     if (!profile) return [];
     let roster = [];
-    if (profile.role === 'organizer') {
+    if (getUserRole(profile) === 'organizer') {
         roster = masterDb; // Organizers can see all players
     } else if (profile.isDistrictCoordinator) {
         roster = masterDb.filter(p => p.district === profile.district);
@@ -172,8 +173,8 @@ export function ChangeRequestDialog({ isOpen, onOpenChange, profile, onRequestCr
         details: details,
         submitted: new Date().toISOString(),
         submittedBy: `${profile.firstName} ${profile.lastName}`,
-        status: profile.role === 'organizer' ? 'Approved' : 'Pending',
-        ...(profile.role === 'organizer' && {
+        status: getUserRole(profile) === 'organizer' ? 'Approved' : 'Pending',
+        ...(getUserRole(profile) === 'organizer' && {
             approvedBy: `${profile.firstName} ${profile.lastName}`,
             approvedAt: new Date().toISOString()
         })

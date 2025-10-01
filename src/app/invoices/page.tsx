@@ -3,6 +3,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { getUserRole } from '@/lib/role-utils';
 import { collection, getDocs, doc, setDoc, query, where, orderBy, limit } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { AppLayout } from "@/components/app-layout";
@@ -112,14 +113,14 @@ export default function UnifiedInvoiceRegistrations() {
         let invoicesQuery = query(collection(db, 'invoices'));
 
         // Apply server-side filtering based on user role
-        if (profile.role === 'district_coordinator') {
+        if (getUserRole(profile) === 'district_coordinator') {
             invoicesQuery = query(invoicesQuery, where('district', '==', profile.district));
-        } else if (profile.role === 'sponsor') {
+        } else if (getUserRole(profile) === 'sponsor') {
             invoicesQuery = query(invoicesQuery, 
                 where('district', '==', profile.district),
                 where('schoolName', '==', profile.school)
             );
-        } else if (profile.role === 'individual') {
+        } else if (getUserRole(profile) === 'individual') {
             invoicesQuery = query(invoicesQuery, where('parentEmail', '==', profile.email));
         }
         
@@ -556,7 +557,7 @@ export default function UnifiedInvoiceRegistrations() {
                       onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
-                {profile?.role === 'organizer' && (
+                {getUserRole(profile) === 'organizer' && (
                     <div>
                         <Label>District</Label>
                         <Select value={districtFilter} onValueChange={setDistrictFilter}>
@@ -730,7 +731,7 @@ export default function UnifiedInvoiceRegistrations() {
                             <Eye className="h-4 w-4" />
                             Details
                           </Button>
-                          {profile?.role === 'organizer' && (
+                          {getUserRole(profile) === 'organizer' && (
                             <>
                               <Button 
                                 variant="outline" 

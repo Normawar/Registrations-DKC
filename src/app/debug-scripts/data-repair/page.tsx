@@ -8,7 +8,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Upload, Check, AlertTriangle } from 'lucide-react';
-import { OrganizerGuard } from '@/components/auth-guard';
+import { OrganizerGuard } from '@/app/auth-guard';
 
 function DataRepairPageContent() {
   const { bulkUpdateFromCSV } = useMasterDb();

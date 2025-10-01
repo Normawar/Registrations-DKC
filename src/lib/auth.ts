@@ -1,4 +1,3 @@
-
 // src/lib/auth.ts - Complete authentication service with React hooks
 import { useState, useEffect } from 'react';
 import { 
@@ -17,24 +16,32 @@ import { auth, db } from '@/lib/firebase';
 import { SponsorProfile } from '@/hooks/use-sponsor-profile';
 
 export class AuthService {
+  private static ensureTenant(authInstance: typeof auth): void {
+    if (authInstance) {
+      authInstance.tenantId = process.env.NEXT_PUBLIC_FIREBASE_TENANT_ID || null;
+    }
+  }
+
   // Sign up with Firebase Auth and create Firestore profile
   static async signUp(email: string, password: string, profileData: Omit<SponsorProfile, 'email'>) {
     try {
       if (!auth || !db) {
         throw new Error('Firebase services not initialized');
       }
+      this.ensureTenant(auth);
 
-      // Create user with Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // Create user profile in Firestore using Auth UID
       const userProfile: SponsorProfile = {
         ...profileData,
         email: email.toLowerCase(),
       };
 
       await setDoc(doc(db, 'users', user.uid), userProfile);
+      
+      // Prime localStorage to prevent race conditions on first login
+      localStorage.setItem(`user_profile_${user.uid}`, JSON.stringify(userProfile));
       
       return { user, profile: userProfile };
     } catch (error) {
@@ -49,12 +56,11 @@ export class AuthService {
       if (!auth || !db) {
         throw new Error('Firebase services not initialized');
       }
+      this.ensureTenant(auth);
 
-      // Sign in with Firebase Auth
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // Get user profile from Firestore
       const profileDoc = await getDoc(doc(db, 'users', user.uid));
       
       if (!profileDoc.exists()) {
@@ -62,6 +68,10 @@ export class AuthService {
       }
 
       const profile = profileDoc.data() as SponsorProfile;
+      
+      // Prime localStorage to prevent race conditions on login
+      localStorage.setItem(`user_profile_${user.uid}`, JSON.stringify(profile));
+      
       return { user, profile };
     } catch (error) {
       console.error('Sign in error:', error);
@@ -75,6 +85,14 @@ export class AuthService {
       if (!auth) {
         throw new Error('Firebase Auth not initialized');
       }
+      this.ensureTenant(auth);
+      
+      const user = auth.currentUser;
+      if (user) {
+        // Clear the user's profile from localStorage on sign-out
+        localStorage.removeItem(`user_profile_${user.uid}`);
+      }
+      
       await signOut(auth);
     } catch (error) {
       console.error('Sign out error:', error);
@@ -102,41 +120,68 @@ export class AuthService {
     }
   }
 
-  // Listen to auth state changes
+  // Fixed onAuthStateChanged method for AuthService
   static onAuthStateChanged(callback: (user: User | null, profile: SponsorProfile | null) => void) {
     if (!auth) {
       console.warn('Firebase Auth not initialized');
       return () => {};
     }
-
+    
+    this.ensureTenant(auth);
+    
+    let lastUserId: string | null = null;
+    let lastProfileState: SponsorProfile | null | undefined = undefined;
+    
     return onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        const profile = await this.getCurrentUserProfile(user.uid);
-        callback(user, profile);
-      } else {
+      if (!user) {
+        // User logged out - clear state and notify immediately
+        lastUserId = null;
+        lastProfileState = null;
         callback(null, null);
+        return;
+      }
+      
+      // User is authenticated
+      try {
+        // Fetch the profile
+        const profile = await this.getCurrentUserProfile(user.uid);
+        
+        // Only call callback if this is a meaningful change
+        // This prevents redundant callbacks during initial auth
+        const userChanged = lastUserId !== user.uid;
+        const profileChanged = JSON.stringify(lastProfileState) !== JSON.stringify(profile);
+        
+        if (userChanged || profileChanged) {
+          lastUserId = user.uid;
+          lastProfileState = profile;
+          callback(user, profile);
+        }
+      } catch (error) {
+        console.error('Error fetching user profile:', error);
+        // Even if profile fetch fails, we should notify with null profile
+        // so the app doesn't hang in loading state
+        if (lastUserId !== user.uid) {
+          lastUserId = user.uid;
+          lastProfileState = null;
+          callback(user, null);
+        }
       }
     });
   }
-
+  
   static async updateUserPassword(currentPassword: string, newPassword: string): Promise<void> {
     const user = auth.currentUser;
     if (!user || !user.email) {
       throw new Error("No user is currently signed in.");
     }
+    this.ensureTenant(auth);
     
     try {
-      // Create a credential with the user's email and current password
       const credential = EmailAuthProvider.credential(user.email, currentPassword);
-      
-      // Re-authenticate the user to confirm their identity
       await reauthenticateWithCredential(user, credential);
-      
-      // If re-authentication is successful, update the password
       await updatePassword(user, newPassword);
       
     } catch (error: any) {
-      // Handle specific errors for re-authentication and password update
       if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
         throw new Error("The current password you entered is incorrect.");
       }
@@ -151,10 +196,10 @@ export class AuthService {
     }
   }
 
-
-  // Handle Firebase Auth errors
   private static handleAuthError(error: AuthError): Error {
     switch (error.code) {
+      case 'auth/tenant-id-mismatch':
+        return new Error('There was a problem with your account configuration (tenant mismatch). Please contact support.');
       case 'auth/email-already-in-use':
         return new Error('An account with this email already exists.');
       case 'auth/weak-password':
@@ -172,7 +217,6 @@ export class AuthService {
   }
 }
 
-// Export auth state hook for React components
 export function useAuthState() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<SponsorProfile | null>(null);

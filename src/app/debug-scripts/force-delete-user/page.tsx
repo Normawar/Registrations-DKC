@@ -3,7 +3,7 @@
 
 import { useState, useTransition } from 'react';
 import { AppLayout } from "@/components/app-layout";
-import { OrganizerGuard } from "@/components/auth-guard";
+import { OrganizerGuard } from "@/app/auth-guard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";

@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense } from 'react';
+import { getUserRole } from '@/lib/role-utils';
 import { useSearchParams, useParams } from 'next/navigation';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { useEvents } from '@/hooks/use-events';
@@ -32,7 +33,7 @@ function EventRegistrationContent() {
     
     // For now, we only have a sponsor registration flow here.
     // Individual registration is handled elsewhere.
-    if (profile.role === 'sponsor' || profile.role === 'organizer') {
+    if (getUserRole(profile) === 'sponsor' || getUserRole(profile) === 'organizer') {
         return (
             <SponsorRegistrationDialog 
                 isOpen={true} 

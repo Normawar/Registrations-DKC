@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useMasterDb, type SearchCriteria, type SearchResult, type MasterPlayer } from '@/context/master-db-context';
 import { AppLayout } from '@/components/app-layout';
 import { Button } from '@/components/ui/button';
-import { OrganizerGuard } from '@/components/auth-guard';
+import { OrganizerGuard } from '@/app/auth-guard';
 
 // --- Copied EnhancedPlayerSearchDialog Component Logic ---
 

@@ -3,6 +3,7 @@
 'use client';
 
 import { AppLayout } from '@/components/app-layout';
+import { getUserRole } from '@/lib/role-utils';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { ParentRegistrationComponent } from '@/components/parent-registration-component';
 import { SponsorRegistrationDialog } from '@/components/sponsor-registration-dialog';
@@ -52,9 +53,9 @@ export default function EventsPage() {
       const invoicesCol = collection(db, 'invoices');
       let invoicesQuery;
       
-      if (profile.role === 'individual') {
+      if (getUserRole(profile) === 'individual') {
         invoicesQuery = query(invoicesCol, where('parentEmail', '==', profile.email));
-      } else if (profile.role === 'sponsor' || profile.role === 'district_coordinator') {
+      } else if (getUserRole(profile) === 'sponsor' || getUserRole(profile) === 'district_coordinator') {
         invoicesQuery = query(invoicesCol, where('schoolName', '==', profile.school), where('district', '==', profile.district));
       } else {
         invoicesQuery = query(invoicesCol); // Fallback for organizer or other roles
@@ -85,7 +86,7 @@ export default function EventsPage() {
 
         const isTestEvent = event.name.toLowerCase().startsWith('test') || getDistrictForLocation(event.location).toLowerCase().startsWith("test");
         
-        if (profile?.role === 'individual') {
+        if (getUserRole(profile) === 'individual') {
           return !isTestEvent;
         }
 
@@ -105,9 +106,9 @@ export default function EventsPage() {
     const eventRegistrations = registrations.filter(reg => {
       if (reg.eventId !== event.id) return false;
       
-      if (profile.role === 'individual') {
+      if (getUserRole(profile) === 'individual') {
         return reg.parentEmail === profile.email;
-      } else if (profile.role === 'sponsor' || profile.role === 'district_coordinator') {
+      } else if (getUserRole(profile) === 'sponsor' || getUserRole(profile) === 'district_coordinator') {
         return reg.schoolName === profile.school && reg.district === profile.district;
       }
       
@@ -144,7 +145,7 @@ export default function EventsPage() {
   }
 
   // For individual users, show the parent registration component
-  if (profile.role === 'individual') {
+  if (getUserRole(profile) === 'individual') {
     return (
       <AppLayout>
         <div className="space-y-6">

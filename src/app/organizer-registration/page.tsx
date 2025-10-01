@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { AppLayout } from '@/components/app-layout';
 import { Skeleton } from '@/components/ui/skeleton';
 import { OrganizerRegistrationForm } from '@/components/organizer-registration-form';
-import { OrganizerGuard } from '@/components/auth-guard';
+import { OrganizerGuard } from '@/app/auth-guard';
 
 function OrganizerRegistrationContent() {
     const searchParams = useSearchParams();

@@ -35,7 +35,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { IndividualRegistrationDialog } from "@/components/individual-registration-dialog";
 import { PlayerSearchDialog } from "@/components/PlayerSearchDialog";
 import { useToast } from "@/hooks/use-toast";
-import { IndividualGuard } from "@/components/auth-guard";
+import { IndividualGuard } from "@/app/auth-guard";
 import { useRouter } from "next/navigation";
 
 

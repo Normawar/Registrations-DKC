@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef, type ChangeEvent, type ElementType } from 'react';
+import { getUserRole } from '@/lib/role-utils';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -328,7 +329,7 @@ export default function ProfilePage() {
       description: 'Your information has been successfully saved.',
     });
 
-    if (profile?.role === 'individual') {
+    if (getUserRole(profile) === 'individual') {
         router.push('/individual-dashboard');
     }
   }
@@ -370,7 +371,7 @@ export default function ProfilePage() {
   }
   
   const isSavePictureDisabled = isSavingPicture || !isAuthReady;
-  const isSponsorOrCoordinator = profile?.role === 'sponsor' || profile?.role === 'district_coordinator';
+  const isSponsorOrCoordinator = getUserRole(profile) === 'sponsor' || getUserRole(profile) === 'district_coordinator';
 
   return (
     <AppLayout>
@@ -396,7 +397,7 @@ export default function ProfilePage() {
           <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
             <Label className="text-sm font-medium text-blue-800">Current Role</Label>
             <div className="mt-2 flex items-center gap-3">
-              {profile.role === 'district_coordinator' ? (
+              {getUserRole(profile) === 'district_coordinator' ? (
                 <>
                   <Building className="h-5 w-5 text-blue-600" />
                   <span className="font-medium">District Coordinator</span>
@@ -597,7 +598,7 @@ export default function ProfilePage() {
           </Form>
         </Card>
         
-        {profile?.role === 'organizer' && (
+        {getUserRole(profile) === 'organizer' && (
             <Card>
                 <CardHeader>
                     <CardTitle>Account Role</CardTitle>

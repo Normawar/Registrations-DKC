@@ -1,7 +1,7 @@
-
 'use client';
 
 import { useState } from 'react';
+import { getUserRole } from '@/lib/role-utils';
 import { useRouter } from 'next/navigation';
 import { useSponsorProfile, type SponsorProfile } from '@/hooks/use-sponsor-profile';
 import { simpleSignIn, resetPassword } from '@/lib/simple-auth';
@@ -33,6 +33,11 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
+// --- START OF CHANGE ---
+// This flag controls the Individual and Organizer tabs. Set to false to disable them.
+const individualAndOrganizerEnabled = true;
+// --- END OF CHANGE ---
+
 const SignInForm = ({ userType }: { userType: 'sponsor' | 'individual' | 'organizer' }) => {
   const { updateProfile } = useSponsorProfile();
   const router = useRouter();
@@ -57,15 +62,18 @@ const SignInForm = ({ userType }: { userType: 'sponsor' | 'individual' | 'organi
           description: `Welcome back, ${profile.firstName}!`,
         });
 
-        // Redirect based on role
-        if (profile.role === 'organizer') {
-            router.push('/manage-events');
+        const userRole = getUserRole(profile);
+
+        if (userRole === 'organizer') {
+          router.push('/manage-events');
         } else if (profile.isDistrictCoordinator) {
-            router.push('/auth/role-selection');
-        } else if (profile.role === 'sponsor') {
-            router.push('/dashboard');
+          router.push('/auth/role-selection');
+        } else if (userRole === 'sponsor') {
+          router.push('/dashboard');
+        } else if (userRole === 'individual') {
+          router.push('/individual-dashboard');
         } else {
-            router.push('/individual-dashboard');
+          router.push('/');
         }
       }
     } catch (error) {
@@ -225,8 +233,10 @@ export default function LoginPage() {
         <Tabs defaultValue="sponsor" className="w-full">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="sponsor">Sponsor</TabsTrigger>
-            <TabsTrigger value="individual">Individual</TabsTrigger>
-            <TabsTrigger value="organizer">Organizer</TabsTrigger>
+            {/* --- START OF CHANGE --- */}
+            <TabsTrigger value="individual" disabled={!individualAndOrganizerEnabled}>Individual</TabsTrigger>
+            <TabsTrigger value="organizer" disabled={!individualAndOrganizerEnabled}>Organizer</TabsTrigger>
+            {/* --- END OF CHANGE --- */}
           </TabsList>
           <TabsContent value="sponsor">
             <SignInForm userType="sponsor" />

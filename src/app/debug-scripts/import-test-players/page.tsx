@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, Upload } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { OrganizerGuard } from '@/components/auth-guard';
+import { OrganizerGuard } from '@/app/auth-guard';
 import { useToast } from '@/hooks/use-toast';
 import { writeBatch, doc } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';

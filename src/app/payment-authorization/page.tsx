@@ -40,7 +40,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { collection, getDocs, doc, setDoc, query, where } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
-import { OrganizerGuard } from '@/components/auth-guard';
+import { OrganizerGuard } from '@/app/auth-guard';
 import { useEvents, type Event } from '@/hooks/use-events';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { InvoiceDetailsDialog } from '@/components/invoice-details-dialog';

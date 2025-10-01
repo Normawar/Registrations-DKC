@@ -39,7 +39,7 @@ import { generateTeamCode } from '@/lib/school-utils';
 import { Label } from '@/components/ui/label';
 import { useMasterDb } from '@/context/master-db-context';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { OrganizerGuard } from '@/components/auth-guard';
+import { OrganizerGuard } from '@/app/auth-guard';
 
 type SchoolWithTeamCode = School & { id: string; teamCode: string };
 

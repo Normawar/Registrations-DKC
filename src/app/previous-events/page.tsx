@@ -3,6 +3,7 @@
 'use client';
 
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import { getUserRole } from '@/lib/role-utils';
 import { format } from 'date-fns';
 import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
@@ -44,9 +45,9 @@ export default function PreviousEventsPage() {
         try {
             const invoicesCol = collection(db, 'invoices');
             let q;
-            if(profile.role === 'sponsor'){
+            if(getUserRole(profile) === 'sponsor'){
                 q = query(invoicesCol, where('sponsorEmail', '==', profile.email));
-            } else if (profile.role === 'individual'){
+            } else if (getUserRole(profile) === 'individual'){
                 q = query(invoicesCol, where('parentEmail', '==', profile.email));
             } else {
                 q = query(invoicesCol); // Organizers see all

@@ -1,5 +1,5 @@
 
-import { LucideIcon, User, QueenIcon, PawnIcon, RookIcon, Receipt, KnightIcon, BishopIcon, History, Code, FileQuestion } from "lucide-react";
+import { LucideIcon, User, Receipt, History, Code, FileQuestion, Crown, PersonStanding, Castle, VenetianMask, Church } from "lucide-react";
 
 export type HelpTopic = {
   id: string;
@@ -41,7 +41,7 @@ export const helpTopics: HelpTopic[] = [
   {
     id: "dashboard",
     title: "Using Your Dashboard",
-    icon: QueenIcon,
+    icon: Crown,
     keywords: ["dashboard", "overview", "calendar", "roster", "activity"],
     content: `
       ## The Dashboard
@@ -65,7 +65,7 @@ export const helpTopics: HelpTopic[] = [
   {
     id: "roster",
     title: "Managing Your Roster",
-    icon: PawnIcon,
+    icon: PersonStanding,
     keywords: ["roster", "players", "add student", "remove student", "team code"],
     content: `
       ## The Roster Page
@@ -94,7 +94,7 @@ export const helpTopics: HelpTopic[] = [
   {
     id: "register-for-event",
     title: "Registering for an Event",
-    icon: RookIcon,
+    icon: Castle,
     keywords: ["register", "event", "tournament", "selection", "charges", "invoice"],
     content: `
       ## Registering for an Event
@@ -140,7 +140,7 @@ export const helpTopics: HelpTopic[] = [
   {
     id: "change-requests",
     title: "Making a Change Request",
-    icon: KnightIcon,
+    icon: VenetianMask,
     keywords: ["change request", "withdraw", "substitute", "section change", "bye"],
     content: `
       ## Change Requests
@@ -160,7 +160,7 @@ export const helpTopics: HelpTopic[] = [
   {
     id: "uscf-membership",
     title: "Purchasing USCF Membership ONLY",
-    icon: BishopIcon,
+    icon: Church,
     keywords: ["uscf", "membership", "assistant", "purchase"],
     content: `
       ## USCF Membership

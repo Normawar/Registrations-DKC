@@ -40,7 +40,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { collection, getDocs, query, where, doc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
-import { OrganizerGuard } from '@/components/auth-guard';
+import { OrganizerGuard } from '@/app/auth-guard';
 
 
 type Confirmation = {

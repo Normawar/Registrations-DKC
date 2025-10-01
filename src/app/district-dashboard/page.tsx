@@ -24,7 +24,7 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { Building, Users, FileText, Award } from 'lucide-react';
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { DistrictCoordinatorGuard } from "@/components/auth-guard";
+import { DistrictCoordinatorGuard } from "@/app/auth-guard";
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { MasterPlayer } from '@/lib/data/full-master-player-data';

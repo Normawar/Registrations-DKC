@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Playfair_Display, PT_Sans } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
+import { AuthProvider } from "@/components/auth-provider"; // Import the new AuthProvider
 import { Providers } from "@/components/providers";
 
 const playfair = Playfair_Display({
@@ -33,10 +34,12 @@ export default function RootLayout({
         
       </head>
       <body className={`${playfair.variable} ${ptSans.variable} font-body antialiased`}>
-        <Providers>
-          {children}
-          <Toaster />
-        </Providers>
+        <AuthProvider> {/* Wrap the existing providers with the new AuthProvider */}
+          <Providers>
+            {children}
+            <Toaster />
+          </Providers>
+        </AuthProvider>
       </body>
     </html>
   );

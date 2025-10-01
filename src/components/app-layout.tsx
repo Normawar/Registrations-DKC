@@ -2,6 +2,7 @@
 "use client";
 
 import * as React from "react";
+import { getUserRole } from '@/lib/role-utils';
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -165,19 +166,17 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const pendingRequestsCount = useMemo(() => {
     if (!profile) return 0;
-    
-    if (profile.role === 'organizer') {
+    const userRole = getUserRole(profile);
+    if (userRole === 'organizer') {
         return changeRequests.filter(r => r.status === 'Pending').length;
     }
-    
-    // For non-organizers, we cannot reliably filter on the client
-    // without fetching all invoices. This count will be primarily for organizers.
     return 0;
-    
   }, [profile, changeRequests]);
 
   const pendingPaymentsCount = useMemo(() => {
-    if (profile?.role !== 'organizer') return 0;
+    if (!profile) return 0;
+    const userRole = getUserRole(profile);
+    if (userRole !== 'organizer') return 0;
     return confirmations.filter(c => c.paymentStatus === 'pending-po').length;
   }, [profile, confirmations]);
 
@@ -189,25 +188,32 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   };
   
   const handleRoleToggle = () => {
-    if (profile?.isDistrictCoordinator && profile.role !== 'organizer') {
+    const userRole = getUserRole(profile);
+    if (profile?.isDistrictCoordinator && userRole !== 'organizer') {
         router.push('/auth/role-selection');
     }
   };
 
   const getMenuItems = () => {
-      if (!profile) return [];
-      let items = [];
-      switch(profile.role) {
-          case 'organizer': return null; // Special handling for organizer
-          case 'individual': items = individualMenuItems; break;
-          case 'district_coordinator': items = districtCoordinatorMenuItems; break;
-          default: items = sponsorMenuItems; break;
-      }
-      return [...items, { href: "/help", icon: FileQuestion, label: "Help" }];
-  };
+    if (!profile) return [];
+    
+    // CRITICAL: Normalize role - handle both string and array formats
+    const userRole = getUserRole(profile);
+    
+    let items = [];
+    switch(userRole) {
+        case 'organizer': return null; // Special handling for organizer
+        case 'individual': items = individualMenuItems; break;
+        case 'district_coordinator': items = districtCoordinatorMenuItems; break;
+        default: items = sponsorMenuItems; break;
+    }
+    return [...items, { href: "/help", icon: FileQuestion, label: "Help" }];
+  }
 
   const menuItems = getMenuItems();
   const profileUpdateRequired = profile?.forceProfileUpdate === true;
+  
+  const userRole = profile ? (Array.isArray(profile.role) ? profile.role[0] : profile.role) : '';
 
   const AvatarComponent = profile && profile.avatarType === 'icon' ? icons[profile.avatarValue] : null;
   const teamCode = profile ? generateTeamCode({ schoolName: profile.school, district: profile.district }) : null;
@@ -234,7 +240,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                     <p className="font-headline text-base font-bold text-sidebar-foreground truncate">
                         {profile ? `${''}${profile.firstName} ${''}${profile.lastName}` : 'User Name'}
                     </p>
-                    {profile?.role === 'sponsor' && (
+                    {userRole === 'sponsor' && (
                       <>
                         <p className="text-xs text-sidebar-foreground/80 truncate">
                             {profile.isDistrictCoordinator ? `${''}${profile.district} Coordinator` : profile.school || 'School Name'}
@@ -246,17 +252,17 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                         )}
                       </>
                     )}
-                    {profile?.role === 'organizer' && (
+                    {userRole === 'organizer' && (
                         <p className="text-xs text-sidebar-primary truncate font-semibold">
                             Organizer
                         </p>
                     )}
-                    {profile?.role === 'individual' && (
+                    {userRole === 'individual' && (
                         <p className="text-xs text-sidebar-primary truncate font-semibold">
                             Individual Player
                         </p>
                     )}
-                     {profile?.role === 'district_coordinator' && (
+                     {userRole === 'district_coordinator' && (
                         <p className="text-xs text-sidebar-primary truncate font-semibold">
                             District Coordinator
                         </p>
@@ -265,7 +271,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </SidebarHeader>
           <SidebarContent>
-            {profile?.isDistrictCoordinator && profile.role !== 'organizer' && (
+            {profile?.isDistrictCoordinator && userRole !== 'organizer' && (
                  <div className="px-2 mb-2">
                     <Button variant="secondary" className="w-full h-auto py-2 group-data-[collapsible=icon]:w-auto group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:p-2" onClick={handleRoleToggle}>
                        <Repeat className="w-4 h-4 mr-2 group-data-[collapsible=icon]:mr-0" />
@@ -276,7 +282,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 </div>
             )}
             <SidebarMenu>
-              {profile?.role === 'organizer' ? (
+              {userRole === 'organizer' ? (
                 Object.entries(organizerMenuStructure).map(([groupName, items]) => (
                   <SidebarGroup key={groupName}>
                     <SidebarGroupLabel>{groupName}</SidebarGroupLabel>

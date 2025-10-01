@@ -15,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Papa from 'papaparse';
-import { DistrictCoordinatorGuard } from '@/components/auth-guard';
+import { DistrictCoordinatorGuard } from '@/app/auth-guard';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { collection, getDocs } from 'firebase/firestore';

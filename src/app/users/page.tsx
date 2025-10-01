@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useTransition } from 'react';
+import { getUserRole } from '@/lib/role-utils';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -444,7 +445,7 @@ export default function UsersPage() {
                                             <TableCell>{user.firstName} {user.lastName}</TableCell>
                                             <TableCell className='capitalize'>
                                                 {user.role}
-                                                {user.isDistrictCoordinator && user.role === 'sponsor' && <span className="text-xs text-primary font-semibold ml-2">(Coordinator)</span>}
+                                                {user.isDistrictCoordinator && getUserRole(user) === 'sponsor' && <span className="text-xs text-primary font-semibold ml-2">(Coordinator)</span>}
                                             </TableCell>
                                             <TableCell>{user.school || 'N/A'}{user.district ? ` / ${user.district}`: ''}</TableCell>
                                             <TableCell className="text-right">
