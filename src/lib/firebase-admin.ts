@@ -1,71 +1,33 @@
 // src/lib/firebase-admin.ts
-import { initializeApp, getApps, type App } from 'firebase-admin/app';
+import admin from 'firebase-admin';
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';
 import { getAuth, type Auth } from 'firebase-admin/auth';
 
-let app: App | undefined;
-let dbInstance: Firestore | undefined;
-let authInstance: Auth | undefined;
+let db: Firestore;
+let auth: Auth;
 
-function initializeAdminApp() {
-  // Only execute this logic ONCE.
-  if (getApps().length > 0) {
-    if (!app) {
-        app = getApps()[0];
-        dbInstance = getFirestore(app);
-        authInstance = getAuth(app);
-    }
-    return;
+try {
+  console.log('[[DEBUG]] Checking for existing Firebase Admin apps...');
+  if (admin.apps.length === 0) {
+    console.log('[[DEBUG]] No existing app found. Initializing new Firebase Admin app...');
+    admin.initializeApp();
+    console.log('[[DEBUG]] Firebase Admin SDK initialized successfully.');
+  } else {
+    console.log(`[[DEBUG]] ${admin.apps.length} Firebase Admin app(s) already exist. Using the default app.`);
   }
-
-  console.log('[[DEBUG]] Attempting first-time Firebase Admin SDK initialization...');
   
-  try {
-    // Use Firebase App Hosting's automatic service account credentials
-    // No manual configuration needed - Firebase App Hosting provides credentials automatically
-    app = initializeApp();
-    dbInstance = getFirestore(app);
-    authInstance = getAuth(app);
-    console.log('[[DEBUG]] Firebase Admin SDK initialized successfully with automatic credentials.');
-  } catch (error: any) {
-    console.error('[[DEBUG]] CRITICAL: Firebase Admin SDK initializeApp failed.');
+  // Get instances from the default app.
+  // These calls will fail if initialization did not succeed.
+  db = getFirestore();
+  auth = getAuth();
+
+} catch (error: any) {
+    console.error('[[DEBUG]] CRITICAL: Firebase Admin SDK initialization failed during module load.');
+    console.error('[[DEBUG]] This is a fatal error, and the server process will likely exit.');
     console.error('[[DEBUG]] Error details:', error);
-    console.error('[[DEBUG]] Error code:', error.code);
-    console.error('[[DEBUG]] Error message:', error.message);
-    console.error('[[DEBUG]] Available environment:', {
-      NODE_ENV: process.env.NODE_ENV,
-      hasGoogleCredentials: !!process.env.GOOGLE_APPLICATION_CREDENTIALS,
-      hasFirebaseProject: !!process.env.FIREBASE_PROJECT_ID,
-      projectFromGCP: process.env.GCP_PROJECT || process.env.GOOGLE_CLOUD_PROJECT
-    });
-    // Ensure instances remain undefined on failure.
-    app = undefined;
-    dbInstance = undefined;
-    authInstance = undefined;
-  }
+    // Re-throwing the error is important. It will prevent the app from starting
+    // in a broken state and will make the failure visible in the logs.
+    throw new Error(`Firebase Admin SDK failed to initialize: ${error.message}`);
 }
 
-// Export getter functions that ensure initialization and throw if it failed.
-export function getDb(): Firestore {
-  if (!dbInstance) {
-    // Attempt to initialize if it hasn't been.
-    initializeAdminApp();
-  }
-  if (!dbInstance) {
-    // If it's still not available after trying, throw a clear error.
-    throw new Error("Failed to initialize Firestore Admin SDK. Check server logs for credential errors.");
-  }
-  return dbInstance;
-}
-
-export function getAdminAuth(): Auth {
-  if (!authInstance) {
-    // Attempt to initialize if it hasn't been.
-    initializeAdminApp();
-  }
-  if (!authInstance) {
-    // If it's still not available, throw.
-    throw new Error("Failed to initialize Firebase Admin Auth SDK. Check server logs for credential errors.");
-  }
-  return authInstance;
-}
+export { db, auth };
