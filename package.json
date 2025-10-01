@@ -6,6 +6,7 @@
     "dev": "next dev",
     "genkit:dev": "genkit start -- tsx --dotenv src/ai/dev.ts",
     "genkit:watch": "genkit start -- tsx --watch --dotenv src/ai/dev.ts",
+    "prebuild": "echo 'Build-time check => NEXT_PUBLIC_FIREBASE_API_KEY is: $NEXT_PUBLIC_FIREBASE_API_KEY'",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
