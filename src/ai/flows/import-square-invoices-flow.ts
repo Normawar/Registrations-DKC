@@ -4,10 +4,13 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { type Invoice, type Order, type Customer, Client, Environment } from 'square';
+import admin from 'firebase-admin'; // Import firebase-admin
 import { collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
-import { getDb } from '@/lib/firebase-admin';
 import { generateTeamCode } from '@/lib/school-utils';
 import { type MasterPlayer } from '@/lib/data/full-master-player-data';
+
+// Get the Firestore instance from the initialized admin SDK
+const db = admin.firestore();
 
 const ImportSquareInvoicesInputSchema = z.object({
   startInvoiceNumber: z.number().describe('The invoice number to start importing from.'),
@@ -34,7 +37,6 @@ const importSquareInvoicesFlow = ai.defineFlow(
     outputSchema: ImportSquareInvoicesOutputSchema,
   },
   async (input) => {
-    const db = getDb();
     
     const squareClient = new Client({
         accessToken: "EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC",
@@ -106,7 +108,6 @@ async function processSingleInvoice(client: Client, invoice: Invoice, batch: Fir
         throw new Error(`Invoice #${invoice.invoiceNumber} is missing order or customer ID.`);
     }
 
-    const db = getDb();
     const { result: { order } } = await client.ordersApi.retrieveOrder(invoice.orderId);
     const { result: { customer } } = await client.customersApi.retrieveCustomer(invoice.primaryRecipient.customerId);
     
