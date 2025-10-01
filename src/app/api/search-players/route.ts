@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
-import { db } from '@/lib/services/firestore-service';
+import { db } from '@/lib/firebase-admin';
 
 export async function POST(request: Request) {
   if (!db) {
