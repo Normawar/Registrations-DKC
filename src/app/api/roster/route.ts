@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { collection, query, where, getDocs, documentId } from 'firebase/firestore';
 import { getDb } from '@/lib/firebase-admin';
+import { FieldPath } from 'firebase-admin/firestore';
 
 export async function GET(request: Request) {
   const db = getDb();
@@ -14,11 +14,11 @@ export async function GET(request: Request) {
   }
 
   try {
-    const playersRef = collection(db, 'players');
+    const playersRef = db.collection('players');
     let players: any[] = [];
 
     if (playerIdsParam) {
-      const playerIds = playerIdsParam.split(',');
+      const playerIds = playerIdsParam.split(',').filter(id => id.trim() !== '');
       if (playerIds.length > 0) {
         const chunks = [];
         for (let i = 0; i < playerIds.length; i += 30) {
@@ -26,8 +26,8 @@ export async function GET(request: Request) {
         }
         
         const queryPromises = chunks.map(chunk => {
-          const q = query(playersRef, where(documentId(), 'in', chunk));
-          return getDocs(q);
+          const q = playersRef.where(FieldPath.documentId(), 'in', chunk);
+          return q.get();
         });
 
         const snapshots = await Promise.all(queryPromises);
@@ -37,15 +37,16 @@ export async function GET(request: Request) {
         });
       }
     } else if (district || school) {
-        const constraints = [];
+        let q: FirebaseFirestore.Query<FirebaseFirestore.DocumentData> = playersRef;
+        
         if (district) {
-            constraints.push(where('district', '==', district));
+            q = q.where('district', '==', district);
         }
         if (school) {
-            constraints.push(where('school', '==', school));
+            q = q.where('school', '==', school);
         }
-        const q = query(playersRef, ...constraints);
-        const snapshot = await getDocs(q);
+
+        const snapshot = await q.get();
         players = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     } else {
       return NextResponse.json({ error: 'A school, district, or playerIds must be specified.' }, { status: 400 });
