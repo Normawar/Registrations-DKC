@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase-admin';
+import { getDb } from '@/lib/firebase-admin';
 import { FieldPath } from 'firebase-admin/firestore';
 
 export async function GET(request: Request) {
@@ -11,8 +11,11 @@ export async function GET(request: Request) {
 
   console.log(`Query Params: school=${school}, district=${district}, playerIds=${playerIdsParam}`);
 
-  if (!db) {
-    console.error('Firestore is not initialized');
+  let db;
+  try {
+    db = getDb();
+  } catch (error) {
+    console.error('Failed to get Firestore instance:', error);
     return NextResponse.json({ error: 'Firestore is not initialized' }, { status: 500 });
   }
 
