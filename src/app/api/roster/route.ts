@@ -46,7 +46,7 @@ export async function GET(request: Request) {
         }
 
         const snapshot = await q.get();
-        players = snapshot.docs.-map(doc => ({ id: doc.id, ...doc.data() }));
+        players = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     } else {
       return NextResponse.json({ error: 'A school, district, or playerIds must be specified.' }, { status: 400 });
     }
