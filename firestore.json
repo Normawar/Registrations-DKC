@@ -1,7 +1,7 @@
 {
   "indexes": [
     {
-      "collectionGroup": "players",
+      "collectionId": "players",
       "queryScope": "COLLECTION",
       "fields": [
         {
