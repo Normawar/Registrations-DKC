@@ -11,6 +11,9 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  env: {
+    GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+  },
   images: {
     remotePatterns: [
       {

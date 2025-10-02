@@ -6,8 +6,8 @@
     "dev": "next dev",
     "genkit:dev": "genkit start -- tsx --dotenv src/ai/dev.ts",
     "genkit:watch": "genkit start -- tsx --watch --dotenv src/ai/dev.ts",
-    "build": "node create-dotenv.js && next build",
-    "start": "next start",
+    "build": "node -r dotenv/config create-dotenv.js && next build",
+    "start": "next start -p 3001",
     "lint": "next lint",
     "typecheck": "tsc --noEmit"
   },

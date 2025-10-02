@@ -17,15 +17,7 @@ export async function GET(request: Request) {
     const playersRef = collection(db, 'players');
     let players: any[] = [];
 
-    if (school && district) {
-      const q = query(playersRef, where('district', '==', district), where('school', '==', school));
-      const snapshot = await getDocs(q);
-      players = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    } else if (district) {
-        const q = query(playersRef, where('district', '==', district));
-        const snapshot = await getDocs(q);
-        players = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    } else if (playerIdsParam) {
+    if (playerIdsParam) {
       const playerIds = playerIdsParam.split(',');
       if (playerIds.length > 0) {
         const chunks = [];
@@ -44,8 +36,19 @@ export async function GET(request: Request) {
           players.push(...chunkPlayers);
         });
       }
+    } else if (district || school) {
+        const constraints = [];
+        if (district) {
+            constraints.push(where('district', '==', district));
+        }
+        if (school) {
+            constraints.push(where('school', '==', school));
+        }
+        const q = query(playersRef, ...constraints);
+        const snapshot = await getDocs(q);
+        players = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     } else {
-      return NextResponse.json({ error: 'A school/district or playerIds must be specified.' }, { status: 400 });
+      return NextResponse.json({ error: 'A school, district, or playerIds must be specified.' }, { status: 400 });
     }
 
     return NextResponse.json(players);

@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
-import { db } from '@/lib/firebase-admin';
+import { getDb } from '@/lib/firebase-admin';
 
 export async function POST(request: Request) {
+  const db = getDb();
   if (!db) {
     return NextResponse.json(
       { error: 'Firestore is not initialized' },

@@ -34,12 +34,14 @@ export default function RootLayout({
         
       </head>
       <body className={`${playfair.variable} ${ptSans.variable} font-body antialiased`}>
-        <AuthProvider> {/* Wrap the existing providers with the new AuthProvider */}
-          <Providers>
-            {children}
-            <Toaster />
-          </Providers>
-        </AuthProvider>
+        <div className="bg-background text-foreground">
+          <AuthProvider> {/* Wrap the existing providers with the new AuthProvider */}
+            <Providers>
+              {children}
+              <Toaster />
+            </Providers>
+          </AuthProvider>
+        </div>
       </body>
     </html>
   );
