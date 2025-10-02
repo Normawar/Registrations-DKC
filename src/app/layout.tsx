@@ -5,8 +5,6 @@ import './globals.css';
 import { cn } from '@/lib/utils';
 import { Toaster } from '@/components/ui/toaster';
 import { Providers } from '@/components/providers';
-import { SpeedInsights } from "@vercel/speed-insights/react"
-import { Analytics } from '@vercel/analytics/react';
 
 const fontSans = FontSans({
   subsets: ['latin'],
@@ -48,8 +46,6 @@ export default function RootLayout({
           </div>
           <Toaster />
         </Providers>
-        <SpeedInsights />
-        <Analytics />
       </body>
     </html>
   );
