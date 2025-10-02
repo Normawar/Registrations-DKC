@@ -2,12 +2,15 @@
 'use client';
 
 import { MasterDbProvider } from '@/context/master-db-context';
+import { AuthProvider } from '@/components/auth-provider';
 import { ReactNode } from 'react';
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
-    <MasterDbProvider>
-      {children}
-    </MasterDbProvider>
+    <AuthProvider>
+      <MasterDbProvider>
+        {children}
+      </MasterDbProvider>
+    </AuthProvider>
   );
 }

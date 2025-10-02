@@ -1,47 +1,55 @@
 
-import type { Metadata } from "next";
-import { Playfair_Display, PT_Sans } from "next/font/google";
-import "./globals.css";
-import { Toaster } from "@/components/ui/toaster";
-import { AuthProvider } from "@/components/auth-provider"; // Import the new AuthProvider
-import { Providers } from "@/components/providers";
+import type { Metadata, Viewport } from 'next';
+import { Inter as FontSans } from 'next/font/google';
+import './globals.css';
+import { cn } from '@/lib/utils';
+import { Toaster } from '@/components/ui/toaster';
+import { Providers } from '@/components/providers';
+import { SpeedInsights } from "@vercel/speed-insights/react"
+import { Analytics } from '@vercel/analytics/react';
 
-const playfair = Playfair_Display({
-  subsets: ["latin"],
-  weight: ["700"],
-  variable: "--font-headline",
-});
-
-const ptSans = PT_Sans({
-  subsets: ["latin"],
-  weight: ["400", "700"],
-  variable: "--font-body",
+const fontSans = FontSans({
+  subsets: ['latin'],
+  variable: '--font-sans',
 });
 
 export const metadata: Metadata = {
-  title: "ChessMate",
-  description: "Manage chess tournaments with ease.",
+  title: 'DKC Registrations',
+  description: 'Tournament registrations for the Dallas Chess Club.',
+  icons: {
+    icon: '/knight-icon.svg',
+    shortcut: '/knight-icon.svg',
+    apple: '/knight-icon.svg',
+  },
 };
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: 'white' },
+    { media: '(prefers-color-scheme: dark)', color: 'black' },
+  ],
+}
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        
-      </head>
-      <body className={`${playfair.variable} ${ptSans.variable} font-body antialiased`}>
-        <div className="bg-background text-foreground">
-          <AuthProvider> {/* Wrap the existing providers with the new AuthProvider */}
-            <Providers>
-              {children}
-              <Toaster />
-            </Providers>
-          </AuthProvider>
-        </div>
+      <head />
+      <body className={cn(
+        'min-h-screen bg-background font-sans antialiased',
+        fontSans.variable
+      )}>
+        <Providers>
+          <div vaul-drawer-wrapper="">
+            {children}
+          </div>
+          <Toaster />
+        </Providers>
+        <SpeedInsights />
+        <Analytics />
       </body>
     </html>
   );
