@@ -1,24 +1,31 @@
+
 import admin from 'firebase-admin';
+import { initializeApp, getApps } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
+import {cert, App, applicationDefault} from 'firebase-admin/app';
 
-function getFirebaseAdmin() {
-  if (admin.apps.length === 0) {
-    const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-    if (!serviceAccount) {
-      throw new Error('The FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.');
-    }
 
-    admin.initializeApp({
-      credential: admin.credential.cert(JSON.parse(serviceAccount)),
-      databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL,
-    });
+// Use a function to safely initialize and get the app
+function getFirebaseAdminApp(): App {
+  if (getApps().length > 0) {
+    return getApps()[0];
   }
-  return admin;
+  
+  // This will use the GOOGLE_APPLICATION_CREDENTIALS environment variable
+  // automatically provided by App Hosting.
+  initializeApp({credential: applicationDefault()});
+
+  // Return the initialized app
+  return getApps()[0];
 }
 
 export function getDb() {
-  return getFirebaseAdmin().firestore();
+  const app = getFirebaseAdminApp();
+  return getFirestore(app);
 }
 
 export function getAdminAuth() {
-  return getFirebaseAdmin().auth();
+  const app = getFirebaseAdminApp();
+  return getAuth(app);
 }
