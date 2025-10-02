@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
-import { getDb } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase-admin';
 import { FieldPath } from 'firebase-admin/firestore';
 
 export async function GET(request: Request) {
-  const db = getDb();
   const { searchParams } = new URL(request.url);
   const school = searchParams.get('school');
   const district = searchParams.get('district');
@@ -47,7 +46,7 @@ export async function GET(request: Request) {
         }
 
         const snapshot = await q.get();
-        players = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        players = snapshot.docs.-map(doc => ({ id: doc.id, ...doc.data() }));
     } else {
       return NextResponse.json({ error: 'A school, district, or playerIds must be specified.' }, { status: 400 });
     }
