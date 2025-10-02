@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getDb } from '@/lib/firebase-admin';
+import FirebaseAdmin from '@/lib/firebase-admin';
 import { FieldPath } from 'firebase-admin/firestore';
 
 export async function GET(request: Request) {
@@ -13,7 +13,8 @@ export async function GET(request: Request) {
 
   try {
     console.log('Getting Firestore instance...');
-    const db = getDb();
+    const firebaseAdmin = FirebaseAdmin.getInstance();
+    const db = firebaseAdmin.getDb();
     console.log('Firestore instance obtained, fetching players...');
     
     const playersRef = db.collection('players');
