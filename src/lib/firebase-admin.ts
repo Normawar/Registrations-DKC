@@ -7,7 +7,13 @@ if (!admin.apps.length) {
   });
 }
 
-// Export instances directly
-export const db = admin.firestore();
-export const auth = admin.auth();
+// Export getter functions instead of instances to ensure lazy initialization
+export function getDb() {
+  return admin.firestore();
+}
+
+export function getAuth() {
+  return admin.auth();
+}
+
 export { admin };

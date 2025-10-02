@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase-admin';
+import { getDb } from '@/lib/firebase-admin';
 import { FieldPath } from 'firebase-admin/firestore';
 
 export async function GET(request: Request) {
@@ -12,7 +12,10 @@ export async function GET(request: Request) {
   console.log(`Query Params: school=${school}, district=${district}, playerIds=${playerIdsParam}`);
 
   try {
-    console.log('Attempting to fetch players from Firestore');
+    console.log('Getting Firestore instance...');
+    const db = getDb();
+    console.log('Firestore instance obtained, fetching players...');
+    
     const playersRef = db.collection('players');
     let players: any[] = [];
 
@@ -69,7 +72,6 @@ export async function GET(request: Request) {
     console.error('Error message:', error?.message);
     console.error('Error code:', error?.code);
     console.error('Error stack:', error?.stack);
-    console.error('Full error object:', error);
     
     return NextResponse.json(
       { 
