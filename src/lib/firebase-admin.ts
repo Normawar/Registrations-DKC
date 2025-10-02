@@ -3,15 +3,32 @@ import admin from "firebase-admin";
 
 function initializeAdmin() {
   if (!admin.apps.length) {
-    if (!process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+    const secretKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+    
+    console.log("=== FIREBASE ADMIN INIT DEBUG ===");
+    console.log("Secret exists:", !!secretKey);
+    console.log("Secret length:", secretKey?.length || 0);
+    console.log("Secret first 100 chars:", secretKey?.substring(0, 100));
+    
+    if (!secretKey) {
       throw new Error("Missing FIREBASE_SERVICE_ACCOUNT_KEY env var");
     }
 
-    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
-
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-    });
+    try {
+      const serviceAccount = JSON.parse(secretKey);
+      console.log("Service account parsed successfully");
+      console.log("Project ID from service account:", serviceAccount.project_id);
+      
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+      });
+      
+      console.log("Firebase Admin initialized successfully");
+    } catch (parseError: any) {
+      console.error("Failed to parse service account JSON:", parseError);
+      console.error("Secret content type:", typeof secretKey);
+      throw new Error(`Failed to parse service account: ${parseError.message}`);
+    }
   }
 }
 
