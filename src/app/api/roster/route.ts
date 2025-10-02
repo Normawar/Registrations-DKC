@@ -2,14 +2,16 @@ import { NextResponse } from 'next/server';
 import admin from 'firebase-admin';
 import { FieldPath } from 'firebase-admin/firestore';
 
-// Initialize Firebase Admin if not already initialized
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.applicationDefault()
-  });
-}
+// DO NOT initialize Firebase Admin here
 
 export async function GET(request: Request) {
+  // Initialize Firebase Admin inside the handler
+  if (!admin.apps.length) {
+    admin.initializeApp({
+      credential: admin.credential.applicationDefault()
+    });
+  }
+
   console.log('API Route Hit');
   const { searchParams } = new URL(request.url);
   const school = searchParams.get('school');
