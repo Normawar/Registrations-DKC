@@ -1,4 +1,3 @@
-
 'use server';
 
 import { ai } from '@/ai/genkit';
@@ -55,7 +54,8 @@ const importSquareInvoicesFlow = ai.defineFlow(
 
     try {
       console.log('Fetching all invoices from Square...');
-      const { result: { invoices } } = await squareClient.invoicesApi.listInvoices({ locationId, limit: 200 });
+      const { result } = await squareClient.invoicesApi.listInvoices(locationId, undefined, undefined, 200);
+      const invoices = result.invoices;
 
       if (!invoices) {
         return { created: 0, updated: 0, failed: 0, errors: ['No invoices found in Square for this location.'] };
@@ -76,7 +76,10 @@ const importSquareInvoicesFlow = ai.defineFlow(
 
       for (const invoice of invoicesToProcess) {
         try {
+          // Process the invoice and get plain data
           const invoiceData = await processSingleInvoice(squareClient, db, invoice, batch);
+          
+          // Query for existing invoice
           const q = db.collection('invoices').where('invoiceId', '==', invoice.id);
           const querySnapshot = await q.get();
 
@@ -91,10 +94,13 @@ const importSquareInvoicesFlow = ai.defineFlow(
           }
         } catch (procError: any) {
           failedCount++;
-          errors.push(`Invoice #${invoice.invoiceNumber}: ${procError.message}`);
+          // Ensure error message is a plain string
+          const errorMessage = procError?.message || String(procError);
+          errors.push(`Invoice #${invoice.invoiceNumber}: ${errorMessage}`);
         }
       }
 
+      // Commit all batched writes
       await batch.commit();
 
     } catch (error: any) {
@@ -103,9 +109,12 @@ const importSquareInvoicesFlow = ai.defineFlow(
         const errorDetail = error.result?.errors?.[0]?.detail || error.message;
         return { created: 0, updated: 0, failed: invoicesToProcess.length || 1, errors: [`Square API Error: ${errorDetail}`] };
       }
-      return { created: 0, updated: 0, failed: invoicesToProcess.length || 1, errors: [`API Error: ${error.message}`] };
+      // Ensure error is converted to plain string
+      const errorMessage = error?.message || String(error);
+      return { created: 0, updated: 0, failed: invoicesToProcess.length || 1, errors: [`API Error: ${errorMessage}`] };
     }
 
+    // Return only plain data
     return { created: createdCount, updated: updatedCount, failed: failedCount, errors };
   }
 );
