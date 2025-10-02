@@ -1,23 +1,26 @@
-import admin from 'firebase-admin';
+// src/lib/firebase-admin.ts
+import admin from "firebase-admin";
 
-// Initialize Firebase Admin if not already initialized
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.applicationDefault()
-  });
+function initializeAdmin() {
+  if (!admin.apps.length) {
+    if (!process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+      throw new Error("Missing FIREBASE_SERVICE_ACCOUNT_KEY env var");
+    }
+
+    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+    });
+  }
 }
 
-// Export getter functions (for server actions that follow the documented pattern)
 export function getDb(): FirebaseFirestore.Firestore {
+  initializeAdmin();
   return admin.firestore();
 }
 
 export function getAdminAuth(): admin.auth.Auth {
+  initializeAdmin();
   return admin.auth();
 }
-
-// Also export direct instances (for API routes)
-export const db = admin.firestore();
-export const adminAuth = admin.auth();
-
-export { admin };
