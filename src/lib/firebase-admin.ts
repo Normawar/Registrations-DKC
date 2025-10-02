@@ -40,4 +40,4 @@ export function getDb(): FirebaseFirestore.Firestore {
 export function getAdminAuth(): admin.auth.Auth {
   initializeAdmin();
   return admin.auth();
-}
+}// Force rebuild Thu Oct  2 10:45:28 PM UTC 2025
