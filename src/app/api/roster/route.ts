@@ -50,7 +50,9 @@ export async function GET(request: Request) {
             q = q.where('school', '==', school);
         }
 
+        console.log('Executing Firestore query...');
         const snapshot = await q.get();
+        console.log(`Query returned ${snapshot.docs.length} documents`);
         players = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         console.log(`Fetched ${players.length} players by district/school`);
     } else {
@@ -62,12 +64,19 @@ export async function GET(request: Request) {
     return NextResponse.json(players);
 
   } catch (error: any) {
-    console.error('Detailed error fetching roster:', JSON.stringify(error, null, 2));
+    console.error('Error type:', typeof error);
+    console.error('Error constructor:', error?.constructor?.name);
+    console.error('Error message:', error?.message);
+    console.error('Error code:', error?.code);
+    console.error('Error stack:', error?.stack);
+    console.error('Full error object:', error);
+    
     return NextResponse.json(
       { 
         error: `Failed to fetch roster.`,
-        detailedError: error.message,
-        errorCode: error.code 
+        detailedError: error?.message || 'Unknown error',
+        errorCode: error?.code || 'unknown',
+        errorType: error?.constructor?.name || typeof error
       },
       { status: 500 }
     );
