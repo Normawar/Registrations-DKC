@@ -1,15 +1,17 @@
-
 // src/app/api/districts/route.ts
 import { NextResponse } from 'next/server';
-import { getDb } from '@/lib/firebase-admin';
+import admin from 'firebase-admin';
+
+// Initialize Firebase Admin if not already initialized
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.applicationDefault()
+  });
+}
 
 export async function GET() {
-  const db = getDb();
-  if (!db) {
-    return NextResponse.json({ error: 'Firestore is not configured' }, { status: 500 });
-  }
-
   try {
+    const db = admin.firestore();
     const schoolsRef = db.collection('schools');
     const snapshot = await schoolsRef.get();
     

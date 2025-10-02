@@ -1,97 +1,89 @@
 import { NextResponse } from 'next/server';
-import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
-import { getDb } from '@/lib/firebase-admin';
+import admin from 'firebase-admin';
+
+// Initialize Firebase Admin if not already initialized
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.applicationDefault()
+  });
+}
 
 export async function POST(request: Request) {
-  const db = getDb();
-  if (!db) {
-    return NextResponse.json(
-      { error: 'Firestore is not initialized' },
-      { status: 500 }
-    );
-  }
-  
   try {
+    const db = admin.firestore();
     const criteria = await request.json();
     console.log('Searching players with criteria:', criteria);
     
-    const playersRef = collection(db, 'players');
-    let constraints = [];
+    const playersRef = db.collection('players');
+    let q: FirebaseFirestore.Query = playersRef;
 
-    // Now that we have the composite index, we can use proper where clauses
-    
+    // Build query with Firebase Admin SDK syntax
     if (criteria.uscfId?.trim()) {
       // Exact USCF ID match - highest priority
-      constraints.push(where('uscfId', '==', criteria.uscfId.trim()));
+      q = q.where('uscfId', '==', criteria.uscfId.trim());
     } else {
-      // Use the composite index for district/school filtering
-      
-      // District filter - now use where clause instead of client-side filtering
+      // District filter
       if (criteria.district && criteria.district !== 'all') {
         if (criteria.district === 'Unassigned') {
-          constraints.push(where('district', 'in', ['', 'Unassigned', 'None']));
+          q = q.where('district', 'in', ['', 'Unassigned', 'None']);
         } else {
-          constraints.push(where('district', '==', criteria.district));
+          q = q.where('district', '==', criteria.district);
         }
       }
       
-      // School filter - now use where clause
+      // School filter
       if (criteria.school && criteria.school !== 'all') {
         if (criteria.school === 'Unassigned') {
-          constraints.push(where('school', 'in', ['', 'Unassigned', 'None']));
+          q = q.where('school', 'in', ['', 'Unassigned', 'None']);
         } else {
-          constraints.push(where('school', '==', criteria.school));
+          q = q.where('school', '==', criteria.school);
         }
       }
       
       // Name filters with range queries
       if (criteria.lastName?.trim()) {
         const lastName = criteria.lastName.trim();
-        constraints.push(where('lastName', '>=', lastName));
-        constraints.push(where('lastName', '<=', lastName + '\uf8ff'));
+        q = q.where('lastName', '>=', lastName);
+        q = q.where('lastName', '<=', lastName + '\uf8ff');
       } else if (criteria.firstName?.trim()) {
-        // Only if lastName is not specified
         const firstName = criteria.firstName.trim();
-        constraints.push(where('firstName', '>=', firstName));
-        constraints.push(where('firstName', '<=', firstName + '\uf8ff'));
+        q = q.where('firstName', '>=', firstName);
+        q = q.where('firstName', '<=', firstName + '\uf8ff');
       }
       
       // State filter
       if (criteria.state?.trim()) {
-        constraints.push(where('state', '==', criteria.state.trim()));
+        q = q.where('state', '==', criteria.state.trim());
       }
       
       // Rating filters
       if (criteria.minRating) {
-        constraints.push(where('regularRating', '>=', criteria.minRating));
+        q = q.where('regularRating', '>=', criteria.minRating);
       }
       if (criteria.maxRating) {
-        constraints.push(where('regularRating', '<=', criteria.maxRating));
+        q = q.where('regularRating', '<=', criteria.maxRating);
       }
     }
     
-    // Add ordering - must be compatible with the where clauses
+    // Add ordering
     if (criteria.uscfId?.trim()) {
       // No ordering needed for unique ID
     } else if (criteria.lastName?.trim()) {
-      constraints.push(orderBy('lastName'));
+      q = q.orderBy('lastName');
     } else if (criteria.firstName?.trim() && !criteria.lastName?.trim()) {
-      constraints.push(orderBy('firstName'));
+      q = q.orderBy('firstName');
     } else if (criteria.minRating || criteria.maxRating) {
-      constraints.push(orderBy('regularRating'));
-      constraints.push(orderBy('lastName')); // Secondary sort
+      q = q.orderBy('regularRating');
+      q = q.orderBy('lastName'); // Secondary sort
     } else {
-      // For district/school searches, order by lastName
-      constraints.push(orderBy('lastName'));
+      q = q.orderBy('lastName');
     }
 
     // Add limit
-    constraints.push(limit(criteria.pageSize || 50));
+    q = q.limit(criteria.pageSize || 50);
 
-    console.log('Building query with constraints:', constraints.length);
-    const q = query(playersRef, ...constraints);
-    
-    const snapshot = await getDocs(q);
+    console.log('Executing query...');
+    const snapshot = await q.get();
     
     let players: any[] = [];
     snapshot.forEach(doc => {
@@ -100,9 +92,8 @@ export async function POST(request: Request) {
     
     console.log(`Query returned ${players.length} players before additional filtering`);
     
-    // Only minimal client-side filtering for criteria that couldn't be in the main query
+    // Additional client-side filtering
     let filteredPlayers = players.filter(player => {
-      // Additional firstName filtering if lastName was the primary search
       if (criteria.firstName?.trim() && criteria.lastName?.trim()) {
         const firstName = (player.firstName || '').toLowerCase();
         const searchFirst = criteria.firstName.toLowerCase().trim();
@@ -110,11 +101,10 @@ export async function POST(request: Request) {
           return false;
         }
       }
-      
       return true;
     });
 
-    // Generate appropriate message
+    // Generate message
     let message = '';
     if (criteria.uscfId?.trim()) {
       message = filteredPlayers.length > 0 ? 
