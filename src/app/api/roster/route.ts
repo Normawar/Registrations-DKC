@@ -55,9 +55,13 @@ export async function GET(request: Request) {
     return NextResponse.json(players);
 
   } catch (error: any) {
-    console.error('Error fetching roster:', error);
+    console.error('Detailed error fetching roster:', JSON.stringify(error, null, 2));
     return NextResponse.json(
-      { error: `Failed to fetch roster: ${error.message}` },
+      { 
+        error: `Failed to fetch roster.`,
+        detailedError: error.message,
+        errorCode: error.code 
+      },
       { status: 500 }
     );
   }
