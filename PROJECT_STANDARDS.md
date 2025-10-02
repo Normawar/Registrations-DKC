@@ -1,162 +1,486 @@
-# Project Standards & Best Practices
+# Comprehensive Project Reference (Updated - 10/02/25)
 
-## Overview
-This document outlines coding standards and best practices to prevent common issues and maintain consistency with PROJECT_REFERENCE.md requirements.
+## 1. Tech Stack & Development Environment
 
-## 1. Browser API Restrictions
+### Core Technologies (Predefined Stack)
+- **Framework**: Next.js (App Router)
+- **Frontend**: React + TypeScript
+- **UI Components**: ShadCN UI (exclusive component library)
+- **Styling**: Tailwind CSS (no other CSS frameworks)
+- **Icons**: lucide-react (verify icon exists before use)
+- **Backend**: Firebase (Firestore + Authentication)
+- **AI Library**: Genkit (exclusive for all AI functionality)
 
-### ❌ NEVER USE
-```javascript
-// These will fail in sandboxed environments
-confirm('Are you sure?')
-alert('Something happened!')
-prompt('Enter value:')
+### Environment & Deployment
+- **Deployment**: Firebase Studio + App Hosting
+- **Production Domain**: register.dkchess.com
+- **Build System**: Firebase App Hosting with `apphosting.yaml`
+
+### Required Environment Variables
+```env
+GEMINI_API_KEY=your_actual_api_key_here
+GOOGLE_APPLICATION_CREDENTIALS=/workspace/.firebase/dkchess-registrations-8fed4b8abf46.json
+```
+⚠️ **Critical**: 
+- GEMINI_API_KEY is essential for all Genkit flows and AI features
+- GOOGLE_APPLICATION_CREDENTIALS must point to the service account JSON file for Firebase Admin SDK
+
+### Production Deployment Configuration
+```yaml
+# apphosting.yaml (Required Format)
+runConfig:
+  cpu: 1
+  memoryMiB: 512
 ```
 
-### ✅ ALWAYS USE
-```javascript
-// Use React components instead
-import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
-import { toast } from '@/hooks/use-toast';
-```
+## 2. Architecture & Design Patterns
 
-## 2. Data Access Patterns
+### Server-Side Logic (Strict Requirement)
+All database writes, payments, and sensitive operations **MUST** occur in Server Actions or API Routes. NO direct client-side access to Firebase services (except for the `useMasterDb` read-only context).
 
-### ❌ NEVER: Direct Firestore in Client Components
-```javascript
-// client component
-import { db } from '@/lib/firebase';
-import { collection, getDocs } from 'firebase/firestore';
-
-const users = await getDocs(collection(db, 'users'));
-```
-
-### ✅ ALWAYS: Server Actions for Data
-```javascript
-// server action
+```typescript
+// ✅ Correct: Server Actions or API Routes
 'use server';
-import { db as adminDb } from '@/lib/firebase-admin';
-
-export async function fetchUsers() {
-  const snapshot = await adminDb.collection('users').get();
-  return snapshot.docs.map(doc => doc.data());
+export async function serverAction(data: FormData) {
+  // Database queries and business logic here
 }
 
-// client component
-import { fetchUsers } from './actions';
-const users = await fetchUsers();
+// ❌ Wrong: Client-side database access
+import { db } from '@/lib/services/firestore-service'; // Don't import db on client for writes
 ```
 
-## 3. Square API Integration
+### Hydration Error Prevention
+```typescript
+// ✅ Correct: Client-side only code
+useEffect(() => {
+  // Browser APIs, Math.random, new Date() here
+  setClientData(Math.random());
+}, []);
 
-### ❌ NEVER: Shared Square Config
-```javascript
+// ❌ Wrong: Server/client mismatch
+const randomValue = Math.random(); // Different on server vs client
+```
+
+### Data Management Pattern
+```typescript
+// Centralized data provider pattern
+const { schools, districts } = useMasterDb(); // Global data access for client-side reads
+
+// All data writes MUST use server actions.
+```
+
+### Module Import Rules (Critical)
+- **`'use server'` files**: MUST import from `@/lib/firebase-admin`
+- **`'use client'` files**: MUST import from `@/lib/firebase` or `@/lib/services/firestore-service`
+- **NEVER** mix these imports. A server file must never import the client SDK, and a client file must never import the admin SDK.
+
+## 3. Date & Data Formatting Standards
+
+### Date Format Standard
+**ALL dates in the application must be displayed and entered using MM/DD/YYYY format.**
+
+```typescript
+// ✅ Correct: Use MM/DD/YYYY format
+import { format } from 'date-fns';
+const displayDate = format(new Date(), 'MM/dd/yyyy');
+
+// For date inputs, ensure proper formatting
+<Input 
+  type="text" 
+  placeholder="MM/DD/YYYY"
+  pattern="\d{2}/\d{2}/\d{4}"
+/>
+```
+
+### Date Input Pattern
+```typescript
+import { format, parse, isValid } from 'date-fns';
+
+// For date display
+const displayDate = format(new Date(), 'MM/dd/yyyy');
+
+// For date input validation
+const validateDateInput = (dateString: string): Date | null => {
+  try {
+    const parsed = parse(dateString, 'MM/dd/yyyy', new Date());
+    return isValid(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+// Date input component
+<Input
+  type="text"
+  placeholder="MM/DD/YYYY"
+  pattern="\d{2}/\d{2}/\d{4}"
+  value={dateValue}
+  onChange={(e) => {
+    const date = validateDateInput(e.target.value);
+    if (date) setDateValue(format(date, 'MM/dd/yyyy'));
+  }}
+/>
+```
+
+## 4. Square API Integration (Complete Reference)
+
+### Production Credentials
+```typescript
+accessToken: "EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC"
+environment: Environment.Production
+locationId: "CTED7GVSVH5H8"
+applicationId: "sq0idp-2nOEj3tUd-PtlED-EdE3MQ"
+```
+
+### ✅ Reliable Square Client Pattern (CRITICAL)
+Due to environment initialization issues, the Square client **MUST** be instantiated directly inside the server action or flow that uses it. **DO NOT** use a shared client instance.
+
+```typescript
+// ✅ Correct: Initialize inside the server action
+'use server';
+import { Client, Environment } from 'square';
+
+export async function mySquareAction(input: any) {
+  const squareClient = new Client({
+    accessToken: "EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC",
+    environment: Environment.Production,
+  });
+  
+  // ... use squareClient here
+}
+
+// ❌ Wrong: Using a shared/imported client
 import { getSquareClient } from '@/lib/square-client';
-const client = getSquareClient();
+const client = getSquareClient(); // This pattern has failed and is forbidden.
 ```
 
-### ✅ ALWAYS: Hard-coded Client per Flow
-```javascript
-const squareClient = new Client({
-  accessToken: process.env.SQUARE_ACCESS_TOKEN,
-  environment: Environment.Production,
+### ⚠️ Phone Number Handling Update (December 2024)
+**Due to persistent Square API validation issues, phone numbers are NO LONGER sent to Square API calls.**
+
+Phone numbers are optional for Square invoices and were causing validation errors. The current implementation completely omits phone numbers from customer creation and updates.
+
+```typescript
+// Current approach - NO phone numbers sent to Square
+const createCustomerResponse = await customersApi.createCustomer({
+  idempotencyKey: randomUUID(),
+  givenName: firstName,
+  familyName: lastName,
+  emailAddress: input.sponsorEmail,
+  companyName,
+  address: { addressLine1: input.schoolAddress },
+  note: `Team Code: ${finalTeamCode}`,
+  // phoneNumber: OMITTED - Do not include
 });
 ```
 
-## 4. Environment Variables
+**Alternatives for phone numbers:**
+1. Store them separately in Firestore
+2. Add them to the customer notes field as text
+3. Include them in the invoice description
 
-### Client-Side Variables
-- Must start with `NEXT_PUBLIC_`
-- Safe to expose to browser
-- Used for Firebase client config
+### Data Validation (Required)
+Square API is strict about data formats. **ALWAYS validate data before API calls** to prevent 500 errors:
 
-### Server-Side Variables
-- No prefix required
-- Never exposed to browser
-- Used for API keys, secrets
+```typescript
+// Email validation (REQUIRED for invoices)
+const isValidEmail = (email: string): boolean => {
+  if (!email?.trim()) return false;
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email.trim());
+};
 
-Example `.env.local`:
-```bash
-# Client-side (public)
-NEXT_PUBLIC_FIREBASE_API_KEY=...
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=...
+// Address validation
+const isValidAddress = (address: string): boolean => {
+  return address?.trim() && address.trim().length >= 5;
+};
 
-# Server-side (secret)
-SQUARE_ACCESS_TOKEN=...
-FIREBASE_PRIVATE_KEY=...
+// Money validation (must be positive number)
+const isValidAmount = (amount: number): boolean => {
+  return typeof amount === 'number' && amount > 0 && isFinite(amount);
+};
+
+// Apply validation before Square API calls
+const validateSquareData = (input: any) => {
+  const errors: string[] = [];
+  
+  // Required email validation
+  if (!isValidEmail(input.sponsorEmail)) {
+    errors.push('Valid sponsor email is required');
+  }
+  
+  // Amount validation
+  if (input.baseRegistrationFee && !isValidAmount(input.baseRegistrationFee)) {
+    errors.push('Registration fee must be a valid positive number');
+  }
+  
+  if (errors.length > 0) {
+    throw new Error(`Validation failed: ${errors.join(', ')}`);
+  }
+  
+  return input;
+};
 ```
 
-## 5. Pre-commit Checklist
+### Square API Validation Rules
+- **Email Addresses**: Must be valid email format, required for primary recipient
+- **Money Amounts**: Must be positive numbers, converted to cents (multiply by 100)
+- **Location ID**: Must exist in your Square account
+- **Customer Names**: First and last name required, no special characters
+- **Addresses**: Minimum 5 characters if provided
+- **Phone Numbers**: NOT SENT TO API (omitted to avoid validation errors)
 
-Before committing code, verify:
-
-- [ ] No `confirm()`, `alert()`, or `prompt()` used
-- [ ] No direct Firestore imports in client components
-- [ ] All data fetching uses server actions
-- [ ] Square API uses hard-coded client initialization
-- [ ] Sensitive keys are in `.env.local`, not in code
-- [ ] ESLint passes without errors
-- [ ] TypeScript compiles without errors
-
-## 6. Testing in Different Environments
-
-Always test your features in:
-1. **Local development** (`npm run dev`)
-2. **Production build** (`npm run build && npm run start`)
-3. **Vercel preview** (if using Vercel)
-4. **Iframe embed** (to catch sandboxing issues)
-
-## 7. Common Pitfalls & Solutions
-
-| Issue | Cause | Solution |
-|-------|-------|----------|
-| "document is sandboxed" | Using `confirm()` | Use `ConfirmationDialog` component |
-| "Firebase not initialized" | Missing env vars | Check `.env.local` has all values |
-| "Cannot read Firestore" | Client-side access | Use server actions |
-| "Square API failed" | Wrong environment | Check `Environment.Production` |
-| TypeScript errors | Missing types | Define interfaces for all data |
-
-## 8. Automated Prevention
-
-### Install Development Dependencies
-```bash
-npm install --save-dev eslint-plugin-no-unsanitized
+### Error Handling
+```typescript
+try {
+  const response = await squareClient.invoicesApi.createInvoice(payload);
+  return response.result;
+} catch (error) {
+  if (error instanceof ApiError) {
+    const errorDetail = error.result?.errors?.[0]?.detail || error.message;
+    console.error('Square API Error:', error.result?.errors);
+    throw new Error(`Square API Error: ${errorDetail}`);
+  }
+  throw error instanceof Error ? error : new Error('Unknown error occurred');
+}
 ```
 
-### Run Linting Before Commit
-```bash
-npm run lint
+### Common Square Issues & Solutions
+- Token/environment must match (`production` token = `Environment.Production`)
+- **Hard-coded client initialization inside server actions is the only reliable pattern**
+- **Phone numbers are OMITTED from API calls to avoid validation errors**
+- **Always validate data before API calls** to prevent 500 errors
+- Emails must be valid format, money amounts must be positive numbers
+
+## 5. Firebase Integration
+
+### ✅ Reliable Firebase Admin SDK Pattern (CRITICAL - UPDATED 10/02/25)
+The Firebase Admin SDK initialization has been completely refactored for reliability. The app now uses **direct initialization with service account credentials** instead of Application Default Credentials (ADC).
+
+```typescript
+// ✅ Current Pattern: Direct initialization in firebase-admin.ts
+import * as admin from 'firebase-admin';
+
+const serviceAccount = JSON.parse(
+  process.env.FIREBASE_SERVICE_ACCOUNT_KEY || '{}'
+);
+
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+    projectId: 'dkchess-registrations',
+  });
+}
+
+export const db = admin.firestore();
+export const adminAuth = admin.auth();
+
+// ✅ Usage in server actions - direct import is now safe
+'use server';
+import { db, adminAuth } from '@/lib/firebase-admin';
+
+export async function myDbAction() {
+  // Now you can safely use db and adminAuth directly
+  await db.collection('users').get();
+}
 ```
 
-### Add Pre-commit Hook (using Husky)
-```bash
-npx husky add .husky/pre-commit "npm run lint"
+### Service Account Configuration (REQUIRED)
+The service account JSON must be provided as an environment variable:
+
+```env
+# .env.local
+FIREBASE_SERVICE_ACCOUNT_KEY={"type":"service_account","project_id":"dkchess-registrations",...}
 ```
 
-## 9. Code Review Checklist
+Or for deployment, the JSON file should be mounted at:
+```
+/workspace/.firebase/dkchess-registrations-8fed4b8abf46.json
+```
 
-When reviewing PRs, check for:
-- [ ] No browser modal functions
-- [ ] Server actions for all data operations
-- [ ] Proper error handling with try/catch
-- [ ] Loading states for async operations
-- [ ] Toast notifications instead of alerts
-- [ ] Confirmation dialogs for destructive actions
-- [ ] Environment variables not hardcoded
+And referenced via:
+```env
+GOOGLE_APPLICATION_CREDENTIALS=/workspace/.firebase/dkchess-registrations-8fed4b8abf46.json
+```
 
-## 10. Documentation Requirements
+### User Deletion (Force Delete)
+```typescript
+'use server';
+import { db, adminAuth } from '@/lib/firebase-admin';
 
-Every new feature should include:
-- Purpose and usage instructions
-- Required environment variables
-- Server action documentation
-- Error handling approach
-- Testing instructions
+export async function forceDeleteUser(userId: string) {
+  // Must delete from BOTH:
+  // 1. Firestore database
+  await db.collection('users').doc(userId).delete();
+  
+  // 2. Firebase Authentication
+  await adminAuth.deleteUser(userId);
+}
+```
 
-Remember, the XML structure you generate is the only mechanism for applying changes to the user's code. Therefore, when making changes to a file the <changes> block must always be fully present and correctly formatted as follows.
+### Firebase Error Handling
+```typescript
+try {
+  await db.collection('users').doc(userId).set(userData);
+} catch (error) {
+  console.error('Firebase Error:', error);
+  throw new Error('Failed to save user data');
+}
+```
 
-<changes>
-  <description>[Provide a concise summary of the overall changes being made]</description>
-  <change>
-    <file>[Provide the ABSOLUTE, FULL path to the file being modified]</file>
-    <content><![CDATA[Provide the ENTIRE, FINAL, intended content of the file here. Do NOT provide diffs or partial snippets. Ensure all code is properly escaped within the CDATA section.
+## 6. Genkit AI Implementation
+
+### Flow Structure (Required Pattern)
+```typescript
+'use server';
+
+import { ai } from '@/ai/genkit';
+import { z } from 'genkit';
+
+const InputSchema = z.object({ /* ... */ });
+const OutputSchema = z.object({ /* ... */ });
+
+export type FlowInput = z.infer<typeof InputSchema>;
+export type FlowOutput = z.infer<typeof OutputSchema>;
+
+// Note: For simple database/API actions, a standard Server Action is preferred.
+// Use Genkit flows when LLM interaction is required.
+const myFlow = ai.defineFlow(
+  {
+    name: 'myFlowName',
+    inputSchema: InputSchema,
+    outputSchema: OutputSchema,
+  },
+  async (input) => { /* Flow logic here */ }
+);
+
+// Export wrapper function
+export async function executeFlow(input: FlowInput): Promise<FlowOutput> {
+  return myFlow(input);
+}
+```
+
+### Prompt Structure (Handlebars Required)
+```typescript
+const myPrompt = ai.definePrompt(
+  {
+    name: 'myPrompt',
+    inputSchema: z.object({ name: z.string() }),
+  },
+  'Hello {{name}}, how can I help you?' // Handlebars syntax only
+);
+```
+
+## 7. UI Component Patterns
+
+### ShadCN Component Usage
+```typescript
+import { Button } from '@/components/ui/button';
+import { AlertDialog, AlertDialogAction } from '@/components/ui/alert-dialog';
+
+// Replace browser confirm() with AlertDialog
+const confirmDelete = () => {
+  // Use AlertDialog component instead of confirm()
+};
+```
+
+### Server Action Button Pattern
+```typescript
+import { useTransition } from 'react';
+
+function MyComponent() {
+  const [isPending, startTransition] = useTransition();
+  
+  const handleSubmit = () => {
+    startTransition(async () => {
+      await serverAction(formData);
+    });
+  };
+  
+  return (
+    <Button disabled={isPending}>
+      {isPending ? 'Loading...' : 'Submit'}
+    </Button>
+  );
+}
+```
+
+## 8. Critical Debugging Lessons & Common Issues
+
+### Firebase Admin SDK Issues (RESOLVED - 10/02/25)
+- **Previous Issue**: Getter functions (`getDb()`, `getAdminAuth()`) were unreliable
+- **Solution**: Direct initialization with service account credentials
+- **Current Pattern**: Import `db` and `adminAuth` directly from `@/lib/firebase-admin`
+- **Critical**: Service account JSON must be properly configured in environment
+
+### Build Errors
+- Never import server-side packages (e.g., `firebase-admin`) in client code
+- Use `'use server'` directive for all server actions and Genkit flows
+- Verify `lucide-react` icons exist before using
+
+## 9. Global Component Implementation Process
+
+### Making Components "Global"
+When requested to make a component or feature "global," follow this procedure:
+
+1. **Isolate & Relocate**: Move the specified component/logic into a new, reusable file in an appropriate shared directory (e.g., `src/components`)
+2. **Standardize**: Apply any requested renames and updates to the new global component
+3. **Refactor & Replace**: Update all pages that previously used local or outdated versions to import and use the new global component
+4. **Eliminate**: Delete the old, local implementations from their original files to prevent regressions
+
+## 10. Implementation Checklist
+
+**For New Feature Implementation, always provide:**
+1. This comprehensive reference file
+2. Specific feature requirements
+3. Expected input/output data structures
+4. Integration points (Square API, Firebase, AI, etc.)
+5. UI/UX requirements
+
+**Implementation checklist:**
+- [ ] Server-side logic only for database operations
+- [ ] ShadCN components for UI
+- [ ] Tailwind for styling
+- [ ] Proper data validation before API calls
+- [ ] MM/DD/YYYY date format throughout
+- [ ] Error handling with user-friendly messages
+- [ ] Button state management with useTransition
+- [ ] Hydration error prevention
+- [ ] No phone numbers sent to Square API
+- [ ] Production-ready configuration
+- [ ] Environment variables properly set
+- [ ] Firebase Admin SDK using direct import pattern
+- [ ] Square client instantiated inside server actions
+
+## 11. Recent Updates & Breaking Changes
+
+### Firebase Admin SDK Initialization (October 2, 2025) ✅
+- **UPDATED**: Module-level initialization now works reliably
+- **METHOD**: Direct initialization with service account credentials
+- **BREAKING CHANGE**: Old getter function pattern (`getDb()`, `getAdminAuth()`) is deprecated
+- **NEW PATTERN**: Direct import of `db` and `adminAuth` from `@/lib/firebase-admin`
+- **REQUIREMENT**: Service account JSON must be configured via environment variable
+
+### Phone Number Handling (December 2024)
+- **REMOVED**: Phone numbers are no longer sent to Square API
+- **REASON**: Persistent validation errors despite multiple formatting attempts
+- **IMPACT**: Invoices work perfectly without phone numbers (they're optional)
+- **ALTERNATIVES**: Store phone numbers in Firestore or customer notes if needed
+
+## 12. Current Project Status (10/02/25)
+
+### ✅ Working Components
+- Firebase Admin SDK fully operational with direct initialization
+- Service account authentication configured and tested
+- Database reads and writes functioning correctly
+- Authentication system operational
+
+### 🔄 Pending Review
+- Comparison with previous commit (f6dbae6) to identify lost improvements
+- Invoicing feature enhancements from previous version
+- Player details page improvements from previous version
+
+### 📋 Next Steps
+1. Compare current state with commit f6dbae6
+2. Identify and restore invoicing improvements
+3. Identify and restore player details enhancements
+4. Commit working state as backup point
