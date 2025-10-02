@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getDb } from "@/lib/firebase-admin";
 
 export async function GET() {
-  console.log("SCHOOLS API - DEPLOYED FRESH v3");
+  console.log("SCHOOLS API - DEPLOYED FRESH v4");
 
   // DEBUG INFO
   const debugInfo = {
@@ -16,7 +16,7 @@ export async function GET() {
     ),
   };
 
-  console.log("DEBUG INFO:", debugInfo);
+  console.log("DEBUG INFO:", JSON.stringify(debugInfo, null, 2));
 
   try {
     const db = getDb();
@@ -33,10 +33,17 @@ export async function GET() {
     return NextResponse.json(sortedSchools);
   } catch (error: any) {
     console.error("SCHOOLS API ERROR:", error);
+    console.error("FULL ERROR DETAILS:", JSON.stringify({
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    }, null, 2));
+    
     return NextResponse.json(
       { 
         error: error.message || "Failed to fetch schools",
-        debug: debugInfo  // Include debug info in error response
+        fullError: error.toString(),
+        debug: debugInfo
       },
       { status: 500 }
     );
