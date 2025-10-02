@@ -1,16 +1,9 @@
 import { NextResponse } from 'next/server';
-import admin from 'firebase-admin';
-
-// Initialize Firebase Admin if not already initialized
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.applicationDefault()
-  });
-}
+import { getDb } from '@/lib/firebase-admin';
 
 export async function POST(request: Request) {
   try {
-    const db = admin.firestore();
+    const db = getDb();
     const criteria = await request.json();
     console.log('Searching players with criteria:', criteria);
     
