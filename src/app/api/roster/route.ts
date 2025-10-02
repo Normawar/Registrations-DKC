@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getDb } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase-admin';
 import { FieldPath } from 'firebase-admin/firestore';
 
 export async function GET(request: Request) {
@@ -10,14 +10,6 @@ export async function GET(request: Request) {
   const playerIdsParam = searchParams.get('playerIds');
 
   console.log(`Query Params: school=${school}, district=${district}, playerIds=${playerIdsParam}`);
-
-  let db;
-  try {
-    db = getDb();
-  } catch (error) {
-    console.error('Failed to get Firestore instance:', error);
-    return NextResponse.json({ error: 'Firestore is not initialized' }, { status: 500 });
-  }
 
   try {
     console.log('Attempting to fetch players from Firestore');
