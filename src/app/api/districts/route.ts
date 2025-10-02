@@ -10,6 +10,7 @@ if (!admin.apps.length) {
 }
 
 export async function GET() {
+  console.log('Districts API called - NEW VERSION 2');
   try {
     const db = admin.firestore();
     const schoolsRef = db.collection('schools');
@@ -33,4 +34,4 @@ export async function GET() {
       { status: 500 }
     );
   }
-}// Cache bust
+}

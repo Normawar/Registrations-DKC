@@ -11,6 +11,7 @@ if (!admin.apps.length) {
 }
 
 export async function GET(request: NextRequest) {
+  console.log('Schools API called - NEW VERSION 2');
   try {
     const db = admin.firestore();
     const { searchParams } = new URL(request.url);
