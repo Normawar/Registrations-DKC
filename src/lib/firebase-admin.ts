@@ -1,33 +1,19 @@
 import admin from 'firebase-admin';
 
-class FirebaseAdmin {
-  private static instance: FirebaseAdmin;
-  private app: admin.app.App;
-
-  private constructor() {
-    if (admin.apps.length === 0) {
-      this.app = admin.initializeApp({
-        credential: admin.credential.applicationDefault()
-      });
-    } else {
-      this.app = admin.apps[0]!;
-    }
-  }
-
-  public static getInstance(): FirebaseAdmin {
-    if (!FirebaseAdmin.instance) {
-      FirebaseAdmin.instance = new FirebaseAdmin();
-    }
-    return FirebaseAdmin.instance;
-  }
-
-  public getDb(): FirebaseFirestore.Firestore {
-    return this.app.firestore();
-  }
-
-  public getAuth(): admin.auth.Auth {
-    return this.app.auth();
-  }
+// Initialize once at module level
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.applicationDefault()
+  });
 }
 
-export default FirebaseAdmin;
+// Export getter functions as documented in your preferences
+export function getDb(): FirebaseFirestore.Firestore {
+  return admin.firestore();
+}
+
+export function getAdminAuth(): admin.auth.Auth {
+  return admin.auth();
+}
+
+export { admin };

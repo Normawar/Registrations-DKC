@@ -1,6 +1,13 @@
 import { NextResponse } from 'next/server';
-import FirebaseAdmin from '@/lib/firebase-admin';
+import admin from 'firebase-admin';
 import { FieldPath } from 'firebase-admin/firestore';
+
+// Initialize Firebase Admin if not already initialized
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.applicationDefault()
+  });
+}
 
 export async function GET(request: Request) {
   console.log('API Route Hit');
@@ -13,8 +20,7 @@ export async function GET(request: Request) {
 
   try {
     console.log('Getting Firestore instance...');
-    const firebaseAdmin = FirebaseAdmin.getInstance();
-    const db = firebaseAdmin.getDb();
+    const db = admin.firestore();
     console.log('Firestore instance obtained, fetching players...');
     
     const playersRef = db.collection('players');
