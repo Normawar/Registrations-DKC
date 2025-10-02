@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { User } from 'firebase/auth';
@@ -116,11 +116,13 @@ export function useSponsorProfile() {
     }
   }, [profile, user]);
   
-  return {
+  const value = useMemo(() => ({
     user,
     profile,
     updateProfile,
     isProfileLoaded: !loading,
     loading
-  };
+  }), [user, profile, updateProfile, loading]);
+
+  return value;
 }
