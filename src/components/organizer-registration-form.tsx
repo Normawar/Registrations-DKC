@@ -603,10 +603,6 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             setIsSubmitting(false);
         }
       };
-    } finally {
-        setIsSubmitting(false);
-    }
-  };
 
   const handlePsjaSingleInvoice = async (recipient: InvoiceRecipientValues, district: string) => {
     const { fee: currentFee } = getFeeForEvent();
