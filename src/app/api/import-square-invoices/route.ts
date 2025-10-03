@@ -1,7 +1,7 @@
+'use server';
+
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
-
-'use server';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { importSquareInvoices, ImportSquareInvoicesInput } from '@/ai/flows/import-square-invoices-flow';
