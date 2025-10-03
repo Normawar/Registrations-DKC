@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -9,7 +8,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, DownloadCloud } from 'lucide-react';
-import { importSquareInvoices } from '@/ai/flows/import-square-invoices-flow';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
 export default function ImportFromSquarePage() {
@@ -29,10 +27,21 @@ export default function ImportFromSquarePage() {
     setResults(null);
 
     try {
-      const result = await importSquareInvoices({ 
-        startInvoiceNumber: parseInt(startInvoiceNumber, 10),
-        endInvoiceNumber: parseInt(endInvoiceNumber, 10),
+      const response = await fetch('/api/import-square-invoices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          startInvoiceNumber: parseInt(startInvoiceNumber, 10),
+          endInvoiceNumber: parseInt(endInvoiceNumber, 10),
+        }),
       });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Import failed');
+      }
+
+      const result = await response.json();
       setResults(result);
 
       if (result.failed > 0) {
