@@ -2,7 +2,6 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { importSquareInvoices, ImportSquareInvoicesInput } from '@/ai/flows/import-square-invoices-flow';
 
 interface ImportResult {
   created: number;
@@ -13,7 +12,7 @@ interface ImportResult {
 }
 
 export async function POST(request: NextRequest) {
-  let body: Partial<ImportSquareInvoicesInput>;
+  let body: any;
 
   try {
     body = await request.json();
@@ -47,6 +46,9 @@ export async function POST(request: NextRequest) {
   console.log(`Starting Square invoice import: ${startNum} → ${endNum}`);
 
   try {
+    // Lazy import to avoid build-time execution
+    const { importSquareInvoices } = await import('@/ai/flows/import-square-invoices-flow');
+    
     const result: ImportResult = await importSquareInvoices({
       startInvoiceNumber: startNum,
       endInvoiceNumber: endNum,
