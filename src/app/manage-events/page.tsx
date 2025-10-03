@@ -717,7 +717,7 @@ function ManageEventsContent() {
             "Middle Name": p.middleName || '',
             "USCF ID": p.uscfId,
             "USCF Status": reg.uscfStatus,
-            "Grade": p.grade,
+            "Grade": p.grade === 'Kindergarten' ? 'K' : p.grade?.replace(/\D/g, '') || '',
             "Section": reg.section,
             "Rating": p.regularRating || 'UNR',
             "Status": status,
@@ -1148,14 +1148,18 @@ function ManageEventsContent() {
                           </AccordionTrigger>
                           <AccordionContent>
                               <Table>
-                                  <TableHeader>
+                                    <TableHeader>
                                       <TableRow>
-                                          <TableHead>Player</TableHead>
-                                          <TableHead>USCF ID</TableHead>
-                                          <TableHead>Section</TableHead>
-                                          <TableHead>Status</TableHead>
-                                      </TableRow>
-                                  </TableHeader>
+                                        <TableHead>Player</TableHead>
+                                        <TableHead>USCF ID</TableHead>
+                                        <TableHead>Grade</TableHead>
+                                        <TableHead>DOB</TableHead>
+                                        <TableHead>Email</TableHead>
+                                        <TableHead>Zip</TableHead>
+                                        <TableHead>USCF Exp</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
                                   <TableBody>
                                       {invoice.players.map(({ player, details }) => {
                                           const isWithdrawn = details.status === 'withdrawn';
@@ -1164,7 +1168,7 @@ function ManageEventsContent() {
                                           if(isWithdrawn) status = <Badge variant="destructive">Withdrawn</Badge>;
                                           else if(isExported) status = <Badge variant="default" className="bg-green-600 text-white">Exported</Badge>;
                                           return (
-                                              <TableRow key={player.id} className={cn(isWithdrawn && 'text-muted-foreground opacity-60')}>
+                                                  <TableRow key={player.id} className={cn(isWithdrawn && 'text-muted-foreground opacity-60')}>
                                                   <TableCell className={cn("font-medium", isWithdrawn && "line-through")}>
                                                       <div className="flex items-center gap-2">
                                                           {player.firstName} {player.lastName}
@@ -1172,7 +1176,24 @@ function ManageEventsContent() {
                                                       </div>
                                                   </TableCell>
                                                   <TableCell>{player.uscfId}</TableCell>
-                                                  <TableCell>{details.section}</TableCell>
+                                                  <TableCell>
+                                                      {player.grade === 'Kindergarten' ? 'K' : player.grade?.replace(/\D/g, '') || 'N/A'}
+                                                  </TableCell>
+                                                  <TableCell>
+                                                      {player.dob ? format(new Date(player.dob), 'MM/dd/yyyy') : 'N/A'}
+                                                  </TableCell>
+                                                  <TableCell className="text-xs">{player.email || 'N/A'}</TableCell>
+                                                  <TableCell>{player.zipCode || 'N/A'}</TableCell>
+                                                  <TableCell>
+                                                      {player.uscfExpiration ? (
+                                                          <>
+                                                              {format(new Date(player.uscfExpiration), 'MM/dd/yyyy')}
+                                                              {selectedEventForReg && new Date(player.uscfExpiration) < new Date(selectedEventForReg.date) && (
+                                                                  <Badge variant="destructive" className="ml-2">Expired</Badge>
+                                                              )}
+                                                          </>
+                                                      ) : 'N/A'}
+                                                  </TableCell>
                                                   <TableCell>{status}</TableCell>
                                               </TableRow>
                                           );
