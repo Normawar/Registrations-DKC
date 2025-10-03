@@ -44,7 +44,7 @@ const importSquareInvoicesFlow = ai.defineFlow(
       environment: Environment.Production,
     });
 
-    const locationId = 'CTED7GVSVH5H8';
+    const locationId = 'Production';
 
     let createdCount = 0;
     let updatedCount = 0;
@@ -54,7 +54,7 @@ const importSquareInvoicesFlow = ai.defineFlow(
 
     try {
       console.log('Fetching all invoices from Square...');
-      const { result } = await squareClient.invoicesApi.listInvoices({ locationId: locationId, limit: 200 });
+      const { result } = await squareClient.invoicesApi.listInvoices(locationId, 200);
       const invoices = result.invoices;
 
       if (!invoices) {
