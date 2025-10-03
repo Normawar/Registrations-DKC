@@ -8,7 +8,7 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { doc, setDoc, getDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
-import { getDb } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase-admin';
 import { createInvoice } from './create-invoice-flow';
 import { createPsjaSplitInvoice } from './create-psja-split-invoice-flow';
 import { generateTeamCode } from '@/lib/school-utils';
@@ -100,7 +100,7 @@ const extractInvoiceDataFlow = ai.defineFlow(
     outputSchema: ExtractInvoiceDataOutputSchema,
   },
   async (input) => {
-    const db = getDb();
+    const db = db;
 
     try {
       const { output } = await extractPrompt(input);

@@ -1,6 +1,6 @@
 // src/app/api/schools/route.ts
 import { NextResponse } from "next/server";
-import { getDb } from "@/lib/firebase-admin";
+import { db } from "@/lib/firebase-admin";
 
 export async function GET() {
   console.log("SCHOOLS API - DEPLOYED FRESH v4");
@@ -19,7 +19,7 @@ export async function GET() {
   console.log("DEBUG INFO:", JSON.stringify(debugInfo, null, 2));
 
   try {
-    const db = getDb();
+    const db = db;
     const schoolsRef = db.collection("schools");
     const snapshot = await schoolsRef.get();
 

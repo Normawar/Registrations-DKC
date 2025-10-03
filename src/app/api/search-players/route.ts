@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { getDb } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase-admin';
 
 export async function POST(request: Request) {
   try {
-    const db = getDb();
+    const db = db;
     const criteria = await request.json();
     console.log('Searching players with criteria:', criteria);
     

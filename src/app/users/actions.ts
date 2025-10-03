@@ -1,7 +1,7 @@
 
 'use server';
 
-import { getAdminAuth, getDb } from '@/lib/firebase-admin';
+import { adminAuth, db } from '@/lib/firebase-admin';
 import { UserRecord } from 'firebase-admin/auth';
 import type { SponsorProfile } from '@/hooks/use-sponsor-profile';
 import { simpleSignUp } from '@/lib/simple-auth';
@@ -27,7 +27,7 @@ export async function fetchUsersAction(): Promise<{
   error?: string;
 }> {
   try {
-    const adminDb = getDb();
+    const adminDb = db;
     const usersRef = adminDb.collection('users');
     const snapshot = await usersRef.get();
     
@@ -78,8 +78,8 @@ export async function updateUserAction(
   }
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const adminDb = getDb();
-    const adminAuth = getAdminAuth();
+    const adminDb = db;
+    const adminAuth = adminAuth;
     const userRecord = await adminAuth.getUserByEmail(originalEmail);
     const docRef = adminDb.collection('users').doc(userRecord.uid);
     
@@ -161,8 +161,8 @@ export async function forceDeleteUsersAction(emails: string[]): Promise<{
     return { deleted: [], failed: [] };
   }
   
-  const adminDb = getDb();
-  const adminAuth = getAdminAuth();
+  const adminDb = db;
+  const adminAuth = adminAuth;
   const deletedEmails: string[] = [];
   const failedDeletions: { email: string, reason: string }[] = [];
 

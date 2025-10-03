@@ -4,7 +4,7 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { collection, query, where, getDocs, doc, updateDoc, writeBatch } from 'firebase/firestore';
-import { getDb } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase-admin';
 import { createInvoice } from './create-invoice-flow';
 import { Client, Environment } from 'square';
 
@@ -41,7 +41,7 @@ const consolidateGtInvoicesFlow = ai.defineFlow(
     outputSchema: ConsolidateGtInvoicesOutputSchema,
   },
   async (input) => {
-    const db = getDb();
+    const db = db;
 
     // Step 1: Find all GT invoices for this event
     const invoicesQuery = query(
@@ -166,7 +166,7 @@ export async function canConsolidateGtInvoices(eventId: string): Promise<{
   gtInvoiceCount: number;
   totalGtStudents: number;
 }> {
-  const db = getDb();
+  const db = db;
   
   const invoicesQuery = query(
     collection(db, 'invoices'),
