@@ -1,16 +1,20 @@
+'use server';
+
 import { NextRequest, NextResponse } from 'next/server';
-import { importSquareInvoices } from '@/ai/flows/import-square-invoices-flow';
+import { importSquareInvoices, ImportSquareInvoicesInput } from '@/ai/flows/import-square-invoices-flow';
 
 interface ImportResult {
-  imported: any[];
-  skipped: any[];
-  errors: any[];
+  created: number;
+  updated: number;
+  failed: number;
+  errors: string[];
+  notifications: string[];
 }
 
 export async function POST(request: NextRequest) {
-  let body: any;
+  let body: Partial<ImportSquareInvoicesInput>;
+
   try {
-    // Safely parse the request body
     body = await request.json();
   } catch (err) {
     console.error('Failed to parse JSON body:', err);
@@ -22,18 +26,15 @@ export async function POST(request: NextRequest) {
 
   const { startInvoiceNumber, endInvoiceNumber } = body ?? {};
 
-  if (
-    startInvoiceNumber === undefined ||
-    endInvoiceNumber === undefined
-  ) {
+  if (startInvoiceNumber === undefined || endInvoiceNumber === undefined) {
     return NextResponse.json(
       { error: 'Missing required parameters: startInvoiceNumber or endInvoiceNumber' },
       { status: 400 }
     );
   }
 
-  const startNum = parseInt(startInvoiceNumber, 10);
-  const endNum = parseInt(endInvoiceNumber, 10);
+  const startNum = parseInt(startInvoiceNumber as any, 10);
+  const endNum = parseInt(endInvoiceNumber as any, 10);
 
   if (isNaN(startNum) || isNaN(endNum)) {
     return NextResponse.json(
@@ -42,25 +43,30 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  console.log(`Starting Square invoice import: ${startNum} → ${endNum}`);
+
   try {
-    // Call the import flow
     const result: ImportResult = await importSquareInvoices({
       startInvoiceNumber: startNum,
       endInvoiceNumber: endNum,
     });
 
-    // Ensure result object has arrays
-    const imported = Array.isArray(result.imported) ? result.imported : [];
-    const skipped = Array.isArray(result.skipped) ? result.skipped : [];
+    // Ensure arrays exist
     const errors = Array.isArray(result.errors) ? result.errors : [];
+    const notifications = Array.isArray(result.notifications) ? result.notifications : [];
 
     return NextResponse.json({
       summary: {
-        importedCount: imported.length,
-        skippedCount: skipped.length,
+        created: result.created,
+        updated: result.updated,
+        failed: result.failed,
         errorsCount: errors.length,
+        notificationsCount: notifications.length,
       },
-      details: { imported, skipped, errors },
+      details: {
+        errors,
+        notifications,
+      },
     });
   } catch (error: any) {
     console.error('Import error:', error);

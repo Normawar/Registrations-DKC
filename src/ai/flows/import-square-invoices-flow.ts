@@ -25,7 +25,11 @@ const ImportSquareInvoicesOutputSchema = z.object({
 export type ImportSquareInvoicesOutput = z.infer<typeof ImportSquareInvoicesOutputSchema>;
 
 export async function importSquareInvoices(input: ImportSquareInvoicesInput): Promise<ImportSquareInvoicesOutput> {
-  return importSquareInvoicesFlow(input);
+  try {
+    return await importSquareInvoicesFlow(input);
+  } catch (error: any) {
+    return { created: 0, updated: 0, failed: 1, errors: [error?.message || 'Unknown error'], notifications: [] };
+  }
 }
 
 const importSquareInvoicesFlow = ai.defineFlow(
@@ -54,7 +58,7 @@ const importSquareInvoicesFlow = ai.defineFlow(
     let invoicesToProcess: Invoice[] = [];
 
     try {
-      // Fetch all invoices from Square
+      // Fetch invoices
       let cursor: string | undefined = undefined;
       const allInvoices: Invoice[] = [];
 
@@ -70,13 +74,7 @@ const importSquareInvoicesFlow = ai.defineFlow(
       });
 
       if (invoicesToProcess.length === 0) {
-        return {
-          created: 0,
-          updated: 0,
-          failed: 0,
-          errors: ['No invoices found in the specified range.'],
-          notifications,
-        };
+        return { created: 0, updated: 0, failed: 0, errors: ['No invoices found in the specified range.'], notifications };
       }
 
       const batch = db.batch();
@@ -195,7 +193,6 @@ async function parseSelectionsFromOrder(order: Order, schoolName: string, distri
         if (!info) continue;
 
         const playerId = info.uscfId || `NEW_${Date.now()}_${info.firstName[0]}${info.lastName[0]}`;
-
         const existingPlayerDoc = await db.collection('players').doc(playerId).get();
         const existingPlayer = existingPlayerDoc.exists ? existingPlayerDoc.data() as MasterPlayer : null;
 
@@ -242,32 +239,33 @@ function parsePlayerFromNote(note: string): { firstName: string; lastName: strin
   const isNew = clean.toLowerCase().includes('new');
 
   const patterns = [
-    /^([A-Z\s,'-]+)\s+(\d{8,})\s+\d{1,2}\/\d{1,2}\/\d{2,4}$/i,
-    /^([A-Z\s,'-]+)\s+(\d{8,})(?:\s|$)$/i,
-    /^(\d{8,})\s+([A-Z\s,'-]+)$/i,
-    /^([A-Z][A-Za-z\s,'-]+?)\s+NEW$/i,
-    /^([A-Z][A-Za-z\s,'-]{2,}?)(?:\s+NEW)?$/i,
+    /^([A-Z][a-zA-Z'-]+)\s+([A-Z][a-zA-Z'-]+)\s+([A-Z])$/, // First Last M
+    /^([A-Z][a-zA-Z'-]+)\s+([A-Z][a-zA-Z'-]+)$/            // First Last
   ];
 
-  for (const pat of patterns) {
-    const match = clean.match(pat);
-    if (!match) continue;
-
-    let firstName = '';
-    let lastName = '';
-    let middleName: string | undefined;
-    let uscfId: string | undefined;
-
-    if (pat.source.startsWith('(\\d')) {
-      uscfId = match[1];
-      [firstName, lastName] = match[2].split(' ').filter(Boolean);
-    } else {
-      [firstName, lastName] = match[1].split(' ').filter(Boolean);
-      uscfId = match[2];
+  for (const pattern of patterns) {
+    const match = clean.match(pattern);
+    if (match) {
+      return {
+        firstName: match[1],
+        lastName: match[2],
+        middleName: match[3],
+        uscfId: undefined,
+        isNewPlayer: isNew,
+      };
     }
+  }
 
-    if (!firstName || !lastName) continue;
-    return { firstName, lastName, middleName, uscfId, isNewPlayer: isNew };
+  // fallback: try splitting by space
+  const parts = clean.split(/\s+/);
+  if (parts.length >= 2) {
+    return {
+      firstName: parts[0],
+      lastName: parts[1],
+      middleName: parts[2],
+      uscfId: undefined,
+      isNewPlayer: isNew,
+    };
   }
 
   return null;
