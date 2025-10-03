@@ -1,4 +1,3 @@
-
 runConfig:
   cpu: 1
   memoryMiB: 512
@@ -7,4 +6,5 @@ env:
     secret: FIREBASE_SERVICE_ACCOUNT_KEY_JSON
   - variable: GOOGLE_API_KEY
     secret: GOOGLE_API_KEY
-
+  - variable: SQUARE_ACCESS_TOKEN
+    value: EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC
