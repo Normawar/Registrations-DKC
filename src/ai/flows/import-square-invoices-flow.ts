@@ -3,7 +3,7 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { type Invoice, type Order, Client, Environment, ApiError } from 'square';
-import { getDb } from '@/lib/firebase-admin'; // Correctly import the getter
+import { getDb } from '@/lib/firebase-admin';
 import { generateTeamCode } from '@/lib/school-utils';
 import { type MasterPlayer } from '@/lib/data/full-master-player-data';
 import { Firestore, WriteBatch } from 'firebase-admin/firestore';
@@ -44,7 +44,9 @@ const importSquareInvoicesFlow = ai.defineFlow(
       environment: Environment.Production,
     });
 
-    const locationId = 'Production';
+    // Replace with your real Square Location ID
+    const locationId = process.env.SQUARE_LOCATION_ID;
+    if (!locationId) throw new Error('SQUARE_LOCATION_ID environment variable is not set.');
 
     let createdCount = 0;
     let updatedCount = 0;
@@ -54,19 +56,22 @@ const importSquareInvoicesFlow = ai.defineFlow(
 
     try {
       console.log('Fetching all invoices from Square...');
-      const { result } = await squareClient.invoicesApi.listInvoices(locationId, 200);
-      const invoices = result.invoices;
 
-      if (!invoices) {
-        return { created: 0, updated: 0, failed: 0, errors: ['No invoices found in Square for this location.'] };
-      }
+      let cursor: string | undefined = undefined;
+      do {
+        const { result } = await squareClient.invoicesApi.listInvoices(locationId, {
+          limit: 200,
+          cursor,
+        });
+        const invoices = result.invoices || [];
 
-      console.log(`Found ${invoices.length} total invoices. Filtering from ${input.startInvoiceNumber} to ${input.endInvoiceNumber}.`);
+        invoicesToProcess.push(...invoices.filter(inv => {
+          const invNumber = parseInt(inv.invoiceNumber || '0', 10);
+          return invNumber >= input.startInvoiceNumber && invNumber <= input.endInvoiceNumber;
+        }));
 
-      invoicesToProcess = invoices.filter(inv => {
-        const invNumber = parseInt(inv.invoiceNumber || '0', 10);
-        return invNumber >= input.startInvoiceNumber && invNumber <= input.endInvoiceNumber;
-      });
+        cursor = result.cursor;
+      } while (cursor);
 
       if (invoicesToProcess.length === 0) {
         return { created: 0, updated: 0, failed: 0, errors: ['No invoices found in the specified number range.'] };
@@ -76,10 +81,8 @@ const importSquareInvoicesFlow = ai.defineFlow(
 
       for (const invoice of invoicesToProcess) {
         try {
-          // Process the invoice and get plain data
           const invoiceData = await processSingleInvoice(squareClient, db, invoice, batch);
-          
-          // Query for existing invoice
+
           const q = db.collection('invoices').where('invoiceId', '==', invoice.id);
           const querySnapshot = await q.get();
 
@@ -94,13 +97,11 @@ const importSquareInvoicesFlow = ai.defineFlow(
           }
         } catch (procError: any) {
           failedCount++;
-          // Ensure error message is a plain string
           const errorMessage = procError?.message || String(procError);
           errors.push(`Invoice #${invoice.invoiceNumber}: ${errorMessage}`);
         }
       }
 
-      // Commit all batched writes
       await batch.commit();
 
     } catch (error: any) {
@@ -109,12 +110,10 @@ const importSquareInvoicesFlow = ai.defineFlow(
         const errorDetail = error.result?.errors?.[0]?.detail || error.message;
         return { created: 0, updated: 0, failed: invoicesToProcess.length || 1, errors: [`Square API Error: ${errorDetail}`] };
       }
-      // Ensure error is converted to plain string
       const errorMessage = error?.message || String(error);
       return { created: 0, updated: 0, failed: invoicesToProcess.length || 1, errors: [`API Error: ${errorMessage}`] };
     }
 
-    // Return only plain data
     return { created: createdCount, updated: updatedCount, failed: failedCount, errors };
   }
 );
@@ -138,16 +137,10 @@ async function processSingleInvoice(client: Client, db: Firestore, invoice: Invo
   } else {
     schoolName = companyName.trim();
     const districtMatch = schoolName.match(/\b([A-Z\-\s]+(?:ISD|CISD|USD|SCHOOL DISTRICT))\b/i);
-    if (districtMatch) {
-      district = districtMatch[1].trim();
-    }
+    if (districtMatch) district = districtMatch[1].trim();
   }
 
   const { selections, baseRegistrationFee } = await parseSelectionsFromOrder(order, schoolName, district, batch, db);
-
-  if (Object.keys(selections).length === 0) {
-    console.warn(`No players parsed for Invoice #${invoice.invoiceNumber}.`);
-  }
 
   const totalInvoiced = Number(invoice.paymentRequests?.[0]?.computedAmountMoney?.amount || 0) / 100;
 
@@ -195,108 +188,95 @@ async function parseSelectionsFromOrder(order: Order, schoolName: string, distri
     const isRegistrationItem = itemNameLower.includes('registration');
     const isUscfItem = itemNameLower.includes('uscf');
 
-    if (isRegistrationItem) {
-      const totalPrice = Number(item.basePriceMoney?.amount || 0) / 100;
-      const quantity = parseInt(item.quantity || '1', 10);
-      if (quantity > 0) {
-        baseRegistrationFee = Math.max(baseRegistrationFee, totalPrice / quantity);
+    if (!isRegistrationItem && !isUscfItem) continue;
+
+    const totalPrice = Number(item.basePriceMoney?.amount || 0) / 100;
+    const quantity = parseInt(item.quantity || '1', 10);
+
+    if (isRegistrationItem && quantity > 0) baseRegistrationFee = Math.max(baseRegistrationFee, totalPrice / quantity);
+
+    const playerSources = [
+      item.note || '',
+      item.variationName || '',
+      item.name?.split('(')[1]?.replace(')', '') || ''
+    ];
+
+    let playersFound = false;
+
+    for (const source of playerSources) {
+      if (!source.trim()) continue;
+      const playerNotes = source.split('\n');
+      for (const note of playerNotes) {
+        const playerInfo = parsePlayerFromNote(note.trim());
+        if (!playerInfo) continue;
+
+        playersFound = true;
+        const { firstName, lastName, middleName, uscfId, isNewPlayer } = playerInfo;
+        const playerId = uscfId || `NEW_${Date.now()}_${firstName.charAt(0)}${lastName.charAt(0)}`;
+
+        const playerDoc: Partial<MasterPlayer> = {
+          id: playerId,
+          uscfId: uscfId || 'NEW',
+          firstName,
+          lastName,
+          middleName,
+          school: schoolName,
+          district,
+          dateCreated: new Date().toISOString(),
+          createdBy: 'Square Import',
+        };
+
+        Object.keys(playerDoc).forEach(key => (playerDoc as any)[key] === undefined && delete (playerDoc as any)[key]);
+
+        batch.set(db.collection('players').doc(playerId), playerDoc, { merge: true });
+
+        if (!selections[playerId]) {
+          selections[playerId] = {
+            playerName: `${firstName} ${lastName}`.trim(),
+            section: 'Unknown',
+            baseRegistrationFee: 0,
+          };
+        }
+
+        if (isRegistrationItem) {
+          selections[playerId].isRegistered = true;
+          selections[playerId].baseRegistrationFee = baseRegistrationFee;
+        }
+
+        if (isUscfItem) {
+          selections[playerId].uscfStatus = isNewPlayer ? 'new' : 'renewing';
+          if (quantity > 0) selections[playerId].uscfFee = totalPrice / quantity;
+        } else if (isRegistrationItem && !selections[playerId].uscfStatus) {
+          selections[playerId].uscfStatus = 'current';
+        }
       }
+      if (playersFound) break;
     }
 
-    if (isRegistrationItem || isUscfItem) {
-      const playerSources = [
-        item.note || '',
-        item.variationName || '',
-        item.name?.split('(')[1]?.replace(')', '') || ''
-      ];
+    if (!playersFound && quantity) {
+      for (let i = 1; i <= quantity; i++) {
+        const playerId = `UNKNOWN_${order.id}_${i}`;
+        const playerDoc: Partial<MasterPlayer> = {
+          id: playerId,
+          uscfId: 'UNKNOWN',
+          firstName: 'Unknown',
+          lastName: `Player ${i}`,
+          school: schoolName,
+          district,
+          dateCreated: new Date().toISOString(),
+          createdBy: 'Square Import',
+        };
+        batch.set(db.collection('players').doc(playerId), playerDoc, { merge: true });
 
-      let playersFound = false;
+        selections[playerId] = {
+          playerName: `Unknown Player ${i}`,
+          section: 'Unknown',
+          baseRegistrationFee,
+          uscfStatus: isUscfItem ? 'unknown' : 'current',
+          isRegistered: isRegistrationItem,
+        };
 
-      for (const source of playerSources) {
-        if (source.trim()) {
-          const playerNotes = source.split('\n');
-
-          for (const note of playerNotes) {
-            const playerInfo = parsePlayerFromNote(note.trim());
-
-            if (playerInfo) {
-              playersFound = true;
-              const { firstName, lastName, middleName, uscfId } = playerInfo;
-              const playerId = uscfId || `NEW_${Date.now()}_${firstName.charAt(0)}${lastName.charAt(0)}`;
-
-              const playerDoc: Partial<MasterPlayer> = {
-                id: playerId,
-                uscfId: uscfId || 'NEW',
-                firstName,
-                lastName,
-                middleName,
-                school: schoolName,
-                district,
-                dateCreated: new Date().toISOString(),
-                createdBy: 'Square Import',
-              };
-
-              Object.keys(playerDoc).forEach(key => (playerDoc as any)[key] === undefined && delete (playerDoc as any)[key]);
-
-              const playerRef = db.collection('players').doc(playerId);
-              batch.set(playerRef, playerDoc, { merge: true });
-
-              if (!selections[playerId]) {
-                selections[playerId] = {
-                  playerName: `${firstName} ${lastName}`.trim(),
-                  section: 'Unknown',
-                  baseRegistrationFee: 0,
-                };
-              }
-
-              if (isRegistrationItem) {
-                selections[playerId].isRegistered = true;
-                selections[playerId].baseRegistrationFee = baseRegistrationFee;
-              }
-              if (isUscfItem) {
-                selections[playerId].uscfStatus = playerInfo.isNewPlayer ? 'new' : 'renewing';
-                const uscfTotalPrice = Number(item.basePriceMoney?.amount || 0) / 100;
-                const uscfQuantity = parseInt(item.quantity || '1', 10);
-                if (uscfQuantity > 0) {
-                  selections[playerId].uscfFee = uscfTotalPrice / uscfQuantity;
-                }
-              } else if (isRegistrationItem && !selections[playerId].uscfStatus) {
-                selections[playerId].uscfStatus = 'current';
-              }
-            }
-          }
-          if (playersFound) break;
-        }
-      }
-
-      if (!playersFound && item.quantity) {
-        const quantity = parseInt(item.quantity, 10);
-        for (let i = 1; i <= quantity; i++) {
-          const playerId = `UNKNOWN_${order.id}_${i}`;
-
-          const playerDoc: Partial<MasterPlayer> = {
-            id: playerId, uscfId: 'UNKNOWN', firstName: 'Unknown',
-            lastName: `Player ${i}`, school: schoolName, district,
-            dateCreated: new Date().toISOString(), createdBy: 'Square Import',
-          };
-
-          const playerRef = db.collection('players').doc(playerId);
-          batch.set(playerRef, playerDoc, { merge: true });
-
-          selections[playerId] = {
-            playerName: `Unknown Player ${i}`, section: 'Unknown',
-            baseRegistrationFee: baseRegistrationFee,
-            uscfStatus: isUscfItem ? 'unknown' : 'current',
-            isRegistered: isRegistrationItem,
-          };
-
-          if (isUscfItem) {
-            const uscfTotalPrice = Number(item.basePriceMoney?.amount || 0) / 100;
-            if (quantity > 0) {
-              selections[playerId].uscfFee = uscfTotalPrice / quantity;
-            }
-          }
-        }
+        if (isUscfItem && quantity > 0) selections[playerId].uscfFee = totalPrice / quantity;
       }
     }
   }
@@ -306,7 +286,6 @@ async function parseSelectionsFromOrder(order: Order, schoolName: string, distri
 
 function parsePlayerFromNote(note: string): { firstName: string; lastName: string; middleName?: string; uscfId?: string; isNewPlayer: boolean } | null {
   if (!note || note.trim() === '') return null;
-
   const cleanNote = note.replace(/^\s*\d+\.?\s*/, '').trim();
   const isNewPlayer = cleanNote.toLowerCase().includes('new');
 
@@ -315,51 +294,4 @@ function parsePlayerFromNote(note: string): { firstName: string; lastName: strin
     /^([A-Z\s,'-]+)\s+(\d{8,})\s+\d{1,2}\/\d{1,2}\/\d{2,4}/i,
     /^([A-Z\s,'-]+)\s+(\d{8,})(?:\s|$)/i,
     /^(\d{8,})\s+([A-Z\s,'-]+)/i,
-    /^([A-Z][A-Za-z\s,'-]+?)\s+NEW\s*$/i,
-    /^([A-Z][A-Za-z\s,'-]{2,}?)(?:\s+NEW)?\s*$/i,
-    /([A-Z][A-Za-z\s,'-]*[A-Za-z])\s*[^\w]*(\d{8,})/i
-  ];
-
-  for (const pattern of patterns) {
-    const match = cleanNote.match(pattern);
-    if (match) {
-      let name: string, uscfId: string | undefined;
-
-      if (pattern.source.startsWith('(\d{8,})')) { // USCF ID first
-        uscfId = match[1];
-        name = match[2];
-      } else {
-        name = match[1];
-        uscfId = match[2];
-      }
-
-      if (uscfId && uscfId.trim().length < 8) uscfId = undefined;
-
-      name = name.trim().replace(/\s+NEW\s*$/i, '').replace(/[,]+/g, ' ').replace(/\s+/g, ' ');
-      const nameParts = name.split(/\s+/);
-
-      if (nameParts.length < 2) continue;
-
-      let firstName = nameParts[0];
-      let lastName = nameParts[nameParts.length - 1];
-      let middleName: string | undefined;
-
-      const suffixes = ['jr', 'sr', 'ii', 'iii', 'iv', 'v'];
-      const lastPartLower = lastName.toLowerCase().replace(/[^a-z]/g, '');
-
-      if (suffixes.includes(lastPartLower) && nameParts.length > 2) {
-        const suffix = lastName;
-        lastName = nameParts[nameParts.length - 2];
-        middleName = nameParts.length > 3 ? nameParts.slice(1, -2).join(' ') + ' ' + suffix : suffix;
-      } else if (nameParts.length > 2) {
-        middleName = nameParts.slice(1, -1).join(' ');
-      }
-
-      if (firstName.length < 1 || lastName.length < 1) continue;
-
-      return { firstName, lastName, middleName, uscfId, isNewPlayer };
-    }
-  }
-
-  return null;
-}
+    /^([
