@@ -2,7 +2,6 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase-admin';
 import { FieldPath } from 'firebase-admin/firestore';
 
 export async function GET(request: Request) {
@@ -15,6 +14,9 @@ export async function GET(request: Request) {
   console.log(`Query Params: school=${school}, district=${district}, playerIds=${playerIdsParam}`);
 
   try {
+    // Dynamic import to prevent build-time execution
+    const { db } = await import('@/lib/firebase-admin');
+    
     console.log('Firestore instance obtained, fetching players...');
     
     const playersRef = db.collection('players');
