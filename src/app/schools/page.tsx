@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef, type ChangeEvent, useCallback } from 'react';
@@ -106,14 +105,18 @@ export default function SchoolsPage() {
   const [selectedDistrictToEdit, setSelectedDistrictToEdit] = useState<string | null>(null);
   const [newDistrictName, setNewDistrictName] = useState('');
   
+  // Filter states
+  const [selectedDistrict, setSelectedDistrict] = useState<string>('all');
+  const [selectedSchool, setSelectedSchool] = useState<string>('all');
+  const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
+  const [rosterTypeFilter, setRosterTypeFilter] = useState<'real' | 'test'>('real');
+  
   // Note states
   const [noteType, setNoteType] = useState<'lesson' | 'general'>('general');
   const [noteTitle, setNoteTitle] = useState('');
   const [noteContent, setNoteContent] = useState('');
   const [poFile, setPoFile] = useState<File | null>(null);
   const [editingNote, setEditingNote] = useState<SchoolNote | null>(null);
-  const [rosterTypeFilter, setRosterTypeFilter] = useState<'real' | 'test'>('real');
-
 
   useEffect(() => {
     if (!isDialogOpen) {
@@ -123,6 +126,19 @@ export default function SchoolsPage() {
       setPoFile(null);
     }
   }, [isDialogOpen]);
+
+  useEffect(() => {
+    if (selectedDistrict && selectedDistrict !== 'all') {
+      const schoolNames = schools
+        .filter(s => s.district === selectedDistrict)
+        .map(s => s.schoolName)
+        .sort();
+      setSchoolsForDistrict(schoolNames);
+      setSelectedSchool('all');
+    } else {
+      setSchoolsForDistrict([]);
+    }
+  }, [selectedDistrict, schools]);
 
   const form = useForm<SchoolFormValues>({
     resolver: zodResolver(schoolFormSchema),
@@ -297,10 +313,19 @@ export default function SchoolsPage() {
 
   const filteredSchools = useMemo(() => {
     return schools.filter(school => {
+      // Test/Real filter
       const isTest = school.district?.toLowerCase().startsWith('test');
-      return rosterTypeFilter === 'test' ? isTest : !isTest;
+      const passesTypeFilter = rosterTypeFilter === 'test' ? isTest : !isTest;
+      
+      // District filter
+      const passesDistrictFilter = selectedDistrict === 'all' || school.district === selectedDistrict;
+      
+      // School filter
+      const passesSchoolFilter = selectedSchool === 'all' || school.schoolName === selectedSchool;
+      
+      return passesTypeFilter && passesDistrictFilter && passesSchoolFilter;
     });
-  }, [schools, rosterTypeFilter]);
+  }, [schools, rosterTypeFilter, selectedDistrict, selectedSchool]);
 
   return (
     <AppLayout>
@@ -338,6 +363,54 @@ export default function SchoolsPage() {
               <Input id="new-district-name" value={newDistrictName} onChange={(e) => setNewDistrictName(e.target.value)} disabled={!selectedDistrictToEdit} placeholder='Enter new name...' />
             </div>
             <Button onClick={handleRenameDistrict} disabled={!selectedDistrictToEdit || !newDistrictName.trim()}><Edit className="mr-2 h-4 w-4" /> Rename District</Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Filter Schools</CardTitle>
+            <CardDescription>Filter the school list by district and school.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>District</Label>
+                <Select value={selectedDistrict} onValueChange={setSelectedDistrict}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Districts" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Districts</SelectItem>
+                    {dbDistricts.map(district => (
+                      <SelectItem key={district} value={district}>
+                        {district}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label>School</Label>
+                <Select 
+                  value={selectedSchool} 
+                  onValueChange={setSelectedSchool}
+                  disabled={selectedDistrict === 'all' || schoolsForDistrict.length === 0}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Schools" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Schools</SelectItem>
+                    {schoolsForDistrict.map(school => (
+                      <SelectItem key={school} value={school}>
+                        {school}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
@@ -506,5 +579,3 @@ export default function SchoolsPage() {
     </AppLayout>
   );
 }
-
-    
