@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Edit, UserPlus, History, Building2 } from 'lucide-react';
+import { PlusCircle, Trash2, Edit, UserPlus, History, Building2, UserMinus } from 'lucide-react';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,24 +33,25 @@ const gradeToNumber: { [key: string]: number } = { 'Kindergarten': 0, '1st Grade
 const sectionMaxGrade: { [key: string]: number } = { 'Kinder-1st': 1, 'Primary K-3': 3, 'Elementary K-5': 5, 'Middle School K-8': 8, 'High School K-12': 12, 'Championship': 12 };
 
 const playerFormSchema = z.object({
-  id: z.string().optional(),
-  firstName: z.string().min(1, "First Name is required."),
+  id: z.string().optional(), 
+  firstName: z.string().min(1, "First Name is required."), 
   middleName: z.string().optional().transform(val => val === '' ? undefined : val),
-  lastName: z.string().min(1, "Last Name is required."),
-  uscfId: z.string().min(1, "USCF ID is required."),
+  lastName: z.string().min(1, "Last Name is required."), 
+  uscfId: z.string().min(1, "USCF ID is required."), 
   uscfExpiration: z.date().optional(),
   regularRating: z.preprocess((val) => { if (!val || String(val).toUpperCase() === 'UNR' || val === '') { return undefined; } return val; }, z.coerce.number({ invalid_type_error: "Rating must be a number or UNR." }).optional()),
-  grade: z.string().optional().transform(val => val === '' ? undefined : val),
+  grade: z.string().optional().transform(val => val === '' ? undefined : val), 
   section: z.string().optional().transform(val => val === '' ? undefined : val),
-  email: z.string().email("Invalid email.").min(1, "Email is required."),
+  email: z.string().email("Invalid email.").min(1, "Email is required."), 
   zipCode: z.string().min(1, "Zip Code is required."),
-  phone: z.string().optional().transform(val => val === '' ? undefined : val),
+  phone: z.string().optional().transform(val => val === '' ? undefined : val), 
   dob: z.date().optional(),
-  studentType: z.string().optional().transform(val => val === '' ? undefined : val),
+  studentType: z.string().optional().transform(val => val === '' ? undefined : val), 
   state: z.string().optional().transform(val => val === '' ? undefined : val),
-  school: z.string().min(1, "School is required."),
+  school: z.string().min(1, "School is required."), 
   district: z.string().min(1, "District is required."),
-}).refine(data => data.uscfId.toUpperCase() !== 'NEW' ? data.uscfExpiration !== undefined : true, { message: "USCF Expiration is required unless ID is NEW.", path: ["uscfExpiration"] }).refine(data => { if (!data.grade || !data.section || data.section === 'Championship') return true; const playerGrade = gradeToNumber[data.grade]; const sectionMax = sectionMaxGrade[data.section]; if (playerGrade === undefined || sectionMax === undefined) return true; return playerGrade <= sectionMax; }, { message: "Player's grade is too high for this section.", path: ["section"] });
+}).refine(data => data.uscfId.toUpperCase() !== 'NEW' ? data.uscfExpiration !== undefined : true, { message: "USCF Expiration is required unless ID is NEW.", path: ["uscfExpiration"] })
+.refine(data => { if (!data.grade || !data.section || data.section === 'Championship') return true; const playerGrade = gradeToNumber[data.grade]; const sectionMax = sectionMaxGrade[data.section]; if (playerGrade === undefined || sectionMax === undefined) return true; return playerGrade <= sectionMax; }, { message: "Player's grade is too high for this section.", path: ["section"] });
 
 type PlayerFormValues = z.infer<typeof playerFormSchema>;
 
@@ -101,60 +102,270 @@ function RosterPageContent() {
   useEffect(() => { fetchRoster(); }, [fetchRoster]);
   useEffect(() => { if (selectedDistrict && selectedDistrict !== 'all') { setSchoolsForFilterDistrict(getSchoolsForDistrict(selectedDistrict)); setSelectedSchool('all'); } else { setSchoolsForFilterDistrict([]); } }, [selectedDistrict, getSchoolsForDistrict]);
 
-  const filteredRoster = useMemo(() => {
-    const userRole = getUserRole(profile);
-    if (userRole !== 'organizer' && userRole !== 'district_coordinator') return roster;
-    let filtered = [...roster];
-    if (userRole === 'organizer' && selectedDistrict !== 'all') filtered = filtered.filter(p => p.district === selectedDistrict);
-    if (selectedSchool !== 'all') filtered = filtered.filter(p => p.school === selectedSchool);
-    return filtered;
-  }, [roster, selectedDistrict, selectedSchool, profile]);
+  const filteredRoster = useMemo(() => { const userRole = getUserRole(profile); if (userRole !== 'organizer' && userRole !== 'district_coordinator') return roster; let filtered = [...roster]; if (userRole === 'organizer' && selectedDistrict !== 'all') filtered = filtered.filter(p => p.district === selectedDistrict); if (selectedSchool !== 'all') filtered = filtered.filter(p => p.school === selectedSchool); return filtered; }, [roster, selectedDistrict, selectedSchool, profile]);
 
-  const schoolsWithRosters = useMemo(() => {
-    const schoolMap = new Map<string, number>();
-    filteredRoster.forEach(player => {
-      if (player.school) {
-        schoolMap.set(player.school, (schoolMap.get(player.school) || 0) + 1);
-      }
-    });
-    return Array.from(schoolMap.entries()).map(([school, count]) => ({ school, count })).sort((a, b) => a.school.localeCompare(b.school));
-  }, [filteredRoster]);
+  const schoolsWithRosters = useMemo(() => { const schoolMap = new Map<string, number>(); filteredRoster.forEach(player => { if (player.school) { schoolMap.set(player.school, (schoolMap.get(player.school) || 0) + 1); } }); return Array.from(schoolMap.entries()).map(([school, count]) => ({ school, count })).sort((a, b) => a.school.localeCompare(b.school)); }, [filteredRoster]);
 
-  const availableSchools = useMemo(() => {
-    if (showOnlySchoolsWithRosters) {
-      return schoolsWithRosters.map(s => s.school);
-    }
-    const userRole = getUserRole(profile);
-    if (userRole === 'organizer') {
-      return selectedDistrict === 'all' ? [] : schoolsForFilterDistrict;
-    } else if (userRole === 'district_coordinator') {
-      return getSchoolsForDistrict(profile.district || '');
-    }
-    return [];
-  }, [showOnlySchoolsWithRosters, schoolsWithRosters, schoolsForFilterDistrict, selectedDistrict, profile, getSchoolsForDistrict]);
+  const availableSchools = useMemo(() => { if (showOnlySchoolsWithRosters) { return schoolsWithRosters.map(s => s.school); } const userRole = getUserRole(profile); if (userRole === 'organizer') { return selectedDistrict === 'all' ? [] : schoolsForFilterDistrict; } else if (userRole === 'district_coordinator') { return getSchoolsForDistrict(profile.district || ''); } return []; }, [showOnlySchoolsWithRosters, schoolsWithRosters, schoolsForFilterDistrict, selectedDistrict, profile, getSchoolsForDistrict]);
 
-  const selectedSchoolRoster = useMemo(() => {
-    if (!selectedSchoolForView) return [];
-    return filteredRoster.filter(p => p.school === selectedSchoolForView);
-  }, [selectedSchoolForView, filteredRoster]);
+  const selectedSchoolRoster = useMemo(() => { if (!selectedSchoolForView) return []; return filteredRoster.filter(p => p.school === selectedSchoolForView); }, [selectedSchoolForView, filteredRoster]);
 
   useEffect(() => { if (editDistrict) { setSchoolsForEditDistrict(getSchoolsForDistrict(editDistrict)); } }, [editDistrict, getSchoolsForDistrict]);
   useEffect(() => { if (playerToEdit) { form.reset({ ...playerToEdit, dob: playerToEdit.dob ? new Date(playerToEdit.dob) : undefined, uscfExpiration: playerToEdit.uscfExpiration ? new Date(playerToEdit.uscfExpiration) : undefined }); if (playerToEdit.district) { setSchoolsForEditDistrict(getSchoolsForDistrict(playerToEdit.district)); } } else if (profile) { form.reset({ id: `temp_${Date.now()}`, uscfId: 'NEW', district: profile.district, school: profile.school, email: profile.email, zipCode: profile.zip }); } }, [playerToEdit, form, profile, getSchoolsForDistrict]);
 
   const handleEditPlayer = (player: MasterPlayer) => { setPlayerToEdit(player); setIsEditOpen(true); };
   const handleCreateNewPlayer = () => { setPlayerToEdit(null); setIsEditOpen(true); };
-  const handlePlayerSelectedFromSearch = (player: MasterPlayer) => { if (getUserRole(profile) === 'individual') { const isAlreadyInRoster = profile?.studentIds?.includes(player.id); if (isAlreadyInRoster) { toast({ title: "Player Already in Roster" }); handleEditPlayer(player); } else { const updatedStudentIds = [...(profile?.studentIds || []), player.id]; updateProfile({ studentIds: updatedStudentIds }).then(() => { toast({ title: "Player Added", description: `${player.firstName} has been added to your roster.` }); fetchRoster(); }); } } else { handleEditPlayer(player); } setIsSearchOpen(false); };
-  const onEditSubmit = async (values: PlayerFormValues) => { if (!profile) return; try { if (playerToEdit) { const updatedPlayer: MasterPlayer = { ...playerToEdit, ...values }; await updatePlayer(updatedPlayer, profile); toast({ title: "Player Updated" }); } else { const newPlayer: MasterPlayer = { ...values, id: values.id || `temp_${Date.now()}`, events: 0, eventIds: [] } as MasterPlayer; await addPlayer(newPlayer, profile); toast({ title: "Player Created" }); } fetchRoster(); setIsEditOpen(false); setPlayerToEdit(null); } catch(e: any) { toast({ title: "Save Failed", description: e.message, variant: "destructive" }); } };
-  const handleDeletePlayer = async (player: MasterPlayer) => { if (window.confirm(`Are you sure you want to remove ${player.firstName} from your roster?`)) { if (getUserRole(profile) === 'individual') { const updatedStudentIds = profile.studentIds?.filter(id => id !== player.id); await updateProfile({ studentIds: updatedStudentIds }); toast({ title: 'Student Removed' }); fetchRoster(); } else { toast({ title: 'Not Supported', description: 'Sponsors cannot remove players. Please contact an organizer.' }); } } };
+  const handlePlayerSelectedFromSearch = (player: MasterPlayer) => { 
+    if (getUserRole(profile) === 'individual') { 
+      const isAlreadyInRoster = profile?.studentIds?.includes(player.id); 
+      if (isAlreadyInRoster) { 
+        toast({ title: "Player Already in Roster" }); 
+        handleEditPlayer(player); 
+      } else { 
+        const updatedStudentIds = [...(profile?.studentIds || []), player.id]; 
+        updateProfile({ studentIds: updatedStudentIds }).then(() => { 
+          toast({ title: "Player Added", description: `${player.firstName} has been added to your roster.` }); 
+          fetchRoster(); 
+        }); 
+      } 
+    } else { 
+      handleEditPlayer(player); 
+    } 
+    setIsSearchOpen(false); 
+  };
+
+  const onEditSubmit = async (values: PlayerFormValues) => { 
+    if (!profile) return; 
+    try { 
+      if (playerToEdit) { 
+        const updatedPlayer: MasterPlayer = { ...playerToEdit, ...values }; 
+        await updatePlayer(updatedPlayer, profile); 
+        toast({ title: "Player Updated" }); 
+      } else { 
+        const newPlayer: MasterPlayer = { ...values, id: values.id || `temp_${Date.now()}`, events: 0, eventIds: [] } as MasterPlayer; 
+        await addPlayer(newPlayer, profile); 
+        toast({ title: "Player Created" }); 
+      } 
+      fetchRoster(); setIsEditOpen(false); setPlayerToEdit(null); 
+    } catch(e: any) { 
+      toast({ title: "Save Failed", description: e.message, variant: "destructive" }); 
+    } 
+  };
+
+  const handleDeletePlayer = async (player: MasterPlayer) => { 
+    if (window.confirm(`Are you sure you want to remove ${player.firstName} from your roster?`)) { 
+      if (getUserRole(profile) === 'individual') { 
+        const updatedStudentIds = profile.studentIds?.filter(id => id !== player.id); 
+        await updateProfile({ studentIds: updatedStudentIds }); 
+        toast({ title: 'Student Removed' }); fetchRoster(); 
+      } else { 
+        toast({ title: 'Not Supported', description: 'Sponsors cannot remove players. Please contact an organizer.' }); 
+      } 
+    } 
+  };
+
+  const handlePermanentDelete = async (player: MasterPlayer) => { 
+    if (window.confirm(`PERMANENTLY DELETE ${player.firstName} ${player.lastName} from the database? This cannot be undone!`)) { 
+      try { 
+        await deletePlayer(player.id); 
+        toast({ title: 'Player Deleted', description: 'Player has been permanently removed from the database.' }); 
+        fetchRoster(); 
+      } catch (e: any) { 
+        toast({ title: 'Delete Failed', description: e.message, variant: 'destructive' }); 
+      } 
+    } 
+  };
+
+  const handleRemoveFromRoster = async (player: MasterPlayer) => { 
+    if (window.confirm(`Remove ${player.firstName} ${player.lastName} from roster view?`)) { 
+      toast({ title: 'Feature Coming Soon', description: 'Soft removal will be implemented soon.' }); 
+    } 
+  };
 
   if (isLoading) return <div>Loading your roster...</div>;
   if (error) return <div className='text-red-500'>Error: {error}</div>;
-  if (!profile) return <div>Could not load user profile.</div>
+  if (!profile) return <div>Could not load user profile.</div>;
 
   const userRole = getUserRole(profile);
   const isOrganizerOrCoordinator = userRole === 'organizer' || userRole === 'district_coordinator';
 
-  return <div className="space-y-6"><div className="flex justify-between items-center"><div><h1 className="text-3xl font-bold font-headline">My Roster</h1><p className="text-muted-foreground">Manage your players and students.</p></div><div className="flex gap-2"><Button variant="outline" onClick={() => setIsSearchOpen(true)}><UserPlus className="mr-2 h-4 w-4"/> Find & Add Player</Button><Button onClick={handleCreateNewPlayer}><PlusCircle className="mr-2 h-4 w-4"/> Create New Player</Button></div></div>{isOrganizerOrCoordinator && <Card><CardHeader><CardTitle>Filters</CardTitle></CardHeader><CardContent><div className="space-y-4"><div className="grid grid-cols-1 md:grid-cols-2 gap-4">{userRole === 'organizer' && <div className="space-y-2"><Label>District</Label><Select value={selectedDistrict} onValueChange={setSelectedDistrict}><SelectTrigger><SelectValue placeholder="All Districts" /></SelectTrigger><SelectContent><SelectItem value="all">All Districts</SelectItem>{dbDistricts.map(district => <SelectItem key={district} value={district}>{district}</SelectItem>)}</SelectContent></Select></div>}<div className="space-y-2"><Label>School (Filter)</Label><Select value={selectedSchool} onValueChange={setSelectedSchool} disabled={userRole === 'organizer' && selectedDistrict === 'all'}><SelectTrigger><SelectValue placeholder="All Schools" /></SelectTrigger><SelectContent><SelectItem value="all">All Schools</SelectItem>{(userRole === 'organizer' ? schoolsForFilterDistrict : getSchoolsForDistrict(profile.district || '')).map(school => <SelectItem key={school} value={school}>{school}</SelectItem>)}</SelectContent></Select></div></div><div className="flex items-center space-x-2 mt-4"><Checkbox id="showOnlyWithRosters" checked={showOnlySchoolsWithRosters} onCheckedChange={(checked) => setShowOnlySchoolsWithRosters(checked as boolean)} /><Label htmlFor="showOnlyWithRosters" className="cursor-pointer">Show only schools with rosters</Label></div></div></CardContent></Card>}{isOrganizerOrCoordinator && <Card><CardHeader><CardTitle>Schools ({availableSchools.length})</CardTitle></CardHeader><CardContent><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">{availableSchools.length === 0 ? <p className="text-muted-foreground col-span-full text-center py-8">No schools found. {userRole === 'organizer' && selectedDistrict === 'all' && 'Please select a district.'}</p> : availableSchools.map(school => { const schoolData = schoolsWithRosters.find(s => s.school === school); const count = schoolData?.count || 0; return <Card key={school} className={`cursor-pointer hover:bg-accent transition-colors ${selectedSchoolForView === school ? 'ring-2 ring-primary' : ''}`} onClick={() => setSelectedSchoolForView(school)}><CardHeader className="p-4"><div className="flex items-start justify-between gap-2"><div className="flex items-center gap-2"><Building2 className="h-4 w-4 text-muted-foreground flex-shrink-0" /><CardTitle className="text-sm font-medium leading-tight">{school}</CardTitle></div>{count > 0 && <Badge variant="secondary">{count}</Badge>}</div></CardHeader></Card>; })}</div></CardContent></Card>}{selectedSchoolForView && <Card><CardHeader><CardTitle>{selectedSchoolForView} - Roster ({selectedSchoolRoster.length})</CardTitle></CardHeader><CardContent><Table><TableHeader><TableRow><TableHead>Name</TableHead><TableHead>USCF ID</TableHead><TableHead>Grade</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader><TableBody>{selectedSchoolRoster.length === 0 ? <TableRow><TableCell colSpan={4} className="text-center h-24">No players in this school's roster.</TableCell></TableRow> : selectedSchoolRoster.map(player => <TableRow key={player.id}><TableCell>{player.firstName} {player.lastName}</TableCell><TableCell>{player.uscfId}</TableCell><TableCell>{player.grade}</TableCell><TableCell><Button variant="ghost" size="sm" onClick={() => handleEditPlayer(player)}><Edit className="h-4 w-4" /></Button></TableCell></TableRow>)}</TableBody></Table></CardContent></Card>}{!isOrganizerOrCoordinator && <Card><CardHeader><CardTitle>{userRole === 'individual' ? 'My Students' : 'School Roster'}</CardTitle></CardHeader><CardContent><Table><TableHeader><TableRow><TableHead>Name</TableHead><TableHead>USCF ID</TableHead><TableHead>Grade</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader><TableBody>{roster.length === 0 ? <TableRow><TableCell colSpan={4} className="text-center h-24">No players on this roster yet.</TableCell></TableRow> : roster.map(player => <TableRow key={player.id}><TableCell>{player.firstName} {player.lastName}</TableCell><TableCell>{player.uscfId}</TableCell><TableCell>{player.grade}</TableCell><TableCell><Button variant="ghost" size="sm" onClick={() => handleEditPlayer(player)}><Edit className="h-4 w-4" /></Button>{userRole === 'individual' && <Button variant="ghost" size="sm" className="text-destructive" onClick={() => handleDeletePlayer(player)}><Trash2 className="h-4 w-4" /></Button>}</TableCell></TableRow>)}</TableBody></Table></CardContent></Card>}<EnhancedPlayerSearchDialog isOpen={isSearchOpen} onOpenChange={setIsSearchOpen} onPlayerSelected={handlePlayerSelectedFromSearch} userProfile={profile} preFilterByUserProfile={userRole !== 'organizer'} /></div>;
+  const renderActionsCell = (player: MasterPlayer) => (
+    <div className="flex gap-2">
+      <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleEditPlayer(player); }}>
+        <Edit className="h-4 w-4" />
+      </Button>
+
+      {userRole === 'organizer' && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-destructive hover:text-destructive"
+          onClick={(e) => { e.stopPropagation(); handlePermanentDelete(player); }}
+          title="Permanently delete from database"
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      )}
+
+      <Button
+        variant="ghost"
+        size="sm"
+        className="text-orange-600 hover:text-orange-600"
+        onClick={(e) => { e.stopPropagation(); handleRemoveFromRoster(player); }}
+        title="Remove from roster view"
+      >
+        <UserMinus className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      {/* HEADER & ACTIONS */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold font-headline">My Roster</h1>
+          <p className="text-muted-foreground">Manage your players and students.</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setIsSearchOpen(true)}><UserPlus className="mr-2 h-4 w-4"/> Find & Add Player</Button>
+          <Button onClick={handleCreateNewPlayer}><PlusCircle className="mr-2 h-4 w-4"/> Create New Player</Button>
+        </div>
+      </div>
+
+      {/* FILTERS & SCHOOL LIST */}
+      {isOrganizerOrCoordinator && (
+        <>
+          {/* Filters */}
+          <Card>
+            <CardHeader><CardTitle>Filters</CardTitle></CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {userRole === 'organizer' && (
+                    <div className="space-y-2">
+                      <Label>District</Label>
+                      <Select value={selectedDistrict} onValueChange={setSelectedDistrict}>
+                        <SelectTrigger><SelectValue placeholder="All Districts" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Districts</SelectItem>
+                          {dbDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <Label>School (Filter)</Label>
+                    <Select value={selectedSchool} onValueChange={setSelectedSchool} disabled={userRole === 'organizer' && selectedDistrict === 'all'}>
+                      <SelectTrigger><SelectValue placeholder="All Schools" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Schools</SelectItem>
+                        {(userRole === 'organizer' ? schoolsForFilterDistrict : getSchoolsForDistrict(profile.district || '')).map(school => <SelectItem key={school} value={school}>{school}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2 mt-4">
+                  <Checkbox id="showOnlyWithRosters" checked={showOnlySchoolsWithRosters} onCheckedChange={(checked) => setShowOnlySchoolsWithRosters(checked as boolean)} />
+                  <Label htmlFor="showOnlyWithRosters" className="cursor-pointer">Show only schools with rosters</Label>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* School Cards */}
+          <Card>
+            <CardHeader><CardTitle>Schools ({availableSchools.length})</CardTitle></CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {availableSchools.length === 0 ? <p className="text-muted-foreground col-span-full text-center py-8">No schools found. {userRole === 'organizer' && selectedDistrict === 'all' && 'Please select a district.'}</p> : availableSchools.map(school => {
+                  const schoolData = schoolsWithRosters.find(s => s.school === school);
+                  const count = schoolData?.count || 0;
+                  return (
+                    <Card key={school} className={`cursor-pointer hover:bg-accent transition-colors ${selectedSchoolForView === school ? 'ring-2 ring-primary' : ''}`} onClick={() => setSelectedSchoolForView(school)}>
+                      <CardHeader className="p-4">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <Building2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                            <CardTitle className="text-sm font-medium leading-tight">{school}</CardTitle>
+                          </div>
+                          {count > 0 && <Badge variant="secondary">{count}</Badge>}
+                        </div>
+                      </CardHeader>
+                    </Card>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
+
+      {/* Selected School Roster */}
+      {selectedSchoolForView && (
+        <Card>
+          <CardHeader><CardTitle>{selectedSchoolForView} - Roster ({selectedSchoolRoster.length})</CardTitle></CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>USCF ID</TableHead>
+                  <TableHead>Grade</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {selectedSchoolRoster.length === 0 ? (
+                  <TableRow><TableCell colSpan={4} className="text-center h-24">No players in this school's roster.</TableCell></TableRow>
+                ) : selectedSchoolRoster.map(player => (
+                  <TableRow key={player.id}>
+                    <TableCell>{player.firstName} {player.lastName}</TableCell>
+                    <TableCell>{player.uscfId}</TableCell>
+                    <TableCell>{player.grade}</TableCell>
+                    <TableCell>{renderActionsCell(player)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* General Roster for non-organizers */}
+      {!isOrganizerOrCoordinator && (
+        <Card>
+          <CardHeader><CardTitle>{userRole === 'individual' ? 'My Students' : 'School Roster'}</CardTitle></CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>USCF ID</TableHead>
+                  <TableHead>Grade</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {roster.length === 0 ? (
+                  <TableRow><TableCell colSpan={4} className="text-center h-24">No players on this roster yet.</TableCell></TableRow>
+                ) : roster.map(player => (
+                  <TableRow key={player.id}>
+                    <TableCell>{player.firstName} {player.lastName}</TableCell>
+                    <TableCell>{player.uscfId}</TableCell>
+                    <TableCell>{player.grade}</TableCell>
+                    <TableCell>{renderActionsCell(player)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      <EnhancedPlayerSearchDialog isOpen={isSearchOpen} onOpenChange={setIsSearchOpen} onPlayerSelected={handlePlayerSelectedFromSearch} userProfile={profile} preFilterByUserProfile={userRole !== 'organizer'} />
+    </div>
+  );
 }
 
 export default function RosterPage() {
