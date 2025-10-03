@@ -54,6 +54,7 @@ const importSquareInvoicesFlow = ai.defineFlow(
     let invoicesToProcess: Invoice[] = [];
 
     try {
+      // Fetch all invoices from Square
       let cursor: string | undefined = undefined;
       const allInvoices: Invoice[] = [];
 
@@ -69,7 +70,13 @@ const importSquareInvoicesFlow = ai.defineFlow(
       });
 
       if (invoicesToProcess.length === 0) {
-        return { created: 0, updated: 0, failed: 0, errors: ['No invoices found in the specified range.'], notifications };
+        return {
+          created: 0,
+          updated: 0,
+          failed: 0,
+          errors: ['No invoices found in the specified range.'],
+          notifications,
+        };
       }
 
       const batch = db.batch();
@@ -90,7 +97,7 @@ const importSquareInvoicesFlow = ai.defineFlow(
           notifications.push(...invoiceNotifications);
         } catch (procError: any) {
           failedCount++;
-          errors.push(`Invoice #${invoice.invoiceNumber}: ${procError?.message || String(procError)}`);
+          errors.push(`Invoice #${invoice.invoiceNumber || 'unknown'}: ${procError?.message || String(procError)}`);
         }
       }
 
@@ -108,7 +115,7 @@ const importSquareInvoicesFlow = ai.defineFlow(
 
 async function processSingleInvoice(client: Client, db: Firestore, invoice: Invoice, batch: WriteBatch) {
   if (!invoice.orderId || !invoice.primaryRecipient?.customerId) {
-    throw new Error(`Invoice #${invoice.invoiceNumber} missing order or customer ID.`);
+    throw new Error(`Invoice #${invoice.invoiceNumber || 'unknown'} missing order or customer ID.`);
   }
 
   const { result: { order } } = await client.ordersApi.retrieveOrder(invoice.orderId);
@@ -128,19 +135,19 @@ async function processSingleInvoice(client: Client, db: Firestore, invoice: Invo
     if (districtMatch) district = districtMatch[1].trim();
   }
 
-  const { selections, baseRegistrationFee, notifications } = await parseSelectionsFromOrder(order, schoolName, district, batch, db);
+  const { selections, baseRegistrationFee, notifications } = await parseSelectionsFromOrder(order, schoolName, district, batch, db, customer);
 
   const totalInvoiced = Number(invoice.paymentRequests?.[0]?.computedAmountMoney?.amount || 0) / 100;
-  const eventName = invoice.title?.split('@')[1]?.trim() || invoice.title;
-  const purchaserName = customer.nickname || `${customer.givenName || ''} ${customer.familyName || ''}`.trim();
+  const eventName = invoice.title?.split('@')[1]?.trim() || invoice.title || 'Unknown Event';
+  const purchaserName = customer.nickname || `${customer.givenName || ''} ${customer.familyName || ''}`.trim() || 'Unknown Purchaser';
 
   const invoiceData = {
     id: invoice.id,
     invoiceId: invoice.id,
     invoiceNumber: invoice.invoiceNumber,
     invoiceTitle: invoice.title,
-    submissionTimestamp: format(parseISO(invoice.createdAt!), 'MM/dd/yyyy'),
-    eventDate: format(parseISO(invoice.createdAt!), 'MM/dd/yyyy'),
+    submissionTimestamp: invoice.createdAt ? format(parseISO(invoice.createdAt), 'MM/dd/yyyy') : null,
+    eventDate: invoice.createdAt ? format(parseISO(invoice.createdAt), 'MM/dd/yyyy') : null,
     eventName,
     selections,
     totalInvoiced,
@@ -160,10 +167,10 @@ async function processSingleInvoice(client: Client, db: Firestore, invoice: Invo
   return { invoiceData, invoiceNotifications: notifications };
 }
 
-async function parseSelectionsFromOrder(order: Order, schoolName: string, district: string, batch: WriteBatch, db: Firestore) {
+async function parseSelectionsFromOrder(order: Order, schoolName: string, district: string, batch: WriteBatch, db: Firestore, customer: any) {
   const selections: Record<string, any> = {};
   const notifications: string[] = [];
-  const emailTracker: Record<string, string> = {}; // email -> playerId
+  const emailTracker: Record<string, string> = {};
   let baseRegistrationFee = 0;
 
   if (!order.lineItems) return { selections, baseRegistrationFee, notifications };
@@ -187,10 +194,8 @@ async function parseSelectionsFromOrder(order: Order, schoolName: string, distri
         const info = parsePlayerFromNote(note.trim());
         if (!info) continue;
 
-        // Determine playerId (use USCF if available)
-        let playerId = info.uscfId || `NEW_${Date.now()}_${info.firstName[0]}${info.lastName[0]}`;
+        const playerId = info.uscfId || `NEW_${Date.now()}_${info.firstName[0]}${info.lastName[0]}`;
 
-        // Fetch existing player if present
         const existingPlayerDoc = await db.collection('players').doc(playerId).get();
         const existingPlayer = existingPlayerDoc.exists ? existingPlayerDoc.data() as MasterPlayer : null;
 
@@ -206,7 +211,6 @@ async function parseSelectionsFromOrder(order: Order, schoolName: string, distri
           uscfId: info.uscfId || existingPlayer?.uscfId,
         };
 
-        // Merge only invoice-related fields
         const selectionData = selections[playerId] || { playerName: `${info.firstName} ${info.lastName}`, section: 'Unknown', baseRegistrationFee: 0 };
         if (isRegistration) selectionData.isRegistered = true;
         if (isUscf) selectionData.uscfStatus = info.isNewPlayer ? 'new' : 'renewing';
@@ -214,11 +218,9 @@ async function parseSelectionsFromOrder(order: Order, schoolName: string, distri
 
         batch.set(db.collection('players').doc(playerId), playerDoc, { merge: true });
 
-        // Notifications for missing required fields
         if (!customer.emailAddress) notifications.push(`Player ${info.firstName} ${info.lastName} missing email.`);
         if (!info.uscfId) notifications.push(`Player ${info.firstName} ${info.lastName} missing USCF ID.`);
 
-        // Track duplicate emails
         if (customer.emailAddress) {
           const lowerEmail = customer.emailAddress.toLowerCase();
           if (emailTracker[lowerEmail] && emailTracker[lowerEmail] !== playerId) {
@@ -256,7 +258,7 @@ function parsePlayerFromNote(note: string): { firstName: string; lastName: strin
     let middleName: string | undefined;
     let uscfId: string | undefined;
 
-    if (pat.source.startsWith('(\\d')) { // USCF first
+    if (pat.source.startsWith('(\\d')) {
       uscfId = match[1];
       [firstName, lastName] = match[2].split(' ').filter(Boolean);
     } else {
