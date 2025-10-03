@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 'use server';
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -51,7 +54,6 @@ export async function POST(request: NextRequest) {
       endInvoiceNumber: endNum,
     });
 
-    // Ensure arrays exist
     const errors = Array.isArray(result.errors) ? result.errors : [];
     const notifications = Array.isArray(result.notifications) ? result.notifications : [];
 
