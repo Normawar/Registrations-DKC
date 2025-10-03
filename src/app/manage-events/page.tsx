@@ -140,6 +140,19 @@ type StoredConfirmation = {
   invoiceStatus?: 'CANCELED' | 'COMPED' | 'PAID' | 'UNPAID';
 };
 
+// Safe date formatter following project standards (MM/DD/YYYY)
+const safeFormatDate = (dateValue: any): string => {
+  if (!dateValue) return 'N/A';
+  
+  try {
+    const date = new Date(dateValue);
+    if (!isValid(date)) return 'N/A';
+    return format(date, 'MM/dd/yyyy');
+  } catch {
+    return 'N/A';
+  }
+};
+
 type RegistrationInfo = {
   player: MasterPlayer;
   details: {
@@ -168,7 +181,7 @@ type InvoiceGrouping = {
 function ManageEventsContent() {
   const { toast } = useToast();
   const { events, addBulkEvents, updateEvent, deleteEvent, clearAllEvents } = useEvents();
-  const { database: allPlayers, isDbLoaded, dbSchools } = useMasterDb();
+  const {database: allPlayers, isDbLoaded, dbSchools } = useMasterDb();
   const { profile } = useSponsorProfile();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -1177,24 +1190,24 @@ function ManageEventsContent() {
                                                   </TableCell>
                                                   <TableCell>{player.uscfId}</TableCell>
                                                   <TableCell>
-                                                      {player.grade === 'Kindergarten' ? 'K' : player.grade?.replace(/\D/g, '') || 'N/A'}
-                                                  </TableCell>
-                                                  <TableCell>
-                                                      {player.dob ? format(new Date(player.dob), 'MM/dd/yyyy') : 'N/A'}
-                                                  </TableCell>
-                                                  <TableCell className="text-xs">{player.email || 'N/A'}</TableCell>
-                                                  <TableCell>{player.zipCode || 'N/A'}</TableCell>
-                                                  <TableCell>
-                                                      {player.uscfExpiration ? (
-                                                          <>
-                                                              {format(new Date(player.uscfExpiration), 'MM/dd/yyyy')}
-                                                              {selectedEventForReg && new Date(player.uscfExpiration) < new Date(selectedEventForReg.date) && (
-                                                                  <Badge variant="destructive" className="ml-2">Expired</Badge>
-                                                              )}
-                                                          </>
-                                                      ) : 'N/A'}
-                                                  </TableCell>
-                                                  <TableCell>{status}</TableCell>
+                                                          {player.grade === 'Kindergarten' ? 'K' : player.grade?.replace(/\D/g, '') || 'N/A'}
+                                                      </TableCell>
+                                                      <TableCell>
+                                                          {safeFormatDate(player.dob)}
+                                                      </TableCell>
+                                                      <TableCell className="text-xs">{player.email || 'N/A'}</TableCell>
+                                                      <TableCell>{player.zipCode || 'N/A'}</TableCell>
+                                                      <TableCell>
+                                                          {player.uscfExpiration && isValid(new Date(player.uscfExpiration)) ? (
+                                                              <>
+                                                                  {safeFormatDate(player.uscfExpiration)}
+                                                                  {selectedEventForReg && new Date(player.uscfExpiration) < new Date(selectedEventForReg.date) && (
+                                                                      <Badge variant="destructive" className="ml-2">Expired</Badge>
+                                                                  )}
+                                                              </>
+                                                          ) : 'N/A'}
+                                                      </TableCell>
+                                                      <TableCell>{status}</TableCell>
                                               </TableRow>
                                           );
                                       })}
