@@ -17,7 +17,6 @@ import { School, User, DollarSign, CheckCircle, Clock, AlertCircle, Lock } from 
 import { format, differenceInHours, isSameDay, startOfDay } from "date-fns";
 import { InvoiceDetailsDialog } from '@/components/invoice-details-dialog';
 import { createInvoice } from '@/ai/flows/create-invoice-flow';
-import { createPsjaSingleInvoice } from '@/ai/flows/create-psja-single-invoice-flow';
 import { createPsjaSplitInvoice } from '@/ai/flows/create-psja-split-invoice-flow';
 import { generateTeamCode } from '@/lib/school-utils';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
@@ -243,16 +242,14 @@ export function SponsorRegistrationDialog({
     const hasGt = allSelectedPlayers.some(p => p.player?.studentType === 'gt');
     const hasIndependent = allSelectedPlayers.some(p => p.player?.studentType !== 'gt');
   
-    if (isPsjaDistrict) {
-      // Route ALL PSJA invoices to PSJA-specific flows
-      if (hasGt && hasIndependent) {
-        // PSJA Mixed: GT + Independent players
-        await handlePsjaSplitInvoice();
-      } else {
-        // PSJA Uniform: All GT or All Independent
-        await handlePsjaSingleInvoice();
-      }
+    if (isPsjaDistrict && hasGt && hasIndependent) {
+      await handlePsjaSplitInvoice();
     } else if (splitUscfFees) {
+      await handleSplitInvoices();
+    } else {
+      await handleStandardInvoice();
+    }
+  };
 
   const handleStandardInvoice = async () => {
     if (!profile || !event) return;
@@ -440,64 +437,6 @@ export function SponsorRegistrationDialog({
       
     } catch (error) {
       handleInvoiceError(error, "PSJA Split Invoice Creation Failed");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-  const handlePsjaSingleInvoice = async () => {
-    if (!profile || !event) return;
-
-    setIsSubmitting(true);
-    const { fee: currentFee } = getFeeForEvent();
-    const lateFeeAmount = currentFee - event.regularFee;
-
-    const playersToInvoice = Object.entries(selectedStudents).map(([playerId, details]) => {
-      const student = rosterPlayers.find(p => p.id === playerId);
-      return {
-        playerName: `${student?.firstName} ${student?.lastName}`,
-        uscfId: student?.uscfId || '',
-        baseRegistrationFee: event.regularFee,
-        lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0,
-        uscfAction: details.uscfStatus !== 'current',
-        isGtPlayer: student?.studentType === 'gt',
-        section: details.section,
-      };
-    });
-
-    try {
-      const result = await createPsjaSingleInvoice({
-        sponsorName: `${profile.firstName} ${profile.lastName}`,
-        sponsorEmail: profile.email,
-        schoolName: profile.school,
-        district: 'PHARR-SAN JUAN-ALAMO ISD',
-        eventName: event.name,
-        eventDate: event.date,
-        uscfFee: 24,
-        players: playersToInvoice,
-        description: `PSJA Registration for ${event.name}`
-      });
-
-      if (result.success && result.invoiceId) {
-        await saveConfirmation(result.invoiceId, result, playersToInvoice, 0, result.playerType);
-        
-        toast({ 
-          title: "PSJA Invoice Created!", 
-          description: `${result.playerType.toUpperCase()} invoice created successfully.`
-        });
-        
-        setInvoiceResult(result);
-        setShowConfirmation(false);
-        setShowInvoiceDetails(true);
-      } else {
-        throw new Error(result.message || 'Failed to create PSJA invoice');
-      }
-    } catch (error: any) {
-      console.error('Error creating PSJA single invoice:', error);
-      toast({
-        variant: 'destructive',
-        title: 'PSJA Invoice Creation Failed',
-        description: error.message || 'Failed to create invoice. Please try again.'
-      });
     } finally {
       setIsSubmitting(false);
     }

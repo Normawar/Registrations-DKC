@@ -71,6 +71,7 @@ import { cn } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useEvents, type Event } from '@/hooks/use-events';
 import { createInvoice } from '@/ai/flows/create-invoice-flow';
+import { createPsjaSingleInvoice } from '@/ai/flows/create-psja-single-invoice-flow';
 import { createPsjaSplitInvoice } from '@/ai/flows/create-psja-split-invoice-flow';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
@@ -411,8 +412,15 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         const hasGt = stagedPlayers.some(p => p.studentType === 'gt');
         const hasIndependent = stagedPlayers.some(p => p.studentType !== 'gt');
         
-        if (isPsjaDistrict && hasGt && hasIndependent) {
-            await handlePsjaSplitInvoice(recipient, district);
+        if (isPsjaDistrict) {
+            // Route ALL PSJA invoices to PSJA-specific flows
+            if (hasGt && hasIndependent) {
+                // PSJA Mixed: GT + Independent players
+                await handlePsjaSplitInvoice(recipient, district);
+            } else {
+                // PSJA Uniform: All GT or All Independent
+                await handlePsjaSingleInvoice(recipient, district);
+            }
             return;
         }
         
@@ -595,6 +603,83 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             setIsSubmitting(false);
         }
       };
+    } finally {
+        setIsSubmitting(false);
+    }
+  };
+
+  const handlePsjaSingleInvoice = async (recipient: InvoiceRecipientValues, district: string) => {
+    const { fee: currentFee } = getFeeForEvent();
+    const lateFeeAmount = currentFee - event.regularFee;
+
+    const playersToInvoice = stagedPlayers.map((player) => ({
+      playerName: `${player.firstName} ${player.lastName}`,
+      uscfId: player.uscfId,
+      baseRegistrationFee: event.regularFee,
+      lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0,
+      uscfAction: player.uscfStatus !== 'current',
+      isGtPlayer: player.studentType === 'gt',
+      section: player.section,
+    }));
+
+    try {
+      const result = await createPsjaSingleInvoice({
+        sponsorName: recipient.sponsorName,
+        sponsorEmail: recipient.sponsorEmail,
+        schoolName: recipient.schoolName,
+        district: 'PHARR-SAN JUAN-ALAMO ISD',
+        eventName: event.name,
+        eventDate: event.date,
+        uscfFee: 24,
+        players: playersToInvoice,
+        description: `PSJA Registration for ${event.name}`
+      });
+
+      if (result.success && result.invoiceId) {
+        const confirmationData: ConfirmationItem = {
+          confirmationId: `conf_${Date.now()}`,
+          invoiceId: result.invoiceId,
+          invoiceNumber: result.invoiceNumber || '',
+          publicUrl: result.publicUrl || '',
+          totalInvoiced: result.totalAmount || 0,
+          sponsorName: recipient.sponsorName,
+          sponsorEmail: recipient.sponsorEmail,
+          schoolName: recipient.schoolName,
+          district: district,
+          teamCode: generateTeamCode({ schoolName: recipient.schoolName, district }),
+          eventId: event.id,
+          eventName: event.name,
+          eventDate: event.date,
+          registrationDate: new Date().toISOString(),
+          status: 'pending',
+          paymentStatus: 'unpaid',
+          selections: {},
+          playerType: result.playerType,
+        };
+
+        const confirmationRef = doc(db, 'confirmations', confirmationData.confirmationId);
+        await setDoc(confirmationRef, confirmationData);
+
+        toast({ 
+          title: "PSJA Invoice Created!", 
+          description: `${result.playerType.toUpperCase()} invoice created successfully.`
+        });
+
+        setStep(3);
+      } else {
+        throw new Error(result.message || 'Failed to create PSJA invoice');
+      }
+    } catch (error: any) {
+      console.error('Error creating PSJA single invoice:', error);
+      toast({
+        variant: 'destructive',
+        title: 'PSJA Invoice Creation Failed',
+        description: error.message || 'Failed to create invoice. Please try again.'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
     const handleGenerateIndividualInvoices = async (recipient: InvoiceRecipientValues) => {
         if (!event || !db || stagedPlayers.length === 0) return;
