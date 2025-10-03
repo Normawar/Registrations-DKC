@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -7,7 +6,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format, isValid } from 'date-fns';
-import Papa from 'papaparse';
 import { AppLayout } from '@/components/app-layout';
 import { AuthGuard } from '@/app/auth-guard';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
@@ -17,26 +15,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Search, PlusCircle, Trash2, Edit, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Check, FilePenLine, History, UserPlus, Download } from 'lucide-react';
+import { PlusCircle, Trash2, Edit, UserPlus, History } from 'lucide-react';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EnhancedPlayerSearchDialog } from '@/components/EnhancedPlayerSearchDialog';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
-import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { generateTeamCode } from '@/lib/school-utils';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
-
-// --- Form Schema and Type Definitions ---
+// Form Schema and Type Definitions
 const grades = ['Kindergarten', '1st Grade', '2nd Grade', '3rd Grade', '4th Grade', '5th Grade', '6th Grade', '7th Grade', '8th Grade', '9th Grade', '10th Grade', '11th Grade', '12th Grade'];
 const sections = ['Kinder-1st', 'Primary K-3', 'Elementary K-5', 'Middle School K-8', 'High School K-12', 'Championship'];
-const gradeToNumber: { [key: string]: number } = { 'Kindergarten': 0, '1st Grade': 1, '2nd Grade': 2, '3rd Grade': 3, '4th Grade': 4, '5th Grade': 5, '6th Grade': 6, '7th Grade': 7, '8th Grade': 8, '9th Grade': 9, '10th Grade': 10, '11th Grade': 11, '12th Grade': 12, };
+const gradeToNumber: { [key: string]: number } = { 'Kindergarten': 0, '1st Grade': 1, '2nd Grade': 2, '3rd Grade': 3, '4th Grade': 4, '5th Grade': 5, '6th Grade': 6, '7th Grade': 7, '8th Grade': 8, '9th Grade': 9, '10th Grade': 10, '11th Grade': 11, '12th Grade': 12 };
 const sectionMaxGrade: { [key: string]: number } = { 'Kinder-1st': 1, 'Primary K-3': 3, 'Elementary K-5': 5, 'Middle School K-8': 8, 'High School K-12': 12, 'Championship': 12 };
 
 const playerFormSchema = z.object({
@@ -46,15 +37,25 @@ const playerFormSchema = z.object({
   lastName: z.string().min(1, "Last Name is required."),
   uscfId: z.string().min(1, "USCF ID is required."),
   uscfExpiration: z.date().optional(),
-  regularRating: z.coerce.number().optional(),
-  grade: z.string().optional(),
-  section: z.string().optional(),
+  regularRating: z.preprocess(
+    (val) => {
+      if (!val || String(val).toUpperCase() === 'UNR' || val === '') {
+        return undefined;
+      }
+      return val;
+    },
+    z.coerce.number({
+      invalid_type_error: "Rating must be a number or UNR."
+    }).optional()
+  ),
+  grade: z.string().optional().transform(val => val === '' ? undefined : val),
+  section: z.string().optional().transform(val => val === '' ? undefined : val),
   email: z.string().email("Invalid email.").min(1, "Email is required."),
   zipCode: z.string().min(1, "Zip Code is required."),
-  phone: z.string().optional(),
+  phone: z.string().optional().transform(val => val === '' ? undefined : val),
   dob: z.date().optional(),
-  studentType: z.string().optional(),
-  state: z.string().optional(),
+  studentType: z.string().optional().transform(val => val === '' ? undefined : val),
+  state: z.string().optional().transform(val => val === '' ? undefined : val),
   school: z.string().min(1, "School is required."),
   district: z.string().min(1, "District is required."),
 }).refine(data => data.uscfId.toUpperCase() !== 'NEW' ? data.uscfExpiration !== undefined : true, {
@@ -64,6 +65,7 @@ const playerFormSchema = z.object({
   if (!data.grade || !data.section || data.section === 'Championship') return true;
   const playerGrade = gradeToNumber[data.grade];
   const sectionMax = sectionMaxGrade[data.section];
+  if (playerGrade === undefined || sectionMax === undefined) return true;
   return playerGrade <= sectionMax;
 }, {
   message: "Player's grade is too high for this section.",
@@ -72,8 +74,7 @@ const playerFormSchema = z.object({
 
 type PlayerFormValues = z.infer<typeof playerFormSchema>;
 
-// --- Reusable Components ---
-
+// Date Input Component
 const DateInput = React.forwardRef<HTMLInputElement, { value?: Date; onChange?: (date: Date | undefined) => void; placeholder?: string; }>(({ value, onChange, placeholder }, ref) => {
   const [textValue, setTextValue] = useState('');
 
@@ -88,7 +89,6 @@ const DateInput = React.forwardRef<HTMLInputElement, { value?: Date; onChange?: 
       onChange?.(undefined);
       return;
     }
-    // Basic regex for MM/DD/YYYY
     if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) {
       const [month, day, year] = str.split('/').map(Number);
       const date = new Date(year, month - 1, day);
@@ -102,372 +102,613 @@ const DateInput = React.forwardRef<HTMLInputElement, { value?: Date; onChange?: 
 });
 DateInput.displayName = 'DateInput';
 
+// Change History Component
 const ChangeHistorySection = ({ player }: { player: MasterPlayer | null }) => {
-    if (!player) return null;
+  if (!player) {
     return (
-        <div className="space-y-4 pt-4">
-            <h3 className="text-lg font-semibold flex items-center gap-2"><History className="h-5 w-5 text-muted-foreground" /> Record Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-md bg-muted/30">
-                <div>
-                    <h4 className="font-medium text-sm text-muted-foreground mb-1">CREATED</h4>
-                    <p>{player.dateCreated ? format(new Date(player.dateCreated), 'Pp') : 'N/A'} by {player.createdBy || 'N/A'}</p>
-                </div>
-                <div>
-                    <h4 className="font-medium text-sm text-muted-foreground mb-1">LAST UPDATED</h4>
-                     <p>{player.dateUpdated ? format(new Date(player.dateUpdated), 'Pp') : 'N/A'} by {player.updatedBy || 'N/A'}</p>
-                </div>
-            </div>
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <History className="h-5 w-5 text-muted-foreground" />
+          Record Information
+        </h3>
+        <div className="p-6 text-center text-muted-foreground border rounded-md bg-muted/30">
+          Record information will be available after the player is created.
         </div>
+      </div>
     );
+  }
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+        <History className="h-5 w-5 text-muted-foreground" />
+        Record Information
+      </h3>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-md bg-muted/30">
+        <div>
+          <h4 className="font-medium text-sm text-muted-foreground mb-2">RECORD CREATED</h4>
+          <p className="text-sm font-semibold">
+            {player.dateCreated ? format(new Date(player.dateCreated), 'PPP p') : 'Unknown Date'}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Created by: {player.createdBy || 'Unknown User'}
+          </p>
+        </div>
+        <div>
+          <h4 className="font-medium text-sm text-muted-foreground mb-2">LAST UPDATED</h4>
+          <p className="text-sm font-semibold">
+            {player.dateUpdated 
+              ? format(new Date(player.dateUpdated), 'PPP p') 
+              : (player.dateCreated ? format(new Date(player.dateCreated), 'PPP p') : 'Unknown Date')
+            }
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Updated by: {player.updatedBy || player.createdBy || 'Unknown User'}
+          </p>
+        </div>
+      </div>
+
+      {player.changeHistory && player.changeHistory.length > 0 ? (
+        <div>
+          <h4 className="font-medium text-sm text-muted-foreground mb-3">CHANGE HISTORY</h4>
+          <div className="space-y-3 border rounded-md p-4 max-h-64 overflow-y-auto bg-background">
+            {player.changeHistory.slice().reverse().map((entry, index) => (
+              <div key={entry.timestamp || index} className="text-sm border-l-2 border-muted-foreground pl-4 pb-3 last:pb-0">
+                <p className="font-medium text-foreground">
+                  {format(new Date(entry.timestamp), 'PPP p')} by {entry.userName}
+                </p>
+                <ul className="list-disc pl-5 mt-2 space-y-1">
+                  {entry.changes.map((change, changeIndex) => (
+                    <li key={changeIndex} className="text-xs text-muted-foreground">
+                      Field <span className="font-semibold text-foreground">{change.field}</span> changed from 
+                      <span className="italic text-red-600 mx-1">'{String(change.oldValue)}'</span> to 
+                      <span className="italic text-green-600 mx-1">'{String(change.newValue)}'</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div>
+          <h4 className="font-medium text-sm text-muted-foreground mb-3">CHANGE HISTORY</h4>
+          <div className="p-4 text-center text-xs text-muted-foreground border rounded-md bg-muted/20">
+            No changes recorded for this player.
+          </div>
+        </div>
+      )}
+    </div>
+  );
 };
 
-// --- Main Page Content ---
-
+// Main Roster Page Content
 function RosterPageContent() {
-    const { profile, isProfileLoaded, updateProfile } = useSponsorProfile();
-    const { dbDistricts, getSchoolsForDistrict, addPlayer, updatePlayer, deletePlayer } = useMasterDb(); // Still using context for actions and static data
-    const { toast } = useToast();
-    
-    // State for data fetching and UI
-    const [roster, setRoster] = useState<MasterPlayer[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+  const { profile, isProfileLoaded, updateProfile } = useSponsorProfile();
+  const { dbDistricts, getSchoolsForDistrict, addPlayer, updatePlayer, deletePlayer } = useMasterDb();
+  const { toast } = useToast();
+  
+  const [roster, setRoster] = useState<MasterPlayer[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-    // State for dialogs and forms
-    const [isEditOpen, setIsEditOpen] = useState(false);
-    const [isSearchOpen, setIsSearchOpen] = useState(false);
-    const [playerToEdit, setPlayerToEdit] = useState<MasterPlayer | null>(null);
-    const [schoolsForEditDistrict, setSchoolsForEditDistrict] = useState<string[]>([]);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [playerToEdit, setPlayerToEdit] = useState<MasterPlayer | null>(null);
+  const [schoolsForEditDistrict, setSchoolsForEditDistrict] = useState<string[]>([]);
 
-    const form = useForm<PlayerFormValues>({ resolver: zodResolver(playerFormSchema) });
-    const editDistrict = form.watch('district');
+  const form = useForm<PlayerFormValues>({ resolver: zodResolver(playerFormSchema) });
+  const editDistrict = form.watch('district');
 
-    // --- DATA FETCHING: Use the new /api/roster endpoint ---
-    const fetchRoster = useCallback(async () => {
-        if (!isProfileLoaded || !profile) return;
-        setIsLoading(true);
-        setError(null);
+  // Data Fetching
+  const fetchRoster = useCallback(async () => {
+    if (!isProfileLoaded || !profile) return;
+    setIsLoading(true);
+    setError(null);
 
-        const userRole = getUserRole(profile);
-        let url = '/api/roster';
-        let params = new URLSearchParams();
+    const userRole = getUserRole(profile);
+    let url = '/api/roster';
+    let params = new URLSearchParams();
 
-        if (userRole === 'organizer') {
-            // Organizers can see everything, but for performance, let's not load all by default.
-            // This part can be enhanced with filters.
-            setIsLoading(false);
-            return; // Or load a specific default view
-        } else if (userRole === 'sponsor' || userRole === 'district_coordinator') {
-            if (profile.district) params.append('district', profile.district);
-            if (profile.school) params.append('school', profile.school);
-        } else if (userRole === 'individual' && profile.studentIds) {
-            if (profile.studentIds.length > 0) {
-                 params.append('playerIds', profile.studentIds.join(','));
-            } else {
-                setRoster([]);
-                setIsLoading(false);
-                return;
-            }
-        }
-
-        try {
-            const response = await fetch(`${url}?${params.toString()}`);
-            if (!response.ok) throw new Error('Failed to fetch roster data.');
-            const data = await response.json();
-            setRoster(data);
-        } catch (e: any) {
-            setError(e.message);
-            toast({ title: "Error", description: e.message, variant: "destructive" });
-        } finally {
-            setIsLoading(false);
-        }
-    }, [profile, isProfileLoaded, toast]);
-
-    useEffect(() => {
-        fetchRoster();
-    }, [fetchRoster]);
-
-    // --- Form and Dialog Logic ---
-    useEffect(() => {
-        if (editDistrict) {
-            setSchoolsForEditDistrict(getSchoolsForDistrict(editDistrict));
-        }
-    }, [editDistrict, getSchoolsForDistrict]);
-
-    useEffect(() => {
-        if (playerToEdit) {
-            form.reset({
-                ...playerToEdit,
-                dob: playerToEdit.dob ? new Date(playerToEdit.dob) : undefined,
-                uscfExpiration: playerToEdit.uscfExpiration ? new Date(playerToEdit.uscfExpiration) : undefined,
-            });
-        } else if (profile) {
-            // Pre-fill for new players based on user profile
-            form.reset({
-                id: `temp_${Date.now()}`,
-                uscfId: 'NEW',
-                district: profile.district,
-                school: profile.school,
-                email: profile.email,
-                zipCode: profile.zip,
-            });
-        }
-    }, [playerToEdit, form, profile]);
-
-    const handleEditPlayer = (player: MasterPlayer) => {
-        setPlayerToEdit(player);
-        setIsEditOpen(true);
-    };
-
-    const handleCreateNewPlayer = () => {
-        setPlayerToEdit(null);
-        setIsEditOpen(true);
-    };
-
-    const handlePlayerSelectedFromSearch = (player: MasterPlayer) => {
-        // Logic to add player to user's context (e.g., individual's studentIds)
-        if (getUserRole(profile) === 'individual') {
-             const isAlreadyInRoster = profile?.studentIds?.includes(player.id);
-             if (isAlreadyInRoster) {
-                 toast({ title: "Player Already in Roster" });
-                 handleEditPlayer(player); // Open for editing instead
-             } else {
-                 const updatedStudentIds = [...(profile?.studentIds || []), player.id];
-                 updateProfile({ studentIds: updatedStudentIds }).then(() => {
-                     toast({ title: "Player Added", description: `${player.firstName} has been added to your roster.` });
-                     fetchRoster(); // Refetch the roster
-                 });
-             }
-        } else {
-            // For sponsors, player is likely already in their roster if searchable
-            // Just open the edit dialog
-            handleEditPlayer(player);
-        }
-        setIsSearchOpen(false);
-    };
-    
-    const onEditSubmit = async (values: PlayerFormValues) => {
-      if (!profile) return;
-      
-      try {
-          if (playerToEdit) {
-              const updatedPlayer: MasterPlayer = { ...playerToEdit, ...values };
-              await updatePlayer(updatedPlayer, profile);
-              toast({ title: "Player Updated" });
-          } else {
-              const newPlayer: MasterPlayer = { ...values, id: values.id || `temp_${Date.now()}` } as MasterPlayer;
-              await addPlayer(newPlayer, profile);
-              toast({ title: "Player Created" });
-          }
-          fetchRoster(); // Refresh data
-          setIsEditOpen(false);
-      } catch(e: any) {
-          toast({ title: "Save Failed", description: e.message, variant: "destructive" });
+    if (userRole === 'organizer') {
+      setIsLoading(false);
+      return;
+    } else if (userRole === 'sponsor' || userRole === 'district_coordinator') {
+      if (profile.district) params.append('district', profile.district);
+      if (profile.school) params.append('school', profile.school);
+    } else if (userRole === 'individual' && profile.studentIds) {
+      if (profile.studentIds.length > 0) {
+        params.append('playerIds', profile.studentIds.join(','));
+      } else {
+        setRoster([]);
+        setIsLoading(false);
+        return;
       }
-    };
-
-    const handleDeletePlayer = async (player: MasterPlayer) => {
-        if (window.confirm(`Are you sure you want to remove ${player.firstName} from your roster? This does not delete their master record.`)) {
-            if (getUserRole(profile) === 'individual') {
-                const updatedStudentIds = profile.studentIds?.filter(id => id !== player.id);
-                await updateProfile({ studentIds: updatedStudentIds });
-                toast({ title: 'Student Removed' });
-                fetchRoster(); // Refresh
-            } else {
-                toast({ title: 'Not Supported', description: 'Sponsors cannot remove players. Please contact an organizer.' });
-            }
-        }
-    };
-    
-    // --- Render Logic ---
-    if (isLoading) return <div>Loading your roster...</div>;
-    if (error) return <div className='text-red-500'>Error: {error}</div>;
-    if (!profile) return <div>Could not load user profile.</div>
-
-    return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-3xl font-bold font-headline">My Roster</h1>
-                    <p className="text-muted-foreground">Manage your players and students.</p>
-                </div>
-                <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => setIsSearchOpen(true)}><UserPlus className="mr-2 h-4 w-4"/> Find & Add Player</Button>
-                    <Button onClick={handleCreateNewPlayer}><PlusCircle className="mr-2 h-4 w-4"/> Create New Player</Button>
-                </div>
-            </div>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>{getUserRole(profile) === 'individual' ? 'My Students' : 'School Roster'}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Name</TableHead>
-                                <TableHead>USCF ID</TableHead>
-                                <TableHead>Grade</TableHead>
-                                <TableHead>Actions</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {roster.length === 0 ? (
-                                <TableRow><TableCell colSpan={4} className="text-center h-24">No players on this roster yet.</TableCell></TableRow>
-                            ) : (
-                                roster.map(player => (
-                                    <TableRow key={player.id}>
-                                        <TableCell>{player.firstName} {player.lastName}</TableCell>
-                                        <TableCell>{player.uscfId}</TableCell>
-                                        <TableCell>{player.grade}</TableCell>
-                                        <TableCell>
-                                            <Button variant="ghost" size="sm" onClick={() => handleEditPlayer(player)}><Edit className="h-4 w-4" /></Button>
-                                            {getUserRole(profile) === 'individual' && (
-                                                <Button variant="ghost" size="sm" className="text-destructive" onClick={() => handleDeletePlayer(player)}><Trash2 className="h-4 w-4" /></Button>
-                                            )}
-                                        </TableCell>
-                                    </TableRow>
-                                ))
-                            )}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
-
-            {/* --- Dialogs --- */}
-            <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-                <DialogContent className="sm:max-w-4xl max-h-[90vh]">
-                    <DialogHeader>
-                        <DialogTitle>{playerToEdit ? 'Edit Player' : 'Create New Player'}</DialogTitle>
-                    </DialogHeader>
-                    <ScrollArea className="-mx-6 pr-6 pl-6">
-                        <div className="pt-4">
-                            <Form {...form}>
-                                <form id="player-form" onSubmit={form.handleSubmit(onEditSubmit)} className="space-y-6">
-                                    {/* Form Fields */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <FormField control={form.control} name="firstName" render={({ field }) => (<FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
-                                        <FormField control={form.control} name="lastName" render={({ field }) => (<FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
-                                        <FormField control={form.control} name="district" render={({ field }) => (<FormItem><FormLabel>District</FormLabel><Select onValueChange={v => { field.onChange(v); form.setValue('school', ''); }} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{dbDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
-                                        <FormField control={form.control} name="school" render={({ field }) => (<FormItem><FormLabel>School</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{schoolsForEditDistrict.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
-                                        <FormField control={form.control} name="uscfId" render={({ field }) => (<FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input {...field} /></FormControl><FormDescription>Use 'NEW' for new players.</FormDescription><FormMessage /></FormItem>)} />
-                                        <FormField control={form.control} name="uscfExpiration" render={({ field }) => (<FormItem><FormLabel>USCF Expiration</FormLabel><FormControl><DateInput value={field.value} onChange={field.onChange} /></FormControl><FormMessage /></FormItem>)} />
-                                        <FormField control={form.control} name="grade" render={({ field }) => (<FormItem><FormLabel>Grade</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{grades.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
-                                        <FormField control={form.control} name="email" render={({ field }) => (<FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                                        <FormField control={form.control} name="zipCode" render={({ field }) => (<FormItem><FormLabel>Zip Code</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
-                                    </div>
-                                    <ChangeHistorySection player={playerToEdit} />
-                                </form>
-                            </Form>
-                        </div>
-                    </ScrollArea>
-                    <DialogFooter>
-                        <Button type="button" variant="ghost" onClick={() => setIsEditOpen(false)}>Cancel</Button>
-                        <Button type="submit" form="player-form">{playerToEdit ? 'Save Changes' : 'Create Player'}</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            <EnhancedPlayerSearchDialog
-                isOpen={isSearchOpen}
-                onOpenChange={setIsSearchOpen}
-                onPlayerSelected={handlePlayerSelectedFromSearch}
-                userProfile={profile}
-                preFilterByUserProfile={getUserRole(profile) !== 'organizer'}
-            />
-        </div>
-    );
-}
-
-// Organizer-specific content is now separated for clarity.
-function OrganizerRosterPage() {
-    const { dbDistricts, getSchoolsForDistrict, deletePlayer, updatePlayer, addPlayer } = useMasterDb();
-    const { profile } = useSponsorProfile();
-    const { toast } = useToast();
-
-    const [players, setPlayers] = useState<MasterPlayer[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null);
-    const [selectedSchool, setSelectedSchool] = useState<string>('all');
-
-    const fetchPlayers = useCallback(async (district: string | null) => {
-        if (!district) {
-            setPlayers([]);
-            return;
-        }
-        setIsLoading(true);
-        const params = new URLSearchParams({ district });
-        try {
-            const res = await fetch(`/api/roster?${params.toString()}`);
-            const data = await res.json();
-            setPlayers(data);
-        } catch (e) {
-            toast({ title: "Error fetching players", variant: "destructive" });
-        } finally {
-            setIsLoading(false);
-        }
-    }, [toast]);
-
-    useEffect(() => {
-        fetchPlayers(selectedDistrict);
-    }, [selectedDistrict, fetchPlayers]);
-
-    const schoolsForDistrict = useMemo(() => {
-        return selectedDistrict ? getSchoolsForDistrict(selectedDistrict) : [];
-    }, [selectedDistrict, getSchoolsForDistrict]);
-
-    const filteredPlayers = useMemo(() => {
-        if (selectedSchool === 'all') return players;
-        return players.filter(p => p.school === selectedSchool);
-    }, [players, selectedSchool]);
-    
-    return (
-        <div className="space-y-6">
-            <h1 className="text-3xl font-bold font-headline">Organizer Roster Management</h1>
-            <Card>
-                <CardHeader>
-                    <div className="flex gap-4">
-                        <Select onValueChange={setSelectedDistrict} value={selectedDistrict || ''}>
-                            <SelectTrigger className="w-[280px]"><SelectValue placeholder="Select a District" /></SelectTrigger>
-                            <SelectContent>{dbDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
-                        </Select>
-                        <Select onValueChange={setSelectedSchool} value={selectedSchool} disabled={!selectedDistrict}>
-                             <SelectTrigger className="w-[280px]"><SelectValue placeholder="Select a School" /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Schools</SelectItem>
-                                {schoolsForDistrict.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    {isLoading ? <p>Loading...</p> : 
-                        <p>{filteredPlayers.length} players found.</p>
-                        // Full organizer table display would go here
-                    }
-                </CardContent>
-            </Card>
-        </div>
-    )
-}
-
-
-export default function RosterPage() {
-    const { profile, isProfileLoaded } = useSponsorProfile();
-
-    if (!isProfileLoaded) {
-        return <AppLayout><div>Loading...</div></AppLayout>;
     }
 
-    return (
-        <AuthGuard>
-            <AppLayout>
-                {getUserRole(profile) === 'organizer' ? (
-                    <OrganizerRosterPage />
-                ) : (
-                    <RosterPageContent />
-                )}
-            </AppLayout>
-        </AuthGuard>
-    );
+    try {
+      const response = await fetch(`${url}?${params.toString()}`);
+      if (!response.ok) throw new Error('Failed to fetch roster data.');
+      const data = await response.json();
+      setRoster(data);
+    } catch (e: any) {
+      setError(e.message);
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [profile, isProfileLoaded, toast]);
+
+  useEffect(() => {
+    fetchRoster();
+  }, [fetchRoster]);
+
+  // Form Logic
+  useEffect(() => {
+    if (editDistrict) {
+      setSchoolsForEditDistrict(getSchoolsForDistrict(editDistrict));
+    }
+  }, [editDistrict, getSchoolsForDistrict]);
+
+  useEffect(() => {
+    if (playerToEdit) {
+      form.reset({
+        ...playerToEdit,
+        dob: playerToEdit.dob ? new Date(playerToEdit.dob) : undefined,
+        uscfExpiration: playerToEdit.uscfExpiration ? new Date(playerToEdit.uscfExpiration) : undefined,
+      });
+      if (playerToEdit.district) {
+        setSchoolsForEditDistrict(getSchoolsForDistrict(playerToEdit.district));
+      }
+    } else if (profile) {
+      form.reset({
+        id: `temp_${Date.now()}`,
+        uscfId: 'NEW',
+        district: profile.district,
+        school: profile.school,
+        email: profile.email,
+        zipCode: profile.zip,
+      });
+    }
+  }, [playerToEdit, form, profile, getSchoolsForDistrict]);
+
+  const handleEditPlayer = (player: MasterPlayer) => {
+    setPlayerToEdit(player);
+    setIsEditOpen(true);
+  };
+
+  const handleCreateNewPlayer = () => {
+    setPlayerToEdit(null);
+    setIsEditOpen(true);
+  };
+
+  const handlePlayerSelectedFromSearch = (player: MasterPlayer) => {
+    if (getUserRole(profile) === 'individual') {
+      const isAlreadyInRoster = profile?.studentIds?.includes(player.id);
+      if (isAlreadyInRoster) {
+        toast({ title: "Player Already in Roster" });
+        handleEditPlayer(player);
+      } else {
+        const updatedStudentIds = [...(profile?.studentIds || []), player.id];
+        updateProfile({ studentIds: updatedStudentIds }).then(() => {
+          toast({ title: "Player Added", description: `${player.firstName} has been added to your roster.` });
+          fetchRoster();
+        });
+      }
+    } else {
+      handleEditPlayer(player);
+    }
+    setIsSearchOpen(false);
+  };
+  
+  const onEditSubmit = async (values: PlayerFormValues) => {
+    if (!profile) return;
+    
+    try {
+      if (playerToEdit) {
+        const updatedPlayer: MasterPlayer = { ...playerToEdit, ...values };
+        await updatePlayer(updatedPlayer, profile);
+        toast({ title: "Player Updated" });
+      } else {
+        const newPlayer: MasterPlayer = { 
+          ...values, 
+          id: values.id || `temp_${Date.now()}`,
+          events: 0,
+          eventIds: []
+        } as MasterPlayer;
+        await addPlayer(newPlayer, profile);
+        toast({ title: "Player Created" });
+      }
+      fetchRoster();
+      setIsEditOpen(false);
+      setPlayerToEdit(null);
+    } catch(e: any) {
+      toast({ title: "Save Failed", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const handleDeletePlayer = async (player: MasterPlayer) => {
+    if (window.confirm(`Are you sure you want to remove ${player.firstName} from your roster?`)) {
+      if (getUserRole(profile) === 'individual') {
+        const updatedStudentIds = profile.studentIds?.filter(id => id !== player.id);
+        await updateProfile({ studentIds: updatedStudentIds });
+        toast({ title: 'Student Removed' });
+        fetchRoster();
+      } else {
+        toast({ title: 'Not Supported', description: 'Sponsors cannot remove players. Please contact an organizer.' });
+      }
+    }
+  };
+  
+  if (isLoading) return <div>Loading your roster...</div>;
+  if (error) return <div className='text-red-500'>Error: {error}</div>;
+  if (!profile) return <div>Could not load user profile.</div>
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold font-headline">My Roster</h1>
+          <p className="text-muted-foreground">Manage your players and students.</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setIsSearchOpen(true)}>
+            <UserPlus className="mr-2 h-4 w-4"/> Find & Add Player
+          </Button>
+          <Button onClick={handleCreateNewPlayer}>
+            <PlusCircle className="mr-2 h-4 w-4"/> Create New Player
+          </Button>
+        </div>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{getUserRole(profile) === 'individual' ? 'My Students' : 'School Roster'}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>USCF ID</TableHead>
+                <TableHead>Grade</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {roster.length === 0 ? (
+                <TableRow><TableCell colSpan={4} className="text-center h-24">No players on this roster yet.</TableCell></TableRow>
+              ) : (
+                roster.map(player => (
+                  <TableRow key={player.id}>
+                    <TableCell>{player.firstName} {player.lastName}</TableCell>
+                    <TableCell>{player.uscfId}</TableCell>
+                    <TableCell>{player.grade}</TableCell>
+                    <TableCell>
+                      <Button variant="ghost" size="sm" onClick={() => handleEditPlayer(player)}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      {getUserRole(profile) === 'individual' && (
+                        <Button variant="ghost" size="sm" className="text-destructive" onClick={() => handleDeletePlayer(player)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Enhanced Player Edit Dialog with ScrollArea */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="sm:max-w-4xl max-h-[95vh] flex flex-col p-0">
+          <DialogHeader className="p-6 pb-4 border-b shrink-0">
+            <DialogTitle>{playerToEdit ? 'Edit Player' : 'Create New Player'}</DialogTitle>
+            <DialogDescription>
+              {playerToEdit ? 'Modify the player\'s information below.' : 'Enter the details for the new player.'}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <ScrollArea className="flex-1 overflow-y-auto">
+            <div className="p-6 space-y-6">
+              <Form {...form}>
+                <form id="edit-player-form" onSubmit={form.handleSubmit(onEditSubmit)} className="space-y-6">
+                  
+                  {/* Player Information */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold border-b pb-2">Player Information</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <FormField control={form.control} name="firstName" render={({ field }) => ( 
+                        <FormItem>
+                          <FormLabel>First Name *</FormLabel>
+                          <FormControl><Input {...field} value={field.value || ''} /></FormControl>
+                          <FormMessage />
+                        </FormItem> 
+                      )}/>
+                      <FormField control={form.control} name="lastName" render={({ field }) => ( 
+                        <FormItem>
+                          <FormLabel>Last Name *</FormLabel>
+                          <FormControl><Input {...field} value={field.value || ''} /></FormControl>
+                          <FormMessage />
+                        </FormItem> 
+                      )}/>
+                      <FormField control={form.control} name="middleName" render={({ field }) => ( 
+                        <FormItem>
+                          <FormLabel>Middle Name</FormLabel>
+                          <FormControl><Input {...field} value={field.value || ''} /></FormControl>
+                          <FormMessage />
+                        </FormItem> 
+                      )}/>
+                    </div>
+                  </div>
+
+                  {/* School Information */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold border-b pb-2">School Information</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField control={form.control} name="district" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>District *</FormLabel>
+                          <Select onValueChange={(v) => { 
+                            field.onChange(v); 
+                            setSchoolsForEditDistrict(getSchoolsForDistrict(v)); 
+                            form.setValue('school', ''); 
+                          }} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {dbDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      
+                      <FormField control={form.control} name="school" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>School *</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {schoolsForEditDistrict.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                    </div>
+
+                    {editDistrict === 'PHARR-SAN JUAN-ALAMO ISD' && (
+                      <FormField
+                        control={form.control}
+                        name="studentType"
+                        render={({ field }) => (
+                          <FormItem className="space-y-3">
+                            <FormLabel>Student Type</FormLabel>
+                            <FormControl>
+                              <RadioGroup 
+                                onValueChange={field.onChange} 
+                                value={field.value || 'independent'} 
+                                className="flex items-center space-x-4"
+                              >
+                                <FormItem className="flex items-center space-x-2 space-y-0">
+                                  <FormControl><RadioGroupItem value="independent" /></FormControl>
+                                  <FormLabel className="font-normal">Independent</FormLabel>
+                                </FormItem>
+                                <FormItem className="flex items-center space-x-2 space-y-0">
+                                  <FormControl><RadioGroupItem value="gt" /></FormControl>
+                                  <FormLabel className="font-normal">GT (Gifted & Talented)</FormLabel>
+                                </FormItem>
+                              </RadioGroup>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
+                  </div>
+
+                  {/* Chess Information */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold border-b pb-2">Chess Information</h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField control={form.control} name="uscfId" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>USCF ID *</FormLabel>
+                          <FormControl><Input {...field} /></FormControl>
+                          <FormDescription>Enter USCF ID number or "NEW" for new players.</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      
+                      <FormField control={form.control} name="regularRating" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Rating</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="text" 
+                              placeholder="e.g., 1500, UNR, or NEW" 
+                              value={field.value?.toString() || ''} 
+                              onChange={(e) => { 
+                                const value = e.target.value; 
+                                if (value === '' || value.toUpperCase() === 'UNR' || value.toUpperCase() === 'NEW') { 
+                                  field.onChange(undefined); 
+                                } else { 
+                                  field.onChange(value); 
+                                } 
+                              }} 
+                            />
+                          </FormControl>
+                          <FormDescription>Enter rating, UNR, or NEW</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField control={form.control} name="uscfExpiration" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>USCF Expiration</FormLabel>
+                          <FormControl>
+                            <DateInput value={field.value} onChange={field.onChange} placeholder="MM/DD/YYYY" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <FormField control={form.control} name="dob" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Date of Birth</FormLabel>
+                          <FormControl>
+                            <DateInput value={field.value} onChange={field.onChange} placeholder="MM/DD/YYYY" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField control={form.control} name="grade" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Grade</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger><SelectValue placeholder="Select grade" /></SelectTrigger>
+                            </FormControl>
+                            <SelectContent position="item-aligned">
+                              {grades.map(grade => <SelectItem key={grade} value={grade}>{grade}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      
+                      <FormField control={form.control} name="section" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Section</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger><SelectValue placeholder="Select section" /></SelectTrigger>
+                            </FormControl>
+                            <SelectContent position="item-aligned">
+                              {sections.map(section => <SelectItem key={section} value={section}>{section}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                    </div>
+                  </div>
+
+                  {/* Contact Information */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold border-b pb-2">Contact Information</h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField control={form.control} name="email" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email *</FormLabel>
+                          <FormControl><Input type="email" {...field} value={field.value || ''} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <FormField control={form.control} name="zipCode" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Zip Code *</FormLabel>
+                          <FormControl><Input {...field} value={field.value || ''} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField control={form.control} name="phone" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Phone</FormLabel>
+                          <FormControl><Input {...field} value={field.value || ''} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <FormField control={form.control} name="state" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>State</FormLabel>
+                          <FormControl><Input {...field} value={field.value || ''} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                    </div>
+                  </div>
+
+                  <Separator className="my-6" />
+
+                  <ChangeHistorySection player={playerToEdit} />
+
+                </form>
+              </Form>
+            </div>
+          </ScrollArea>
+
+          <div className="p-6 pt-4 border-t bg-muted/30 shrink-0">
+            <div className="flex justify-between">
+              {playerToEdit && getUserRole(profile) === 'individual' && (
+                <Button 
+                  type="button" 
+                  variant="destructive" 
+                  onClick={() => {
+                    handleDeletePlayer(playerToEdit);
+                    setIsEditOpen(false);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Remove From My List
+                </Button>
+              )}
+              
+              {!playerToEdit && <div></div>}
+              
+              <div className="flex gap-3">
+                <Button type="button" variant="ghost" onClick={() => setIsEditOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" form="edit-player-form">
+                  {playerToEdit ? 'Save Changes' : 'Create Player'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <EnhancedPlayerSearchDialog
+        isOpen={isSearchOpen}
+        onOpenChange={setIsSearchOpen}
+        onPlayerSelected={handlePlayerSelectedFromSearch}
+        userProfile={profile}
+        preFilterByUserProfile={getUserRole(profile) !== 'organizer'}
+      />
+    </div>
+  );
+}
+
+export default function RosterPage() {
+  const { profile, isProfileLoaded } = useSponsorProfile();
+
+  if (!isProfileLoaded) {
+    return <AppLayout><div>Loading...</div></AppLayout>;
+  }
+
+  return (
+    <AuthGuard>
+      <AppLayout>
+        <RosterPageContent />
+      </AppLayout>
+    </AuthGuard>
+  );
 }

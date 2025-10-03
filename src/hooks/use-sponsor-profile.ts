@@ -9,12 +9,11 @@ import { AuthService } from '@/lib/auth';
 export type SponsorProfile = {
   firstName: string;
   lastName: string;
-  district: string;
-  school: string;
   email: string;
-  phone: string;
-  schoolAddress?: string;
-  schoolPhone?: string;
+  school: string;
+  district: string;
+  zip: string;
+  phone?: string;
   gtCoordinatorEmail?: string;
   bookkeeperEmail?: string;
   avatarType: 'icon' | 'upload';
