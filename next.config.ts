@@ -1,4 +1,3 @@
-
 import 'dotenv/config';
 import type {NextConfig} from 'next';
 
@@ -68,6 +67,9 @@ const nextConfig: NextConfig = {
       config.externals.push({
         'file-saver': 'commonjs file-saver',
         'alasql': 'commonjs alasql',
+        'firebase-admin': 'commonjs firebase-admin',
+        'firebase-admin/firestore': 'commonjs firebase-admin/firestore',
+        'firebase-admin/auth': 'commonjs firebase-admin/auth',
       });
     }
 
@@ -75,7 +77,6 @@ const nextConfig: NextConfig = {
     config.externals.push({
       'exceljs': 'commonjs exceljs',
     });
-
 
     return config
   },
