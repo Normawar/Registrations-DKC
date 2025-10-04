@@ -1,17 +1,1 @@
-import admin from "firebase-admin";
-
-if (!admin.apps.length) {
-  const serviceAccount = JSON.parse(
-    process.env.FIREBASE_SERVICE_ACCOUNT_KEY || "{}"
-  );
-
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-  });
-}
-
-// Centralized exports
-const db = admin.firestore();
-const adminAuth = admin.auth();
-
-export { admin, db, adminAuth };
+export { admin, db, adminAuth } from '@/server/firebase-admin';
