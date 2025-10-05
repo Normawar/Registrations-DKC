@@ -36,9 +36,6 @@ import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { generateTeamCode } from "@/lib/school-utils";
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import type { ChangeRequest } from '@/lib/data/requests-data';
-import { collection, getDocs, query, where, limit } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-
 
 const sponsorMenuItems = [
   { href: "/profile", icon: User, label: "Profile" },
@@ -128,39 +125,40 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const loadData = async () => {
-        if (!db || !profile) return;
-        try {
-            const queries = [];
-            
-            // Only load pending requests
-            queries.push(getDocs(query(
-                collection(db, 'requests'), 
-                where('status', '==', 'Pending'),
-                limit(100)
-            )));
-            
-            // Only load recent invoices for payment status
-            queries.push(getDocs(query(
-                collection(db, 'invoices'),
-                where('paymentStatus', '==', 'pending-po'),
-                limit(50)
-            )));
-
-            const [requestSnapshot, invoiceSnapshot] = await Promise.all(queries);
-            
-            const allRequests = requestSnapshot.docs.map(doc => doc.data() as ChangeRequest);
-            setChangeRequests(allRequests);
-            
-            const allConfirmations = invoiceSnapshot.docs.map(doc => doc.data());
-            setConfirmations(allConfirmations);
-            
-        } catch (error) {
-            console.error("Failed to load sidebar notification data:", error);
-            setChangeRequests([]);
-            setConfirmations([]);
-        }
-      };
-
+      if (!profile) return;
+      try {
+          // Dynamic import to avoid build-time issues
+          const { db } = await import("@/lib/firebase");
+          const { collection, getDocs, query, where, limit } = await import("firebase/firestore");
+          
+          const queries = [];
+          
+          queries.push(getDocs(query(
+              collection(db, 'requests'), 
+              where('status', '==', 'Pending'),
+              limit(100)
+          )));
+          
+          queries.push(getDocs(query(
+              collection(db, 'invoices'),
+              where('paymentStatus', '==', 'pending-po'),
+              limit(50)
+          )));
+  
+          const [requestSnapshot, invoiceSnapshot] = await Promise.all(queries);
+          
+          const allRequests = requestSnapshot.docs.map(doc => doc.data() as ChangeRequest);
+          setChangeRequests(allRequests);
+          
+          const allConfirmations = invoiceSnapshot.docs.map(doc => doc.data());
+          setConfirmations(allConfirmations);
+          
+      } catch (error) {
+          console.error("Failed to load sidebar notification data:", error);
+          setChangeRequests([]);
+          setConfirmations([]);
+      }
+  };
       loadData();
   }, [profile]);
 
