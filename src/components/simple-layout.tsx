@@ -1,4 +1,3 @@
-cat > src/components/simple-layout.tsx << 'EOF'
 "use client";
 
 import Link from "next/link";
