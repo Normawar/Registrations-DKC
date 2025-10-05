@@ -24,26 +24,34 @@ type PlayerRow = {
 };
 
 function RostersPageContent() {
-  const { database: allPlayers = [], dbSchools = [], dbDistricts = [], isDbLoaded } = useMasterDb();
+  const { 
+    database: allPlayers = [], 
+    dbPlayerSchools = [], 
+    dbPlayerDistricts = [], 
+    getSchoolsForDistrictFromPlayers,
+    isDbLoaded 
+  } = useMasterDb();
+  
   const [sortConfig, setSortConfig] = useState<{
     key: keyof PlayerRow | "Name";
     direction: "asc" | "desc";
   } | null>(null);
   const [districtFilter, setDistrictFilter] = useState<string>("all");
   const [schoolFilter, setSchoolFilter] = useState<string>("all");
-  const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>(dbSchools);
-  const [newPlayer, setNewPlayer] = useState<Partial<PlayerRow>>({});
+  const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>(dbPlayerSchools);
 
   // Cascading filter: update schools when district changes
   useEffect(() => {
     if (districtFilter === 'all') {
-      setSchoolsForDistrict(dbSchools);
+      setSchoolsForDistrict(dbPlayerSchools);
     } else {
-      const filteredSchools = [...new Set(allPlayers.filter(p => p.district === districtFilter).map(p => p.school).filter(Boolean))].sort();
+      const filteredSchools = getSchoolsForDistrictFromPlayers 
+        ? getSchoolsForDistrictFromPlayers(districtFilter)
+        : [...new Set(allPlayers.filter(p => p.district === districtFilter).map(p => p.school).filter(Boolean))].sort();
       setSchoolsForDistrict(filteredSchools);
     }
     setSchoolFilter('all');
-  }, [districtFilter, dbSchools, allPlayers]);
+  }, [districtFilter, dbPlayerSchools, allPlayers, getSchoolsForDistrictFromPlayers]);
 
   const notifications = useMemo(() => {
     const incomplete: string[] = [];
@@ -164,7 +172,9 @@ function RostersPageContent() {
             className="border p-2 rounded"
           >
             <option value="all">All Districts</option>
-            {dbDistricts.map(d => <option key={d} value={d}>{d}</option>)}
+            {dbPlayerDistricts.filter(d => d && typeof d === 'string').map(d => (
+              <option key={d} value={d}>{d}</option>
+            ))}
           </select>
         </div>
         <div>
@@ -175,7 +185,9 @@ function RostersPageContent() {
             className="border p-2 rounded"
           >
             <option value="all">All Schools</option>
-            {schoolsForDistrict.map(s => <option key={s} value={s}>{s}</option>)}
+            {schoolsForDistrict.filter(s => s && typeof s === 'string').map(s => (
+              <option key={s} value={s}>{s}</option>
+            ))}
           </select>
         </div>
         <div className="flex items-end">

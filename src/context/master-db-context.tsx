@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useMemo } from 'react';
@@ -53,7 +52,10 @@ interface MasterDbContextType {
   dbSchools: string[];
   allSchoolNames: string[];
   dbDistricts: string[];
+  dbPlayerDistricts: string[];
+  dbPlayerSchools: string[];
   getSchoolsForDistrict: (district: string) => string[];
+  getSchoolsForDistrictFromPlayers: (district: string) => string[];
   searchPlayers: (criteria: Partial<SearchCriteria>) => Promise<SearchResult>;
   refreshDatabase: () => void;
   generatePlayerId: (uscfId: string) => string;
@@ -269,12 +271,13 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
   const [playerCount, setPlayerCount] = useState(0);
 
+  // School-based computed values (for schools management)
   const dbSchools = useMemo(() => {
     return [...new Set(schools.map(s => s.schoolName).filter(Boolean))].sort();
   }, [schools]);
   
   const allSchoolNames = useMemo(() => {
-    const schoolNames = schools.map(s => s.schoolName).filter(Boolean); // Filter out empty strings
+    const schoolNames = schools.map(s => s.schoolName).filter(Boolean);
     const uniqueSchoolNames = [...new Set(schoolNames)].sort();
     if (!uniqueSchoolNames.includes('Homeschool')) {
         return ['Homeschool', ...uniqueSchoolNames];
@@ -302,6 +305,42 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
       .map(s => s.schoolName)
       .sort();
   }, [schools, allSchoolNames]);
+
+  // Player-based computed values (for roster filtering)
+  const dbPlayerDistricts = useMemo(() => {
+    const districts = [...new Set(
+      database
+        .map(p => p.district)
+        .filter(d => d && typeof d === 'string' && d.trim() !== '')
+    )].sort();
+    
+    if (!districts.includes('Homeschool')) {
+      districts.unshift('Homeschool');
+    }
+    return districts;
+  }, [database]);
+
+  const dbPlayerSchools = useMemo(() => {
+    return [...new Set(
+      database
+        .map(p => p.school)
+        .filter(s => s && typeof s === 'string' && s.trim() !== '')
+    )].sort();
+  }, [database]);
+
+  const getSchoolsForDistrictFromPlayers = useCallback((district: string): string[] => {
+    if (district === 'Homeschool') {
+      return ['Homeschool'];
+    }
+    if (district === 'all' || !district) {
+      return dbPlayerSchools;
+    }
+    return [...new Set(
+      database
+        .filter(p => p.district === district && p.school && p.school.trim() !== '')
+        .map(p => p.school)
+    )].sort();
+  }, [database, dbPlayerSchools]);
 
   const loadDatabase = useCallback(async () => {
     if (!db) {
@@ -352,7 +391,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
             ...player,
             dateCreated: now,
             createdBy: creatorName,
-            updatedAt: now, // Also set updatedAt on creation
+            updatedAt: now,
             dateUpdated: now,
             updatedBy: creatorName,
         };
@@ -373,7 +412,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     const oldPlayer = oldPlayerDoc.exists() ? oldPlayerDoc.data() as MasterPlayer : null;
 
     if (!oldPlayer) {
-        return addPlayer(updatedPlayer, editingProfile); // Fallback to add if not found
+        return addPlayer(updatedPlayer, editingProfile);
     }
 
     const changedFields: { field: string; oldValue: any; newValue: any }[] = [];
@@ -412,18 +451,18 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
             updatedBy: updaterName,
         };
     } else {
-        return; // No changes
+        return;
     }
     
     const cleanedPlayer = removeUndefined(finalPlayer);
     await setDoc(doc(db, 'players', finalPlayer.id), cleanedPlayer, { merge: true });
-    await loadDatabase(); // Refresh data
+    await loadDatabase();
   };
 
   const deletePlayer = async (playerId: string) => {
     if (!db) return;
     await deleteDoc(doc(db, 'players', playerId));
-    await loadDatabase(); // Refresh data
+    await loadDatabase();
   };
   
   const addSchool = async (school: Omit<School, 'id' | 'teamCode' | 'notes'>) => {
@@ -543,8 +582,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     csvFile: File,
     onProgress?: (progress: UploadProgress) => void
   ): Promise<{ uploaded: number; errors: string[]; }> => {
-    // ... rest of the implementation
-    return { uploaded: 0, errors: [] }; // Placeholder
+    return { uploaded: 0, errors: [] };
   };
 
   const bulkUpdateFromCSV = async (
@@ -646,11 +684,9 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
       const playerDoc = await getDoc(playerRef);
       
       if (playerDoc.exists()) {
-        // Player exists, update their info
         batch.update(playerRef, uscfPlayer);
         updated++;
       } else {
-        // Player doesn't exist, create a new record
         const newPlayer: MasterPlayer = {
           id: uscfPlayer.uscfId,
           uscfId: uscfPlayer.uscfId,
@@ -659,7 +695,6 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
           regularRating: uscfPlayer.regularRating,
           state: uscfPlayer.state,
           uscfExpiration: uscfPlayer.uscfExpiration,
-          // Fill in required fields with defaults
           grade: '',
           section: '',
           email: '',
@@ -674,7 +709,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     }
     
     await batch.commit();
-    await loadDatabase(); // Refresh local state
+    await loadDatabase();
     
     return { updated, created };
   };
@@ -701,7 +736,10 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     dbSchools,
     allSchoolNames,
     dbDistricts,
+    dbPlayerDistricts,
+    dbPlayerSchools,
     getSchoolsForDistrict,
+    getSchoolsForDistrictFromPlayers,
     searchPlayers,
     refreshDatabase,
     generatePlayerId,
