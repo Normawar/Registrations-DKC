@@ -4,9 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Users, Home, Search, FileText, Calendar } from "lucide-react";
 
-const navItems = [
+const navItems = [{ href: "/players", icon: Search, label: "Search Players" },
   { href: "/dashboard", icon: Home, label: "Dashboard" },
-  { href: "/player-search", icon: Search, label: "Search Players" },
+  
   { href: "/roster", icon: Users, label: "Roster" },
   { href: "/manage-events", icon: Calendar, label: "Manage Events" },
   { href: "/invoices", icon: FileText, label: "Invoices" },
