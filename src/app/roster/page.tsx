@@ -31,6 +31,40 @@ function RostersPageContent() {
     getSchoolsForDistrictFromPlayers,
     isDbLoaded 
   } = useMasterDb();
+
+  // Ultra-defensive filtering - ensure ONLY valid strings make it through
+  const safeDistricts = useMemo(() => {
+    if (!Array.isArray(dbPlayerDistricts)) {
+      console.warn('dbPlayerDistricts is not an array:', typeof dbPlayerDistricts);
+      return ['Homeschool'];
+    }
+    const filtered = dbPlayerDistricts.filter(d => {
+      if (d === null || d === undefined) return false;
+      if (typeof d !== 'string') {
+        console.error('Invalid district type found:', typeof d, d);
+        return false;
+      }
+      if (d.trim() === '') return false;
+      return true;
+    });
+    return filtered.length > 0 ? filtered : ['Homeschool'];
+  }, [dbPlayerDistricts]);
+
+  const safeSchools = useMemo(() => {
+    if (!Array.isArray(dbPlayerSchools)) {
+      console.warn('dbPlayerSchools is not an array:', typeof dbPlayerSchools);
+      return [];
+    }
+    return dbPlayerSchools.filter(s => {
+      if (s === null || s === undefined) return false;
+      if (typeof s !== 'string') {
+        console.error('Invalid school type found:', typeof s, s);
+        return false;
+      }
+      if (s.trim() === '') return false;
+      return true;
+    });
+  }, [dbPlayerSchools]);
   
   const [sortConfig, setSortConfig] = useState<{
     key: keyof PlayerRow | "Name";
@@ -38,20 +72,20 @@ function RostersPageContent() {
   } | null>(null);
   const [districtFilter, setDistrictFilter] = useState<string>("all");
   const [schoolFilter, setSchoolFilter] = useState<string>("all");
-  const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>(dbPlayerSchools);
+  const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>(safeSchools);
 
   // Cascading filter: update schools when district changes
   useEffect(() => {
     if (districtFilter === 'all') {
-      setSchoolsForDistrict(dbPlayerSchools);
+      setSchoolsForDistrict(safeSchools);
     } else {
       const filteredSchools = getSchoolsForDistrictFromPlayers 
         ? getSchoolsForDistrictFromPlayers(districtFilter)
-        : [...new Set(allPlayers.filter(p => p.district === districtFilter).map(p => p.school).filter(Boolean))].sort();
+        : [...new Set(allPlayers.filter(p => p.district === districtFilter).map(p => p.school).filter(s => s && typeof s === 'string'))].sort();
       setSchoolsForDistrict(filteredSchools);
     }
     setSchoolFilter('all');
-  }, [districtFilter, dbPlayerSchools, allPlayers, getSchoolsForDistrictFromPlayers]);
+  }, [districtFilter, safeSchools, allPlayers, getSchoolsForDistrictFromPlayers]);
 
   const notifications = useMemo(() => {
     const incomplete: string[] = [];
@@ -147,6 +181,14 @@ function RostersPageContent() {
     saveAs(new Blob([wbout], { type: "application/octet-stream" }), "Roster.xlsx");
   };
 
+  if (!isDbLoaded) {
+    return (
+      <div className="p-4">
+        <p>Loading roster data...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-4">Player Roster</h1>
@@ -172,7 +214,7 @@ function RostersPageContent() {
             className="border p-2 rounded"
           >
             <option value="all">All Districts</option>
-            {dbPlayerDistricts.filter(d => d && typeof d === 'string').map(d => (
+            {safeDistricts.map(d => (
               <option key={d} value={d}>{d}</option>
             ))}
           </select>
@@ -254,4 +296,5 @@ export default function RostersPage() {
       <RostersPageContent />
     </SimpleLayout>
   );
-}// Force rebuild Sun Oct  5 06:57:14 PM UTC 2025
+}
+// Force rebuild Sat Oct  5 14:00:00 CDT 2025
