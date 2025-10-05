@@ -24,7 +24,7 @@ type PlayerRow = {
 };
 
 function RostersPageContent() {
-  const { players: initialPlayers = [] } = useMasterDb() ?? {};
+  const { database: allPlayers = [], dbSchools = [], dbDistricts = [], isDbLoaded } = useMasterDb();
   const [players, setPlayers] = useState<PlayerRow[]>(initialPlayers);
   const [sortConfig, setSortConfig] = useState<{
     key: keyof PlayerRow | "Name";
@@ -35,15 +35,8 @@ function RostersPageContent() {
   const [newPlayer, setNewPlayer] = useState<Partial<PlayerRow>>({});
 
   // Get unique districts and schools
-  const districts = useMemo(() => {
-    const unique = new Set(players.map(p => p.district).filter(Boolean));
-    return Array.from(unique).sort();
-  }, [players]);
-
-  const schools = useMemo(() => {
-    const unique = new Set(players.map(p => p.school).filter(Boolean));
-    return Array.from(unique).sort();
-  }, [players]);
+  const districts = dbDistricts;
+  const schools = dbSchools;
 
   const notifications = useMemo(() => {
     const incomplete: string[] = [];
