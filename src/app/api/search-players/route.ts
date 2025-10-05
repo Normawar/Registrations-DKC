@@ -37,13 +37,16 @@ export async function POST(request: Request) {
       
       // Name filters with range queries
       if (criteria.lastName?.trim()) {
+        // Capitalize first letter to match typical database format
         const lastName = criteria.lastName.trim();
-        q = q.where('lastName', '>=', lastName);
-        q = q.where('lastName', '<=', lastName + '\uf8ff');
+        const capitalizedLastName = lastName.charAt(0).toUpperCase() + lastName.slice(1).toLowerCase();
+        q = q.where('lastName', '>=', capitalizedLastName);
+        q = q.where('lastName', '<=', capitalizedLastName + '\uf8ff');
       } else if (criteria.firstName?.trim()) {
         const firstName = criteria.firstName.trim();
-        q = q.where('firstName', '>=', firstName);
-        q = q.where('firstName', '<=', firstName + '\uf8ff');
+        const capitalizedFirstName = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
+        q = q.where('firstName', '>=', capitalizedFirstName);
+        q = q.where('firstName', '<=', capitalizedFirstName + '\uf8ff');
       }
       
       // State filter
