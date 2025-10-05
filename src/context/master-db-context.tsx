@@ -273,11 +273,11 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
 
   // School-based computed values (for schools management)
   const dbSchools = useMemo(() => {
-    return [...new Set(schools.map(s => s.schoolName).filter(Boolean))].sort();
+    return [...new Set(schools.map(s => s.schoolName).filter(name => name && typeof name === 'string' && name.trim() !== ''))].sort();
   }, [schools]);
   
   const allSchoolNames = useMemo(() => {
-    const schoolNames = schools.map(s => s.schoolName).filter(Boolean);
+    const schoolNames = schools.map(s => s.schoolName).filter(name => name && typeof name === 'string' && name.trim() !== '');
     const uniqueSchoolNames = [...new Set(schoolNames)].sort();
     if (!uniqueSchoolNames.includes('Homeschool')) {
         return ['Homeschool', ...uniqueSchoolNames];
@@ -286,7 +286,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   }, [schools]);
 
   const dbDistricts = useMemo(() => {
-    const districts = [...new Set(schools.map(s => s.district).filter(Boolean))].sort();
+    const districts = [...new Set(schools.map(s => s.district).filter(d => d && typeof d === 'string' && d.trim() !== ''))].sort();
     if (!districts.includes('Homeschool')) {
       districts.unshift('Homeschool');
     }
