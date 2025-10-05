@@ -1,12 +1,11 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { AppLayout } from "@/components/app-layout";
 import { useMasterDb } from "@/context/master-db-context";
 import { format, parseISO, isValid } from "date-fns";
 import { Button } from "@/components/ui/button";
 import * as XLSX from "xlsx";
-import { saveAs } from "file-saver";
+import { saveAs } from "file-saver/dist/FileSaver";
 
 type PlayerRow = {
   id: string;
@@ -21,7 +20,7 @@ type PlayerRow = {
   uscfExpiration?: string;
 };
 
-function RostersPageContent() {
+export default function RostersPage() {
   const { players: initialPlayers = [] } = useMasterDb() ?? {};
   const [players, setPlayers] = useState<PlayerRow[]>(initialPlayers);
   const [sortConfig, setSortConfig] = useState<{
@@ -31,6 +30,7 @@ function RostersPageContent() {
 
   const [newPlayer, setNewPlayer] = useState<Partial<PlayerRow>>({});
 
+  // Notifications for incomplete fields or duplicate emails
   const notifications = useMemo(() => {
     const incomplete: string[] = [];
     const emailMap: Record<string, string[]> = {};
@@ -56,6 +56,7 @@ function RostersPageContent() {
     return { incomplete, duplicateEmails };
   }, [players]);
 
+  // Sorting logic
   const sortedPlayers = useMemo(() => {
     const sortable = [...(players ?? [])];
     if (sortConfig) {
@@ -87,6 +88,7 @@ function RostersPageContent() {
     });
   };
 
+  // Export to Excel
   const exportToExcel = () => {
     const data = (sortedPlayers ?? []).map((p) => {
       const dobFormatted = p?.dob && isValid(parseISO(p.dob)) ? format(parseISO(p.dob), "MM/dd/yyyy") : "";
@@ -139,15 +141,55 @@ function RostersPageContent() {
 
       <div className="flex justify-between items-center gap-2 mb-4">
         <Button onClick={exportToExcel}>Export Roster</Button>
-        <div className="flex gap-2 flex-wrap">
-          <input placeholder="First Name" value={newPlayer.firstName || ""} onChange={(e) => setNewPlayer({ ...newPlayer, firstName: e.target.value })} className="border p-1" />
-          <input placeholder="Middle Name" value={newPlayer.middleName || ""} onChange={(e) => setNewPlayer({ ...newPlayer, middleName: e.target.value })} className="border p-1" />
-          <input placeholder="Last Name" value={newPlayer.lastName || ""} onChange={(e) => setNewPlayer({ ...newPlayer, lastName: e.target.value })} className="border p-1" />
-          <input placeholder="Email" value={newPlayer.email || ""} onChange={(e) => setNewPlayer({ ...newPlayer, email: e.target.value })} className="border p-1" />
-          <input placeholder="USCF ID" value={newPlayer.uscfId || ""} onChange={(e) => setNewPlayer({ ...newPlayer, uscfId: e.target.value })} className="border p-1" />
-          <input placeholder="Grade" value={newPlayer.grade || ""} onChange={(e) => setNewPlayer({ ...newPlayer, grade: e.target.value })} className="border p-1" />
-          <input placeholder="DOB (YYYY-MM-DD)" value={newPlayer.dob || ""} onChange={(e) => setNewPlayer({ ...newPlayer, dob: e.target.value })} className="border p-1" />
-          <input placeholder="Zip" value={newPlayer.zip || ""} onChange={(e) => setNewPlayer({ ...newPlayer, zip: e.target.value })} className="border p-1" />
+        <div className="flex gap-2">
+          <input
+            placeholder="First Name"
+            value={newPlayer.firstName || ""}
+            onChange={(e) => setNewPlayer({ ...newPlayer, firstName: e.target.value })}
+            className="border p-1"
+          />
+          <input
+            placeholder="Middle Name"
+            value={newPlayer.middleName || ""}
+            onChange={(e) => setNewPlayer({ ...newPlayer, middleName: e.target.value })}
+            className="border p-1"
+          />
+          <input
+            placeholder="Last Name"
+            value={newPlayer.lastName || ""}
+            onChange={(e) => setNewPlayer({ ...newPlayer, lastName: e.target.value })}
+            className="border p-1"
+          />
+          <input
+            placeholder="Email"
+            value={newPlayer.email || ""}
+            onChange={(e) => setNewPlayer({ ...newPlayer, email: e.target.value })}
+            className="border p-1"
+          />
+          <input
+            placeholder="USCF ID"
+            value={newPlayer.uscfId || ""}
+            onChange={(e) => setNewPlayer({ ...newPlayer, uscfId: e.target.value })}
+            className="border p-1"
+          />
+          <input
+            placeholder="Grade"
+            value={newPlayer.grade || ""}
+            onChange={(e) => setNewPlayer({ ...newPlayer, grade: e.target.value })}
+            className="border p-1"
+          />
+          <input
+            placeholder="DOB (YYYY-MM-DD)"
+            value={newPlayer.dob || ""}
+            onChange={(e) => setNewPlayer({ ...newPlayer, dob: e.target.value })}
+            className="border p-1"
+          />
+          <input
+            placeholder="Zip"
+            value={newPlayer.zip || ""}
+            onChange={(e) => setNewPlayer({ ...newPlayer, zip: e.target.value })}
+            className="border p-1"
+          />
           <Button onClick={addNewPlayer}>Create New Player</Button>
         </div>
       </div>
@@ -156,7 +198,13 @@ function RostersPageContent() {
         <thead className="bg-gray-100">
           <tr>
             {["Name", "Player USCF ID", "Grade", "DOB", "Email", "Zip", "USCF Exp"].map((col) => (
-              <th key={col} className="p-2 border-b cursor-pointer" onClick={() => requestSort(col as keyof PlayerRow | "Name")}>{col}</th>
+              <th
+                key={col}
+                className="p-2 border-b cursor-pointer"
+                onClick={() => requestSort(col as keyof PlayerRow | "Name")}
+              >
+                {col}
+              </th>
             ))}
           </tr>
         </thead>
@@ -164,7 +212,11 @@ function RostersPageContent() {
           {(sortedPlayers ?? []).map((p) => {
             const dob = p?.dob && isValid(parseISO(p.dob)) ? format(parseISO(p.dob), "MM/dd/yyyy") : "";
             const expired = p?.uscfExpiration && new Date(p.uscfExpiration).getTime() < Date.now();
-            const uscfExp = p?.uscfExpiration && isValid(parseISO(p.uscfExpiration)) ? format(parseISO(p.uscfExpiration), "MM/dd/yyyy") : expired ? "Expired" : "";
+            const uscfExp = p?.uscfExpiration && isValid(parseISO(p.uscfExpiration))
+              ? format(parseISO(p.uscfExpiration), "MM/dd/yyyy")
+              : expired
+              ? "Expired"
+              : "";
 
             return (
               <tr key={p?.id ?? Math.random().toString()} className="border-b hover:bg-gray-50">
@@ -174,7 +226,9 @@ function RostersPageContent() {
                 <td className="p-2">{dob}</td>
                 <td className="p-2">{p?.email ?? ""}</td>
                 <td className="p-2">{p?.zip ?? ""}</td>
-                <td className={`p-2 ${expired ? "text-red-600 font-bold" : ""}`}>{expired ? "Expired" : uscfExp}</td>
+                <td className={`p-2 ${expired ? "text-red-600 font-bold" : ""}`}>
+                  {expired ? "Expired" : uscfExp}
+                </td>
               </tr>
             );
           })}
@@ -183,11 +237,4 @@ function RostersPageContent() {
     </div>
   );
 }
-
-export default function RostersPage() {
-  return (
-    <AppLayout>
-      <RostersPageContent />
-    </AppLayout>
-  );
-}
+// rebuild Sat Oct  4 12:52:44 AM UTC 2025
