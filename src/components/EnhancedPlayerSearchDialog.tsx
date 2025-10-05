@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -52,13 +51,28 @@ export function EnhancedPlayerSearchDialog({
           fetch('/api/districts'),
           fetch('/api/schools')
         ]);
+        
         const districts = await districtsRes.json();
         const schools = await schoolsRes.json();
-        setDbDistricts(districts);
-        setDbSchools(schools);
+        
+        // CRITICAL: Defensive filtering - ensure we have arrays of strings
+        const safeDistricts = Array.isArray(districts) 
+          ? districts.filter(d => d && typeof d === 'string' && d.trim() !== '') 
+          : [];
+          
+        const safeSchools = Array.isArray(schools) 
+          ? schools.filter(s => s && typeof s === 'string' && s.trim() !== '') 
+          : [];
+        
+        setDbDistricts(safeDistricts);
+        setDbSchools(safeSchools);
         setIsDbLoaded(true);
       } catch (error) {
         console.error("Failed to load initial search data:", error);
+        // Set empty arrays on error to prevent crashes
+        setDbDistricts([]);
+        setDbSchools([]);
+        setIsDbLoaded(true);
       }
     }
     fetchData();
@@ -72,7 +86,13 @@ export function EnhancedPlayerSearchDialog({
     try {
       const res = await fetch(`/api/schools?district=${encodeURIComponent(district)}`);
       const schools = await res.json();
-      setAvailableSchools(schools);
+      
+      // Defensive filtering for schools response
+      const safeSchools = Array.isArray(schools) 
+        ? schools.filter(s => s && typeof s === 'string' && s.trim() !== '')
+        : [];
+        
+      setAvailableSchools(safeSchools);
     } catch (error) {
       console.error(`Failed to fetch schools for district ${district}:`, error);
       setAvailableSchools([]);
@@ -80,11 +100,17 @@ export function EnhancedPlayerSearchDialog({
   }, [dbSchools]);
 
   const availableDistricts = React.useMemo(() => {
+    // Additional defensive check
+    if (!Array.isArray(dbDistricts)) {
+      console.error('dbDistricts is not an array:', typeof dbDistricts);
+      return [];
+    }
+    
     if (!preFilterByUserProfile || !userProfile || userProfile.role === 'organizer' || userProfile.isDistrictCoordinator) {
       return dbDistricts;
     }
     if (userProfile.district && userProfile.district !== 'All Districts') {
-      return dbDistricts.filter(district => district === userProfile.district);
+      return dbDistricts.filter(district => typeof district === 'string' && district === userProfile.district);
     }
     return dbDistricts;
   }, [dbDistricts, userProfile, preFilterByUserProfile]);
@@ -188,7 +214,7 @@ export function EnhancedPlayerSearchDialog({
               <select value={searchCriteria.district || 'all'} onChange={(e) => updateField('district', e.target.value)} className="w-full border rounded px-3 py-2" disabled={!isDbLoaded}>
                 <option value="all">{!isDbLoaded ? 'Loading districts...' : 'All Available Districts'}</option>
                 <option value="Unassigned">Unassigned Players</option>
-                {availableDistricts.filter(d => d && d !== 'all').map((district) => (<option key={district} value={district}>{district}</option>))}
+                {availableDistricts.filter(d => d && d !== 'all' && typeof d === 'string').map((district) => (<option key={district} value={district}>{district}</option>))}
               </select>
               {!isDbLoaded && (<small className="text-gray-500">Loading...</small>)}
                {preFilterByUserProfile && userProfile && (
@@ -200,7 +226,7 @@ export function EnhancedPlayerSearchDialog({
               <select value={searchCriteria.school || 'all'} onChange={(e) => updateField('school', e.target.value)} className="w-full border rounded px-3 py-2" disabled={!isDbLoaded}>
                 <option value="all">{!isDbLoaded ? 'Loading schools...' : 'All Available Schools'}</option>
                  <option value="Unassigned">Unassigned Players</option>
-                {availableSchools.filter(s => s && s !== 'all').map((school) => (<option key={school} value={school}>{school}</option>))}
+                {availableSchools.filter(s => s && s !== 'all' && typeof s === 'string').map((school) => (<option key={school} value={school}>{school}</option>))}
               </select>
               {!isDbLoaded && (<small className="text-gray-500">Loading...</small>)}
             </div>
