@@ -59,6 +59,12 @@ export default function ImportFromSquarePage() {
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
+      setResults({
+        created: 0,
+        updated: 0,
+        failed: 1,
+        errors: [errorMessage]
+      });
       toast({ variant: 'destructive', title: 'Import Failed', description: errorMessage });
     } finally {
       setIsProcessing(false);
