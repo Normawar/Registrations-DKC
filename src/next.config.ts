@@ -55,7 +55,6 @@ const nextConfig: NextConfig = {
       
       // These modules are server-side only
       config.externals.push({
-        'file-saver': 'commonjs file-saver',
         'alasql': 'commonjs alasql',
       });
     }

@@ -25,7 +25,7 @@ type PlayerRow = {
 
 function RostersPageContent() {
   const { database: allPlayers = [], dbSchools = [], dbDistricts = [], isDbLoaded } = useMasterDb();
-  const [players, setPlayers] = useState<PlayerRow[]>(initialPlayers);
+  const [players, setPlayers] = useState<PlayerRow[]>(allPlayers);
   const [sortConfig, setSortConfig] = useState<{
     key: keyof PlayerRow | "Name";
     direction: "asc" | "desc";
