@@ -42,7 +42,12 @@ export default function ImportFromSquarePage() {
       }
 
       const result = await response.json();
-      setResults(result);
+        setResults({
+          created: result.summary?.created || 0,
+          updated: result.summary?.updated || 0,
+          failed: result.summary?.failed || 0,
+          errors: result.details?.errors || []
+        });
 
       if (result.failed > 0) {
         toast({
