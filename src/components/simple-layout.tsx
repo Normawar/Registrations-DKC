@@ -39,4 +39,3 @@ export function SimpleLayout({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
-EOF
