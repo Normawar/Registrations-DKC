@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import { AppLayout } from "@/components/app-layout";
 import { useMasterDb } from "@/context/master-db-context";
 import { format, parseISO, isValid } from "date-fns";
 import { Button } from "@/components/ui/button";
 import * as XLSX from "xlsx";
-import { saveAs } from "file-saver/dist/FileSaver";
+import { saveAs } from "file-saver";
 
 type PlayerRow = {
   id: string;
@@ -20,7 +21,7 @@ type PlayerRow = {
   uscfExpiration?: string;
 };
 
-export default function RostersPage() {
+function RostersPageContent() {
   const { players: initialPlayers = [] } = useMasterDb() ?? {};
   const [players, setPlayers] = useState<PlayerRow[]>(initialPlayers);
   const [sortConfig, setSortConfig] = useState<{
@@ -30,7 +31,6 @@ export default function RostersPage() {
 
   const [newPlayer, setNewPlayer] = useState<Partial<PlayerRow>>({});
 
-  // Notifications for incomplete fields or duplicate emails
   const notifications = useMemo(() => {
     const incomplete: string[] = [];
     const emailMap: Record<string, string[]> = {};
@@ -56,7 +56,6 @@ export default function RostersPage() {
     return { incomplete, duplicateEmails };
   }, [players]);
 
-  // Sorting logic
   const sortedPlayers = useMemo(() => {
     const sortable = [...(players ?? [])];
     if (sortConfig) {
@@ -88,7 +87,6 @@ export default function RostersPage() {
     });
   };
 
-  // Export to Excel
   const exportToExcel = () => {
     const data = (sortedPlayers ?? []).map((p) => {
       const dobFormatted = p?.dob && isValid(parseISO(p.dob)) ? format(parseISO(p.dob), "MM/dd/yyyy") : "";
@@ -237,4 +235,12 @@ export default function RostersPage() {
     </div>
   );
 }
-// rebuild Sat Oct  4 12:52:44 AM UTC 2025
+
+export default function RostersPage() {
+  return (
+    <AppLayout>
+      <RostersPageContent />
+    </AppLayout>
+  );
+}
+// rebuild Sat Oct  4 10:15:34 PM CDT 2025
