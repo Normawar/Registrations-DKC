@@ -19,6 +19,8 @@ type PlayerRow = {
   email?: string;
   zip?: string;
   uscfExpiration?: string;
+  district?: string;
+  school?: string;
 };
 
 function RostersPageContent() {
@@ -28,8 +30,20 @@ function RostersPageContent() {
     key: keyof PlayerRow | "Name";
     direction: "asc" | "desc";
   } | null>(null);
-
+  const [districtFilter, setDistrictFilter] = useState<string>("all");
+  const [schoolFilter, setSchoolFilter] = useState<string>("all");
   const [newPlayer, setNewPlayer] = useState<Partial<PlayerRow>>({});
+
+  // Get unique districts and schools
+  const districts = useMemo(() => {
+    const unique = new Set(players.map(p => p.district).filter(Boolean));
+    return Array.from(unique).sort();
+  }, [players]);
+
+  const schools = useMemo(() => {
+    const unique = new Set(players.map(p => p.school).filter(Boolean));
+    return Array.from(unique).sort();
+  }, [players]);
 
   const notifications = useMemo(() => {
     const incomplete: string[] = [];
@@ -57,7 +71,17 @@ function RostersPageContent() {
   }, [players]);
 
   const sortedPlayers = useMemo(() => {
-    const sortable = [...(players ?? [])];
+    let sortable = [...(players ?? [])];
+    
+    // Apply filters
+    if (districtFilter && districtFilter !== "all") {
+      sortable = sortable.filter(p => p.district === districtFilter);
+    }
+    if (schoolFilter && schoolFilter !== "all") {
+      sortable = sortable.filter(p => p.school === schoolFilter);
+    }
+    
+    // Apply sorting
     if (sortConfig) {
       sortable.sort((a, b) => {
         if (sortConfig.key === "Name") {
@@ -76,7 +100,7 @@ function RostersPageContent() {
       });
     }
     return sortable;
-  }, [players, sortConfig]);
+  }, [players, sortConfig, districtFilter, schoolFilter]);
 
   const requestSort = (key: keyof PlayerRow | "Name") => {
     setSortConfig((prev) => {
@@ -102,6 +126,8 @@ function RostersPageContent() {
         DOB: dobFormatted,
         Email: p?.email ?? "",
         Zip: p?.zip ?? "",
+        District: p?.district ?? "",
+        School: p?.school ?? "",
         "USCF Exp": expired ? "Expired" : uscfExpFormatted,
       };
     });
@@ -126,6 +152,8 @@ function RostersPageContent() {
 
   return (
     <div className="p-4">
+      <h1 className="text-2xl font-bold mb-4">Player Roster</h1>
+      
       {(notifications.incomplete.length > 0 || notifications.duplicateEmails.length > 0) && (
         <div className="bg-yellow-100 p-4 mb-4 border-l-4 border-yellow-500">
           {notifications.incomplete.length > 0 && (
@@ -137,8 +165,50 @@ function RostersPageContent() {
         </div>
       )}
 
+      {/* Filters */}
+      <div className="flex gap-4 mb-4 flex-wrap">
+        <div>
+          <label className="block text-sm font-medium mb-1">District</label>
+          <select 
+            value={districtFilter} 
+            onChange={(e) => setDistrictFilter(e.target.value)}
+            className="border p-2 rounded"
+          >
+            <option value="all">All Districts</option>
+            {districts.map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">School</label>
+          <select 
+            value={schoolFilter} 
+            onChange={(e) => setSchoolFilter(e.target.value)}
+            className="border p-2 rounded"
+          >
+            <option value="all">All Schools</option>
+            {schools.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+        <div className="flex items-end">
+          <Button 
+            variant="outline"
+            onClick={() => {
+              setDistrictFilter("all");
+              setSchoolFilter("all");
+            }}
+          >
+            Clear Filters
+          </Button>
+        </div>
+      </div>
+
       <div className="flex justify-between items-center gap-2 mb-4 flex-wrap">
-        <Button onClick={exportToExcel}>Export Roster</Button>
+        <div className="flex gap-2 items-center">
+          <Button onClick={exportToExcel}>Export Roster</Button>
+          <span className="text-sm text-gray-600">
+            Showing {sortedPlayers.length} of {players.length} players
+          </span>
+        </div>
         <div className="flex gap-2 flex-wrap">
           <input placeholder="First Name" value={newPlayer.firstName || ""} onChange={(e) => setNewPlayer({ ...newPlayer, firstName: e.target.value })} className="border p-1" />
           <input placeholder="Middle Name" value={newPlayer.middleName || ""} onChange={(e) => setNewPlayer({ ...newPlayer, middleName: e.target.value })} className="border p-1" />
@@ -152,34 +222,38 @@ function RostersPageContent() {
         </div>
       </div>
 
-      <table className="min-w-full border border-gray-300">
-        <thead className="bg-gray-100">
-          <tr>
-            {["Name", "Player USCF ID", "Grade", "DOB", "Email", "Zip", "USCF Exp"].map((col) => (
-              <th key={col} className="p-2 border-b cursor-pointer" onClick={() => requestSort(col as keyof PlayerRow | "Name")}>{col}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {(sortedPlayers ?? []).map((p) => {
-            const dob = p?.dob && isValid(parseISO(p.dob)) ? format(parseISO(p.dob), "MM/dd/yyyy") : "";
-            const expired = p?.uscfExpiration && new Date(p.uscfExpiration).getTime() < Date.now();
-            const uscfExp = p?.uscfExpiration && isValid(parseISO(p.uscfExpiration)) ? format(parseISO(p.uscfExpiration), "MM/dd/yyyy") : expired ? "Expired" : "";
+      <div className="overflow-x-auto">
+        <table className="min-w-full border border-gray-300">
+          <thead className="bg-gray-100">
+            <tr>
+              {["Name", "Player USCF ID", "Grade", "DOB", "Email", "Zip", "District", "School", "USCF Exp"].map((col) => (
+                <th key={col} className="p-2 border-b cursor-pointer hover:bg-gray-200" onClick={() => requestSort(col as keyof PlayerRow | "Name")}>{col}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {(sortedPlayers ?? []).map((p) => {
+              const dob = p?.dob && isValid(parseISO(p.dob)) ? format(parseISO(p.dob), "MM/dd/yyyy") : "";
+              const expired = p?.uscfExpiration && new Date(p.uscfExpiration).getTime() < Date.now();
+              const uscfExp = p?.uscfExpiration && isValid(parseISO(p.uscfExpiration)) ? format(parseISO(p.uscfExpiration), "MM/dd/yyyy") : expired ? "Expired" : "";
 
-            return (
-              <tr key={p?.id ?? Math.random().toString()} className="border-b hover:bg-gray-50">
-                <td className="p-2">{`${p?.lastName || ""}, ${p?.firstName || ""} ${p?.middleName || ""}`.trim()}</td>
-                <td className="p-2">{p?.uscfId ?? ""}</td>
-                <td className="p-2">{p?.grade === "K" ? "K" : p?.grade ?? ""}</td>
-                <td className="p-2">{dob}</td>
-                <td className="p-2">{p?.email ?? ""}</td>
-                <td className="p-2">{p?.zip ?? ""}</td>
-                <td className={`p-2 ${expired ? "text-red-600 font-bold" : ""}`}>{expired ? "Expired" : uscfExp}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+              return (
+                <tr key={p?.id ?? Math.random().toString()} className="border-b hover:bg-gray-50">
+                  <td className="p-2">{`${p?.lastName || ""}, ${p?.firstName || ""} ${p?.middleName || ""}`.trim()}</td>
+                  <td className="p-2">{p?.uscfId ?? ""}</td>
+                  <td className="p-2">{p?.grade === "K" ? "K" : p?.grade ?? ""}</td>
+                  <td className="p-2">{dob}</td>
+                  <td className="p-2">{p?.email ?? ""}</td>
+                  <td className="p-2">{p?.zip ?? ""}</td>
+                  <td className="p-2">{p?.district ?? ""}</td>
+                  <td className="p-2">{p?.school ?? ""}</td>
+                  <td className={`p-2 ${expired ? "text-red-600 font-bold" : ""}`}>{expired ? "Expired" : uscfExp}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
