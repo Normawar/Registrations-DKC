@@ -1,9 +1,11 @@
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase-admin';
 
 export async function POST(request: Request) {
   try {
-    const db = db;
+    const { db } = await import('@/lib/firebase-admin');
     const criteria = await request.json();
     console.log('Searching players with criteria:', criteria);
     
