@@ -5,7 +5,7 @@ import { useMasterDb } from "@/context/master-db-context";
 import { format, parseISO, isValid } from "date-fns";
 import { Button } from "@/components/ui/button";
 import * as XLSX from "xlsx";
-import { saveAs } from "file-saver";
+import { saveAs } from "file-saver/dist/FileSaver";
 
 type PlayerRow = {
   id: string;
