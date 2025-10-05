@@ -1,11 +1,11 @@
-// src/app/api/schools/route.ts
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 import { NextResponse } from "next/server";
-import { db } from "@/lib/firebase-admin";
 
 export async function GET() {
   console.log("SCHOOLS API - DEPLOYED FRESH v4");
-
-  // DEBUG INFO
+  
   const debugInfo = {
     hasFirebaseSecret: !!process.env.FIREBASE_SERVICE_ACCOUNT_KEY,
     secretLength: process.env.FIREBASE_SERVICE_ACCOUNT_KEY?.length || 0,
@@ -15,20 +15,17 @@ export async function GET() {
       key.includes('FIREBASE') || key.includes('GOOGLE')
     ),
   };
-
   console.log("DEBUG INFO:", JSON.stringify(debugInfo, null, 2));
 
   try {
-    const db = db;
+    const { db } = await import("@/lib/firebase-admin");
     const schoolsRef = db.collection("schools");
     const snapshot = await schoolsRef.get();
-
     const schools = new Set<string>();
     snapshot.forEach((doc) => {
       const data = doc.data();
-      if (data.school?.trim()) schools.add(data.school.trim());
+      if (data.schoolName?.trim()) schools.add(data.schoolName.trim());
     });
-
     const sortedSchools = [...schools].sort();
     return NextResponse.json(sortedSchools);
   } catch (error: any) {

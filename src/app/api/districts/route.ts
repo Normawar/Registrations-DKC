@@ -1,21 +1,19 @@
-// src/app/api/districts/route.ts
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 import { NextResponse } from "next/server";
-import { db } from "@/lib/firebase-admin";
 
 export async function GET() {
   console.log("DISTRICTS API - DEPLOYED FRESH v3");
-
   try {
-    const db = db;
+    const { db } = await import("@/lib/firebase-admin");
     const schoolsRef = db.collection("schools");
     const snapshot = await schoolsRef.get();
-
     const districts = new Set<string>();
     snapshot.forEach((doc) => {
       const data = doc.data();
       if (data.district?.trim()) districts.add(data.district.trim());
     });
-
     const sortedDistricts = [...districts].sort();
     return NextResponse.json(sortedDistricts);
   } catch (error: any) {
