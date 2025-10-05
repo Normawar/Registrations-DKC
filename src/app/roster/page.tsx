@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { SimpleLayout } from "@/components/simple-layout";
 import { useMasterDb } from "@/context/master-db-context";
 import { format, parseISO, isValid } from "date-fns";
@@ -25,24 +25,31 @@ type PlayerRow = {
 
 function RostersPageContent() {
   const { database: allPlayers = [], dbSchools = [], dbDistricts = [], isDbLoaded } = useMasterDb();
-  const [players, setPlayers] = useState<PlayerRow[]>(allPlayers);
   const [sortConfig, setSortConfig] = useState<{
     key: keyof PlayerRow | "Name";
     direction: "asc" | "desc";
   } | null>(null);
   const [districtFilter, setDistrictFilter] = useState<string>("all");
   const [schoolFilter, setSchoolFilter] = useState<string>("all");
+  const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>(dbSchools);
   const [newPlayer, setNewPlayer] = useState<Partial<PlayerRow>>({});
 
-  // Get unique districts and schools
-  const districts = dbDistricts;
-  const schools = dbSchools;
+  // Cascading filter: update schools when district changes
+  useEffect(() => {
+    if (districtFilter === 'all') {
+      setSchoolsForDistrict(dbSchools);
+    } else {
+      const filteredSchools = [...new Set(allPlayers.filter(p => p.district === districtFilter).map(p => p.school).filter(Boolean))].sort();
+      setSchoolsForDistrict(filteredSchools);
+    }
+    setSchoolFilter('all');
+  }, [districtFilter, dbSchools, allPlayers]);
 
   const notifications = useMemo(() => {
     const incomplete: string[] = [];
     const emailMap: Record<string, string[]> = {};
 
-    (players ?? []).forEach((p) => {
+    (allPlayers ?? []).forEach((p) => {
       const fullName = `${p?.lastName || ""}, ${p?.firstName || ""} ${p?.middleName || ""}`.trim();
 
       if (!p?.firstName || !p?.lastName || !p?.email) {
@@ -61,10 +68,10 @@ function RostersPageContent() {
       .map(([email, names]) => `${email} (${names.join(", ")})`);
 
     return { incomplete, duplicateEmails };
-  }, [players]);
+  }, [allPlayers]);
 
   const sortedPlayers = useMemo(() => {
-    let sortable = [...(players ?? [])];
+    let sortable = [...(allPlayers ?? [])];
     
     // Apply filters
     if (districtFilter && districtFilter !== "all") {
@@ -93,7 +100,7 @@ function RostersPageContent() {
       });
     }
     return sortable;
-  }, [players, sortConfig, districtFilter, schoolFilter]);
+  }, [allPlayers, sortConfig, districtFilter, schoolFilter]);
 
   const requestSort = (key: keyof PlayerRow | "Name") => {
     setSortConfig((prev) => {
@@ -132,17 +139,6 @@ function RostersPageContent() {
     saveAs(new Blob([wbout], { type: "application/octet-stream" }), "Roster.xlsx");
   };
 
-  const addNewPlayer = () => {
-    if (!newPlayer.firstName || !newPlayer.lastName || !newPlayer.email) {
-      alert("First Name, Last Name, and Email are required.");
-      return;
-    }
-
-    const id = `NEW_${Date.now()}_${newPlayer.firstName[0]}${newPlayer.lastName[0]}`;
-    setPlayers([...players, { ...newPlayer, id }]);
-    setNewPlayer({});
-  };
-
   return (
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-4">Player Roster</h1>
@@ -168,7 +164,7 @@ function RostersPageContent() {
             className="border p-2 rounded"
           >
             <option value="all">All Districts</option>
-            {districts.map(d => <option key={d} value={d}>{d}</option>)}
+            {dbDistricts.map(d => <option key={d} value={d}>{d}</option>)}
           </select>
         </div>
         <div>
@@ -179,7 +175,7 @@ function RostersPageContent() {
             className="border p-2 rounded"
           >
             <option value="all">All Schools</option>
-            {schools.map(s => <option key={s} value={s}>{s}</option>)}
+            {schoolsForDistrict.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
         <div className="flex items-end">
@@ -199,19 +195,8 @@ function RostersPageContent() {
         <div className="flex gap-2 items-center">
           <Button onClick={exportToExcel}>Export Roster</Button>
           <span className="text-sm text-gray-600">
-            Showing {sortedPlayers.length} of {players.length} players
+            Showing {sortedPlayers.length} of {allPlayers.length} players
           </span>
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          <input placeholder="First Name" value={newPlayer.firstName || ""} onChange={(e) => setNewPlayer({ ...newPlayer, firstName: e.target.value })} className="border p-1" />
-          <input placeholder="Middle Name" value={newPlayer.middleName || ""} onChange={(e) => setNewPlayer({ ...newPlayer, middleName: e.target.value })} className="border p-1" />
-          <input placeholder="Last Name" value={newPlayer.lastName || ""} onChange={(e) => setNewPlayer({ ...newPlayer, lastName: e.target.value })} className="border p-1" />
-          <input placeholder="Email" value={newPlayer.email || ""} onChange={(e) => setNewPlayer({ ...newPlayer, email: e.target.value })} className="border p-1" />
-          <input placeholder="USCF ID" value={newPlayer.uscfId || ""} onChange={(e) => setNewPlayer({ ...newPlayer, uscfId: e.target.value })} className="border p-1" />
-          <input placeholder="Grade" value={newPlayer.grade || ""} onChange={(e) => setNewPlayer({ ...newPlayer, grade: e.target.value })} className="border p-1" />
-          <input placeholder="DOB (YYYY-MM-DD)" value={newPlayer.dob || ""} onChange={(e) => setNewPlayer({ ...newPlayer, dob: e.target.value })} className="border p-1" />
-          <input placeholder="Zip" value={newPlayer.zip || ""} onChange={(e) => setNewPlayer({ ...newPlayer, zip: e.target.value })} className="border p-1" />
-          <Button onClick={addNewPlayer}>Create New Player</Button>
         </div>
       </div>
 

@@ -148,7 +148,7 @@ export default function ImportFromSquarePage() {
                   <div className="p-2 border rounded-md"><p className="text-2xl font-bold">{results.updated}</p><p className="text-sm text-muted-foreground">Updated</p></div>
                   <div className="p-2 border rounded-md"><p className="text-2xl font-bold text-destructive">{results.failed}</p><p className="text-sm text-muted-foreground">Failed</p></div>
               </div>
-              {results.errors.length > 0 && (
+              {results?.errors?.length > 0 && (
                 <div>
                   <h4 className="font-semibold text-destructive">Error Details:</h4>
                   <pre className="mt-2 text-xs bg-muted p-4 rounded-md max-h-48 overflow-y-auto">
