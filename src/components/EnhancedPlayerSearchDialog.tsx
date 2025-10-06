@@ -5,6 +5,11 @@ import { useMasterDb, type SearchCriteria, type SearchResult, type MasterPlayer 
 import type { SponsorProfile } from '@/hooks/use-sponsor-profile';
 import { ExternalLink } from 'lucide-react';
 
+// Helper: safely lowercase strings
+function safeToLower(value?: string): string {
+  return typeof value === 'string' ? value.toLowerCase() : '';
+}
+
 export function EnhancedPlayerSearchDialog({ 
   isOpen, 
   onOpenChange, 
@@ -28,16 +33,12 @@ export function EnhancedPlayerSearchDialog({
   const [dbSchools, setDbSchools] = useState<string[]>([]);
   const [isDbLoaded, setIsDbLoaded] = useState(false);
 
-  // DATABASE SEARCH STATE
   const [searchCriteria, setSearchCriteria] = useState<Partial<SearchCriteria>>({});
   const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [availableSchools, setAvailableSchools] = useState<string[]>([]);
 
-  // Helper: safe split
-  const safeSplit = (str: unknown, sep: string) => typeof str === 'string' ? str.split(sep) : [];
-
-  // Fetch districts and all schools on mount
+  // Fetch districts and schools
   useEffect(() => {
     async function fetchData() {
       try {
@@ -45,99 +46,83 @@ export function EnhancedPlayerSearchDialog({
           fetch('/api/districts'),
           fetch('/api/schools')
         ]);
-        
+
         const districts = await districtsRes.json();
         const schools = await schoolsRes.json();
-        
-        const safeDistricts = Array.isArray(districts)
-          ? districts.filter(d => typeof d === 'string' && d.trim() !== '')
-          : [];
-          
-        const safeSchools = Array.isArray(schools)
-          ? schools.filter(s => typeof s === 'string' && s.trim() !== '')
-          : [];
-        
-        setDbDistricts(safeDistricts);
-        setDbSchools(safeSchools);
-        setIsDbLoaded(true);
+
+        setDbDistricts(Array.isArray(districts) ? districts.filter(d => typeof d === 'string' && d.trim() !== '') : []);
+        setDbSchools(Array.isArray(schools) ? schools.filter(s => typeof s === 'string' && s.trim() !== '') : []);
       } catch (error) {
-        console.error("Failed to load initial search data:", error);
+        console.error("Failed to load districts or schools:", error);
         setDbDistricts([]);
         setDbSchools([]);
+      } finally {
         setIsDbLoaded(true);
       }
     }
     fetchData();
   }, []);
 
-  // Fetch schools for a given district
   const getSchoolsForDistrict = useCallback(async (district: string) => {
-    if (district === 'all' || !district) {
+    if (!district || district === 'all') {
       setAvailableSchools(dbSchools);
       return;
     }
     try {
       const res = await fetch(`/api/schools?district=${encodeURIComponent(district)}`);
       const schools = await res.json();
-      const safeSchools = Array.isArray(schools)
-        ? schools.filter(s => typeof s === 'string' && s.trim() !== '')
-        : [];
-      setAvailableSchools(safeSchools);
+      setAvailableSchools(Array.isArray(schools) ? schools.filter(s => typeof s === 'string' && s.trim() !== '') : []);
     } catch (error) {
       console.error(`Failed to fetch schools for district ${district}:`, error);
       setAvailableSchools([]);
     }
   }, [dbSchools]);
 
-  // Memoized available districts, safe .toLowerCase()
+  // Available districts
   const availableDistricts = React.useMemo(() => {
     if (!Array.isArray(dbDistricts)) return [];
-
     if (!preFilterByUserProfile || !userProfile || userProfile.role === 'organizer' || userProfile.isDistrictCoordinator) {
-      return dbDistricts.filter(d => typeof d === 'string' && d.trim() !== '');
+      return dbDistricts;
     }
-
     if (userProfile.district && userProfile.district !== 'All Districts') {
-      return dbDistricts.filter(
-        d => typeof d === 'string' && d.trim() !== '' &&
-        d.toLowerCase() === userProfile.district.toLowerCase()
-      );
+      return dbDistricts.filter(d => typeof d === 'string' && d === userProfile.district);
     }
-
-    return dbDistricts.filter(d => typeof d === 'string' && d.trim() !== '');
+    return dbDistricts;
   }, [dbDistricts, userProfile, preFilterByUserProfile]);
 
-  // Update available schools when district changes
+  // Filter available schools safely
+  const availableSchoolsSafe = React.useMemo(() => {
+    if (!Array.isArray(availableSchools)) return [];
+    return availableSchools.filter(s => typeof s === 'string' && s.trim() !== '');
+  }, [availableSchools]);
+
+  // Update schools when district changes
   useEffect(() => {
-    if (isDbLoaded) getSchoolsForDistrict(searchCriteria.district || 'all');
+    if (isDbLoaded) {
+      getSchoolsForDistrict(searchCriteria.district || 'all');
+    }
   }, [searchCriteria.district, isDbLoaded, getSchoolsForDistrict]);
 
-  // Initialize search criteria based on user profile
+  // Initialize search criteria from user profile
   useEffect(() => {
     if (!preFilterByUserProfile || !userProfile || !isOpen) return;
-
     const initialCriteria: Partial<SearchCriteria> = {};
 
     if (userProfile.role !== 'organizer' && userProfile.district && userProfile.district !== 'All Districts') {
       initialCriteria.district = userProfile.district;
     }
-
-    if (!userProfile.isDistrictCoordinator && userProfile.role === 'sponsor' && 
-        userProfile.school && userProfile.school !== 'All Schools') {
+    if (!userProfile.isDistrictCoordinator && userProfile.role === 'sponsor' && userProfile.school && userProfile.school !== 'All Schools') {
       initialCriteria.school = userProfile.school;
     }
 
     setSearchCriteria(initialCriteria);
   }, [userProfile, preFilterByUserProfile, isOpen]);
 
-  // API-based search function
+  // Search
   const handleSearch = async () => {
     setIsSearching(true);
     try {
-      const result = await searchPlayers({
-        ...searchCriteria,
-        pageSize: 100
-      });
+      const result = await searchPlayers({ ...searchCriteria, pageSize: 100 });
       setSearchResult(result);
     } catch (error: any) {
       console.error('Search failed:', error);
@@ -178,43 +163,44 @@ export function EnhancedPlayerSearchDialog({
           </a>
         </div>
 
-        {/* Search Criteria Form */}
+        {/* Search Form */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
           <h3 className="text-sm font-medium text-blue-800 mb-2">Database Search</h3>
           <p className="text-sm text-blue-700">Fill in your search criteria and click "Search Database" to find players.</p>
         </div>
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           <div>
             <label className="block text-sm font-medium mb-1">USCF ID</label>
-            <input type="text" value={searchCriteria.uscfId || ''} onChange={e => updateField('uscfId', e.target.value)} placeholder="32052572" className="w-full border rounded px-3 py-2" />
+            <input type="text" value={searchCriteria.uscfId || ''} onChange={(e) => updateField('uscfId', e.target.value)} placeholder="32052572" className="w-full border rounded px-3 py-2" />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">First Name</label>
-            <input type="text" value={searchCriteria.firstName || ''} onChange={e => updateField('firstName', e.target.value)} placeholder="John" className="w-full border rounded px-3 py-2" />
+            <input type="text" value={searchCriteria.firstName || ''} onChange={(e) => updateField('firstName', e.target.value)} placeholder="John" className="w-full border rounded px-3 py-2" />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Last Name</label>
-            <input type="text" value={searchCriteria.lastName || ''} onChange={e => updateField('lastName', e.target.value)} placeholder="Smith" className="w-full border rounded px-3 py-2" />
+            <input type="text" value={searchCriteria.lastName || ''} onChange={(e) => updateField('lastName', e.target.value)} placeholder="Smith" className="w-full border rounded px-3 py-2" />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">District</label>
-            <select value={searchCriteria.district || 'all'} onChange={e => updateField('district', e.target.value)} className="w-full border rounded px-3 py-2" disabled={!isDbLoaded}>
+            <select value={searchCriteria.district || 'all'} onChange={(e) => updateField('district', e.target.value)} className="w-full border rounded px-3 py-2" disabled={!isDbLoaded}>
               <option value="all">{!isDbLoaded ? 'Loading districts...' : 'All Available Districts'}</option>
               <option value="Unassigned">Unassigned Players</option>
-              {availableDistricts.map(district => <option key={district} value={district}>{district}</option>)}
+              {availableDistricts.map(d => (<option key={safeToLower(d)} value={d}>{d}</option>))}
             </select>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">School</label>
-            <select value={searchCriteria.school || 'all'} onChange={e => updateField('school', e.target.value)} className="w-full border rounded px-3 py-2" disabled={!isDbLoaded}>
+            <select value={searchCriteria.school || 'all'} onChange={(e) => updateField('school', e.target.value)} className="w-full border rounded px-3 py-2" disabled={!isDbLoaded}>
               <option value="all">{!isDbLoaded ? 'Loading schools...' : 'All Available Schools'}</option>
               <option value="Unassigned">Unassigned Players</option>
-              {availableSchools.filter(s => typeof s === 'string' && s.trim() !== '').map(school => <option key={school} value={school}>{school}</option>)}
+              {availableSchoolsSafe.map(s => (<option key={safeToLower(s)} value={s}>{s}</option>))}
             </select>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">State</label>
-            <select value={searchCriteria.state || ''} onChange={e => updateField('state', e.target.value)} className="w-full border rounded px-3 py-2">
+            <select value={searchCriteria.state || ''} onChange={(e) => updateField('state', e.target.value)} className="w-full border rounded px-3 py-2">
               <option value="">All States</option>
               <option value="TX">Texas</option>
               <option value="CA">California</option>
@@ -223,26 +209,35 @@ export function EnhancedPlayerSearchDialog({
             </select>
           </div>
         </div>
+
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
             <label className="block text-sm font-medium mb-1">Min Rating</label>
-            <input type="number" value={searchCriteria.minRating || ''} onChange={e => updateField('minRating', e.target.value ? parseInt(e.target.value) : undefined)} placeholder="1000" className="w-full border rounded px-3 py-2" />
+            <input type="number" value={searchCriteria.minRating || ''} onChange={(e) => updateField('minRating', e.target.value ? parseInt(e.target.value) : undefined)} placeholder="1000" className="w-full border rounded px-3 py-2" />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Max Rating</label>
-            <input type="number" value={searchCriteria.maxRating || ''} onChange={e => updateField('maxRating', e.target.value ? parseInt(e.target.value) : undefined)} placeholder="2000" className="w-full border rounded px-3 py-2" />
+            <input type="number" value={searchCriteria.maxRating || ''} onChange={(e) => updateField('maxRating', e.target.value ? parseInt(e.target.value) : undefined)} placeholder="2000" className="w-full border rounded px-3 py-2" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Expiration Date</label>
+            <input type="date" value={searchCriteria.expirationDate || ''} onChange={(e) => updateField('expirationDate', e.target.value)} className="w-full border rounded px-3 py-2" />
           </div>
         </div>
+
         <div className="flex space-x-4 mb-6">
           <button onClick={handleSearch} disabled={isSearching} className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 disabled:opacity-50">{isSearching ? 'Searching...' : 'Search Database'}</button>
           <button onClick={clearSearch} className="bg-gray-600 text-white px-6 py-2 rounded hover:bg-gray-700">Clear All</button>
         </div>
 
-        {/* Search Results Table */}
         {searchResult && (
           <div className="border-t pt-4">
             <h3 className="text-lg font-semibold mb-2">Search Results ({searchResult.players?.length || 0} found)</h3>
-            {searchResult.message && <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4"><p className="text-sm text-yellow-800">{searchResult.message}</p></div>}
+            {searchResult.message && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                <p className="text-sm text-yellow-800">{searchResult.message}</p>
+              </div>
+            )}
             {searchResult.players?.length === 0 ? (
               <p className="text-gray-500">No players found in database.</p>
             ) : (
@@ -266,12 +261,8 @@ export function EnhancedPlayerSearchDialog({
                         <td className="border border-gray-300 px-4 py-2">{player.uscfId}</td>
                         <td className="border border-gray-300 px-4 py-2">{player.state}</td>
                         <td className="border border-gray-300 px-4 py-2">{player.school}</td>
-                        <td className="border border-gray-300 px-4 py-2">
-                          <input type="number" value={player.regularRating || ''} placeholder="Rating" onChange={e => player.regularRating = parseInt(e.target.value) || null} className="border rounded px-2 py-1 w-20" />
-                        </td>
-                        <td className="border border-gray-300 px-4 py-2">
-                          <input type="date" value={player.expirationDate || ''} onChange={e => player.expirationDate = e.target.value} className="border rounded px-2 py-1 w-full" />
-                        </td>
+                        <td className="border border-gray-300 px-4 py-2">{player.regularRating}</td>
+                        <td className="border border-gray-300 px-4 py-2">{player.expirationDate || 'N/A'}</td>
                         <td className="border border-gray-300 px-4 py-2">
                           <button onClick={() => handleSelectPlayer(player)} className="bg-green-500 text-white px-2 py-1 rounded text-xs">Select</button>
                         </td>
