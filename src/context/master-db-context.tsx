@@ -150,7 +150,7 @@ const parseCSVData = (data: any[]): MasterPlayer[] => {
         firstName: firstName,
         lastName: lastName,
         events: Number(eventsStr || 0),
-        eventIds: eventIdsStr ? eventIdsStr.split(',').filter(Boolean) : [],
+        eventIds: eventIdsStr ? String(eventIdsStr).split(',').filter(Boolean) : [],
       };
 
       // Only add optional fields if they have values
