@@ -250,7 +250,7 @@ function ManageEventsContent() {
     return eventDay < today ? "Completed" : "Open";
   };
   
-  const handleConsolidateGt = async (event: Event) => {
+ // const handleConsolidateGt = async (event: Event) => {
     if (!profile || getUserRole(profile) !== 'organizer') return;
     
     setIsConsolidating(event.id);
@@ -277,16 +277,16 @@ function ManageEventsContent() {
     } finally {
       setIsConsolidating(null);
     }
-  };
+ // };
   
-  const checkConsolidationForEvent = useCallback(async (eventId: string) => {
-    try {
-      const status = await canConsolidateGtInvoices(eventId);
-      setConsolidationStatus(prev => ({ ...prev, [eventId]: status }));
-    } catch (error) {
-      console.warn(`Could not check consolidation status for event ${eventId}:`, error);
-    }
-  }, []);
+ //const checkConsolidationForEvent = useCallback(async (eventId: string) => {
+ //   try {
+ //     const status = await canConsolidateGtInvoices(eventId);
+ //     setConsolidationStatus(prev => ({ ...prev, [eventId]: status }));
+ //   } catch (error) {
+ //     console.warn(`Could not check consolidation status for event ${eventId}:`, error);
+ //  }
+ // }, []);
 
 // TEMPORARILY DISABLED - GT consolidation feature causing 500 errors
 // This feature is optional and can be re-enabled after debugging
