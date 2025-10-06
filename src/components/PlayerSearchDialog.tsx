@@ -1,251 +1,240 @@
-
 'use client';
 
-import React, { useState } from 'react';
-import { useMasterDb, type SearchCriteria, type SearchResult, type MasterPlayer } from '@/context/master-db-context';
+import React, { useState, useMemo } from 'react';
+import { useMasterDb } from '@/context/master-db-context';
+import { format, parseISO, isValid } from 'date-fns';
+import { Button } from '@/components/ui/button';
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
 
-export function PlayerSearchDialog({ isOpen, onOpenChange, onSelectPlayer, excludeIds, portalType }: {
-    isOpen: boolean;
-    onOpenChange: (isOpen: boolean) => void;
-    onSelectPlayer: (player: MasterPlayer) => void;
-    excludeIds?: string[];
-    portalType: 'sponsor' | 'organizer' | 'individual';
-}) {
-  const { searchPlayers, isDbLoaded, dbDistricts, dbSchools } = useMasterDb();
-  const [searchCriteria, setSearchCriteria] = useState<Partial<SearchCriteria>>({});
-  const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
-  const [isSearching, setIsSearching] = useState(false);
-  
-  const handleSearch = async () => {
-    setIsSearching(true);
-    try {
-      console.log('Starting search with criteria:', searchCriteria);
-      const result = await searchPlayers({
-        ...searchCriteria,
-        pageSize: 100 // Load 100 results at a time
+type PlayerRow = {
+  id: string;
+  firstName?: string;
+  middleName?: string;
+  lastName?: string;
+  uscfId?: string;
+  grade?: string | number;
+  dob?: string;
+  email?: string;
+  zip?: string;
+  uscfExpiration?: string;
+  registrationInvoice?: string;
+  uscfInvoice?: string;
+  pdReg?: string;
+  pdUscf?: string;
+};
+
+export default function RostersPage() {
+  const { players: initialPlayers = [] } = useMasterDb() ?? {};
+
+  // -------------------------
+  // Safe data transformation
+  // -------------------------
+  const safePlayers = useMemo(() => {
+    return (initialPlayers ?? []).map((p) => {
+      const safeDate = (val: any): string => {
+        if (!val) return '';
+        if (typeof val === 'string' && val.trim()) return val;
+        try {
+          const d = new Date(val);
+          return isNaN(d.getTime()) ? '' : d.toISOString();
+        } catch {
+          return '';
+        }
+      };
+
+      return {
+        ...p,
+        firstName: String(p.firstName || ''),
+        middleName: String(p.middleName || ''),
+        lastName: String(p.lastName || ''),
+        uscfId: String(p.uscfId || ''),
+        grade: p.grade !== undefined ? String(p.grade) : '',
+        dob: safeDate(p.dob),
+        email: p.email ? String(p.email) : '',
+        zip: p.zip ? String(p.zip) : '',
+        uscfExpiration: safeDate(p.uscfExpiration),
+        registrationInvoice: p.registrationInvoice ? String(p.registrationInvoice) : '',
+        uscfInvoice: p.uscfInvoice ? String(p.uscfInvoice) : '',
+        pdReg: p.pdReg ? String(p.pdReg) : '',
+        pdUscf: p.pdUscf ? String(p.pdUscf) : '',
+      };
+    });
+  }, [initialPlayers]);
+
+  const [players, setPlayers] = useState<PlayerRow[]>(safePlayers);
+  const [sortConfig, setSortConfig] = useState<{ key: keyof PlayerRow | 'Name'; direction: 'asc' | 'desc' } | null>(null);
+  const [newPlayer, setNewPlayer] = useState<Partial<PlayerRow>>({});
+
+  // -------------------------
+  // Notifications
+  // -------------------------
+  const notifications = useMemo(() => {
+    const incomplete: string[] = [];
+    const emailMap: Record<string, string[]> = {};
+
+    players.forEach((p) => {
+      const fullName = `${p.lastName}, ${p.firstName} ${p.middleName}`.trim();
+      if (!p.firstName || !p.lastName || !p.email) incomplete.push(fullName);
+      if (p.email) {
+        const email = p.email.toLowerCase();
+        emailMap[email] = emailMap[email] || [];
+        emailMap[email].push(fullName);
+      }
+    });
+
+    const duplicateEmails = Object.entries(emailMap)
+      .filter(([, names]) => names.length > 1)
+      .map(([email, names]) => `${email} (${names.join(', ')})`);
+
+    return { incomplete, duplicateEmails };
+  }, [players]);
+
+  // -------------------------
+  // Sorting
+  // -------------------------
+  const sortedPlayers = useMemo(() => {
+    const sortable = [...players];
+    if (sortConfig) {
+      sortable.sort((a, b) => {
+        let aVal: any, bVal: any;
+        if (sortConfig.key === 'Name') {
+          aVal = `${a.lastName}, ${a.firstName} ${a.middleName}`.toLowerCase();
+          bVal = `${b.lastName}, ${b.firstName} ${b.middleName}`.toLowerCase();
+        } else {
+          aVal = (a as any)[sortConfig.key] ?? '';
+          bVal = (b as any)[sortConfig.key] ?? '';
+        }
+        if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
       });
-      console.log('Search completed:', result);
-      setSearchResult(result);
-    } catch (error) {
-      console.error('Search failed:', error);
-      alert('Search failed. Please try again.');
-    } finally {
-      setIsSearching(false);
     }
+    return sortable;
+  }, [players, sortConfig]);
+
+  const requestSort = (key: keyof PlayerRow | 'Name') => {
+    setSortConfig((prev) => (prev?.key === key ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' } : { key, direction: 'asc' }));
   };
 
-  const handleLoadMore = async () => {
-    if (!searchResult?.hasMore || !searchResult?.lastDoc) return;
-    
-    setIsSearching(true);
-    try {
-      const moreResults = await searchPlayers({
-        ...searchCriteria,
-        lastDoc: searchResult.lastDoc,
-        pageSize: 100
-      });
-      
-      setSearchResult({
-        players: [...searchResult.players, ...moreResults.players],
-        hasMore: moreResults.hasMore,
-        lastDoc: moreResults.lastDoc,
-        totalFound: searchResult.totalFound + moreResults.totalFound
-      });
-    } catch (error) {
-      console.error('Load more failed:', error);
-    } finally {
-      setIsSearching(false);
+  // -------------------------
+  // Export to Excel
+  // -------------------------
+  const exportToExcel = () => {
+    const data = sortedPlayers.map((p) => {
+      const dobFormatted = p.dob && isValid(parseISO(p.dob)) ? format(parseISO(p.dob), 'MM/dd/yyyy') : '';
+      const expFormatted = p.uscfExpiration && isValid(parseISO(p.uscfExpiration)) ? format(parseISO(p.uscfExpiration), 'MM/dd/yyyy') : '';
+      const expired = p.uscfExpiration && new Date(p.uscfExpiration).getTime() < Date.now();
+
+      return {
+        Name: `${p.lastName}, ${p.firstName} ${p.middleName}`.trim(),
+        'Player USCF ID': p.uscfId ?? '',
+        Grade: p.grade ?? '',
+        DOB: dobFormatted,
+        Email: p.email ?? '',
+        Zip: p.zip ?? '',
+        'USCF Exp': expired ? 'Expired' : expFormatted,
+        'Registration Invoice': p.registrationInvoice ?? '',
+        'USCF Invoice': p.uscfInvoice ?? '',
+        'PD REG': p.pdReg ?? '',
+        'PD USCF': p.pdUscf ?? '',
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Roster');
+    const wbout = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
+    saveAs(new Blob([wbout], { type: 'application/octet-stream' }), 'Roster.xlsx');
+  };
+
+  // -------------------------
+  // Add new player
+  // -------------------------
+  const addNewPlayer = () => {
+    if (!newPlayer.firstName || !newPlayer.lastName || !newPlayer.email) {
+      alert('First Name, Last Name, and Email are required.');
+      return;
     }
+
+    const id = `NEW_${Date.now()}_${newPlayer.firstName[0]}${newPlayer.lastName[0]}`;
+    setPlayers([...players, { ...newPlayer, id }]);
+    setNewPlayer({});
   };
 
-  const handleClearSearch = () => {
-    setSearchCriteria({});
-    setSearchResult(null);
-  };
-  
-  const handleSelect = (player: MasterPlayer) => {
-    onSelectPlayer(player);
-    onOpenChange(false);
-  }
-
-  if (!isOpen) return null;
-
+  // -------------------------
+  // Render
+  // -------------------------
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-        
-        {/* Search Form */}
-        <div className="mb-6">
-          <h2 className="text-xl font-bold mb-4">Search Master Player Database</h2>
-          <p className="text-sm text-gray-600 mb-4">
-            Use specific filters for faster results. Avoid broad searches with large datasets.
-          </p>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            {/* USCF ID - Most efficient search */}
-            <div>
-              <label className="block text-sm font-medium mb-1">USCF ID (Exact)</label>
-              <input
-                type="text"
-                value={searchCriteria.uscfId || ''}
-                onChange={(e) => setSearchCriteria(prev => ({ ...prev, uscfId: e.target.value }))}
-                placeholder="12345678"
-                className="w-full border rounded px-3 py-2"
-              />
-            </div>
-            
-            {/* First Name */}
-            <div>
-              <label className="block text-sm font-medium mb-1">First Name</label>
-              <input
-                type="text"
-                value={searchCriteria.firstName || ''}
-                onChange={(e) => setSearchCriteria(prev => ({ ...prev, firstName: e.target.value }))}
-                placeholder="John"
-                className="w-full border rounded px-3 py-2"
-              />
-            </div>
-            
-            {/* Last Name */}
-            <div>
-              <label className="block text-sm font-medium mb-1">Last Name</label>
-              <input
-                type="text"
-                value={searchCriteria.lastName || ''}
-                onChange={(e) => setSearchCriteria(prev => ({ ...prev, lastName: e.target.value }))}
-                placeholder="Doe"
-                className="w-full border rounded px-3 py-2"
-              />
-            </div>
-            
-            {/* District */}
-             <div>
-                <label className="block text-sm font-medium mb-1">District</label>
-                <select
-                  value={searchCriteria.district || 'all'}
-                  onChange={(e) => setSearchCriteria(prev => ({...prev, district: e.target.value, school: 'all'}))}
-                  className="w-full border rounded px-3 py-2"
-                  disabled={!isDbLoaded}
-                >
-                  <option value="all">
-                    {!isDbLoaded ? 'Loading...' : 'All Districts'}
-                  </option>
-                  {dbDistricts.map((district) => (
-                    <option key={district} value={district}>
-                      {district}
-                    </option>
-                  ))}
-                </select>
-            </div>
-            
-            {/* School */}
-            <div>
-                <label className="block text-sm font-medium mb-1">School</label>
-                <select
-                  value={searchCriteria.school || 'all'}
-                  onChange={(e) => setSearchCriteria(prev => ({ ...prev, school: e.target.value }))}
-                  className="w-full border rounded px-3 py-2"
-                  disabled={!isDbLoaded}
-                >
-                  <option value="all">
-                    {!isDbLoaded ? 'Loading...' : 'All Schools'}
-                  </option>
-                  {dbSchools.map((school) => (
-                    <option key={school} value={school}>
-                      {school}
-                    </option>
-                  ))}
-                </select>
-            </div>
-          </div>
-          
-          {/* Action Buttons */}
-          <div className="flex space-x-4">
-            <button
-              onClick={handleSearch}
-              disabled={isSearching}
-              className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
-            >
-              {isSearching ? 'Searching...' : 'Search Players'}
-            </button>
-            
-            <button
-              onClick={handleClearSearch}
-              className="bg-gray-600 text-white px-6 py-2 rounded hover:bg-gray-700"
-            >
-              Clear
-            </button>
-            
-            <button
-              onClick={() => onOpenChange(false)}
-              className="bg-red-600 text-white px-6 py-2 rounded hover:bg-red-700"
-            >
-              Close
-            </button>
-          </div>
+    <div className="p-4">
+      {(notifications.incomplete.length > 0 || notifications.duplicateEmails.length > 0) && (
+        <div className="bg-yellow-100 p-4 mb-4 border-l-4 border-yellow-500">
+          {notifications.incomplete.length > 0 && (
+            <p>Players with incomplete required fields: {notifications.incomplete.join(', ')}</p>
+          )}
+          {notifications.duplicateEmails.length > 0 && (
+            <p>Duplicate emails detected: {notifications.duplicateEmails.join('; ')}</p>
+          )}
         </div>
-        
-        {/* Search Results */}
-        {searchResult && (
-          <div>
-            <div className="border-t pt-4">
-              <h3 className="text-lg font-semibold mb-2">
-                Search Results ({searchResult.players.length} shown)
-              </h3>
-              
-              {searchResult.players.length === 0 ? (
-                <p className="text-gray-500">No players found matching your criteria.</p>
-              ) : (
-                <>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full border-collapse border border-gray-300">
-                      <thead>
-                        <tr className="bg-gray-50">
-                          <th className="border border-gray-300 px-4 py-2 text-left">Name</th>
-                          <th className="border border-gray-300 px-4 py-2 text-left">USCF ID</th>
-                          <th className="border border-gray-300 px-4 py-2 text-left">State</th>
-                          <th className="border border-gray-300 px-4 py-2 text-left">School</th>
-                          <th className="border border-gray-300 px-4 py-2 text-left">Rating</th>
-                          <th className="border border-gray-300 px-4 py-2 text-left">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {searchResult.players.map((player) => (
-                          <tr key={player.id} className="hover:bg-gray-50">
-                            <td className="border border-gray-300 px-4 py-2">
-                              {player.firstName} {player.lastName}
-                            </td>
-                            <td className="border border-gray-300 px-4 py-2">{player.uscfId}</td>
-                            <td className="border border-gray-300 px-4 py-2">{player.state}</td>
-                            <td className="border border-gray-300 px-4 py-2">{player.school}</td>
-                            <td className="border border-gray-300 px-4 py-2">{player.regularRating}</td>
-                            <td className="border border-gray-300 px-4 py-2">
-                                <button onClick={() => handleSelect(player)} className="bg-green-500 text-white px-2 py-1 rounded text-xs">Select</button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  
-                  {/* Load More Button */}
-                  {searchResult.hasMore && (
-                    <div className="mt-4 text-center">
-                      <button
-                        onClick={handleLoadMore}
-                        disabled={isSearching}
-                        className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 disabled:opacity-50"
-                      >
-                        {isSearching ? 'Loading...' : 'Load More Results'}
-                      </button>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-        )}
+      )}
+
+      <div className="flex justify-between items-center gap-2 mb-4 flex-wrap">
+        <Button onClick={exportToExcel}>Export Roster</Button>
+        <div className="flex gap-2 flex-wrap">
+          {['firstName', 'middleName', 'lastName', 'email', 'uscfId', 'grade', 'dob', 'zip'].map((field) => (
+            <input
+              key={field}
+              placeholder={field.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+              value={(newPlayer as any)[field] || ''}
+              onChange={(e) => setNewPlayer({ ...newPlayer, [field]: e.target.value })}
+              className="border p-1"
+            />
+          ))}
+          <Button onClick={addNewPlayer}>Create New Player</Button>
+        </div>
       </div>
+
+      <table className="min-w-full border border-gray-300">
+        <thead className="bg-gray-100">
+          <tr>
+            {['Name', 'Player USCF ID', 'Grade', 'DOB', 'Email', 'Zip', 'USCF Exp', 'Registration Invoice', 'USCF Invoice', 'PD REG', 'PD USCF'].map((col) => (
+              <th key={col} className="p-2 border-b cursor-pointer" onClick={() => requestSort(col as keyof PlayerRow | 'Name')}>
+                {col}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {sortedPlayers.map((p) => {
+            const dob = p.dob && isValid(parseISO(p.dob)) ? format(parseISO(p.dob), 'MM/dd/yyyy') : '';
+            const expired = p.uscfExpiration && new Date(p.uscfExpiration).getTime() < Date.now();
+            const uscfExp = p.uscfExpiration && isValid(parseISO(p.uscfExpiration))
+              ? format(parseISO(p.uscfExpiration), 'MM/dd/yyyy')
+              : expired
+              ? 'Expired'
+              : '';
+
+            return (
+              <tr key={p.id} className="border-b hover:bg-gray-50">
+                <td className="p-2">{`${p.lastName}, ${p.firstName} ${p.middleName}`.trim()}</td>
+                <td className="p-2">{p.uscfId ?? ''}</td>
+                <td className="p-2">{p.grade ?? ''}</td>
+                <td className="p-2">{dob}</td>
+                <td className="p-2">{p.email ?? ''}</td>
+                <td className="p-2">{p.zip ?? ''}</td>
+                <td className={`p-2 ${expired ? 'text-red-600 font-bold' : ''}`}>{expired ? 'Expired' : uscfExp}</td>
+                <td className="p-2">{p.registrationInvoice ?? ''}</td>
+                <td className="p-2">{p.uscfInvoice ?? ''}</td>
+                <td className="p-2">{p.pdReg ?? ''}</td>
+                <td className="p-2">{p.pdUscf ?? ''}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
-};
+}
+
+export default PlayerSearchDialog;
+
