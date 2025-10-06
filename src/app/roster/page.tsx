@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
-import { SimpleLayout } from "@/components/simple-layout";
+import { AppLayout } from "@/components/simple-layout";
 import { useMasterDb } from "@/context/master-db-context";
 import { format, parseISO, isValid } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -272,8 +272,8 @@ useEffect(() => {
 
 export default function RostersPage() {
   return (
-    <SimpleLayout>
+    <AppLayout>
       <RostersPageContent />
-    </SimpleLayout>
+    </AppLayout>
   );
 }
