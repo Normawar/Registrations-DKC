@@ -111,7 +111,7 @@ function RostersPageContent() {
     const incomplete: string[] = [];
     const emailMap: Record<string, string[]> = {};
 
-    (safeAllPlayers  ?? []).forEach((p) => {
+    (selectedPlayers ?? []).forEach((p) => {
       const fullName = `${p?.lastName || ""}, ${p?.firstName || ""} ${p?.middleName || ""}`.trim();
 
       if (!p?.firstName || !p?.lastName || !p?.email) {
