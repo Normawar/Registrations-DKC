@@ -213,7 +213,7 @@ function RostersPageContent() {
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-4">Player Roster</h1>
       
-      {(selectedPlayers.length > 0 && (notifications.incomplete.length > 0 || notifications.duplicateEmails.length > 0) && (
+      {selectedPlayers.length > 0 && (notifications.incomplete.length > 0 || notifications.duplicateEmails.length > 0) && (
         <div className="bg-yellow-100 p-4 mb-4 border-l-4 border-yellow-500">
           {notifications.incomplete.length > 0 && (
             <p>Players with incomplete required fields: {notifications.incomplete.join(", ")}</p>
