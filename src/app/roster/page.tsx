@@ -44,6 +44,9 @@ function RostersPageContent() {
       email: player.email ? String(player.email) : '',
       grade: player.grade ? String(player.grade) : '',
       zip: player.zip ? String(player.zip) : '',
+      // Fix date fields - convert to ISO string if not already
+      dob: player.dob ? (typeof player.dob === 'string' ? player.dob : new Date(player.dob).toISOString()) : '',
+      uscfExpiration: player.uscfExpiration ? (typeof player.uscfExpiration === 'string' ? player.uscfExpiration : new Date(player.uscfExpiration).toISOString()) : '',
     }));
   }, [allPlayers]);
 
