@@ -1,234 +1,291 @@
-"use client";
+'use client';
 
-import React, { useState, useMemo, useEffect } from "react";
-import { AppLayout } from "@/components/app-layout";
-import { useMasterDb } from "@/context/master-db-context";
-import { format, parseISO, isValid } from "date-fns";
-import { Button } from "@/components/ui/button";
-import * as XLSX from "xlsx";
-import { saveAs } from "file-saver/dist/FileSaver";
-import { useToast } from "@/hooks/use-toast";
-import EnhancedPlayerSearchDialog from "@/components/EnhancedPlayerSearchDialog";
+import React, { useState, useEffect, useCallback } from 'react';
+import { useMasterDb, type SearchCriteria, type SearchResult, type MasterPlayer } from '@/context/master-db-context';
+import type { SponsorProfile } from '@/hooks/use-sponsor-profile';
+import { EnhancedPlayerSearchDialog } from '@/components/EnhancedPlayerSearchDialog';
 
-// --- Helper: safe split ---
-const splitSafe = (value: any, separator = ","): string[] => {
-  if (!value) return [];
-  if (typeof value === "string") return value.split(separator).map(v => v.trim()).filter(Boolean);
-  if (Array.isArray(value)) return value.filter(Boolean);
-  return [String(value)];
-};
+export default function RosterPage({ userProfile }: { userProfile?: SponsorProfile | null }) {
+  const { searchPlayers } = useMasterDb();
 
-// --- Types ---
-type PlayerRow = {
-  id: string;
-  firstName: string;
-  middleName?: string;
-  lastName: string;
-  uscfId: string;
-  grade: string | number;
-  dob: string;
-  email: string;
-  zip: string;
-  uscfExpiration?: string;
-  district?: string;
-  school?: string;
-};
+  const [dbDistricts, setDbDistricts] = useState<string[]>([]);
+  const [dbSchools, setDbSchools] = useState<string[]>([]);
+  const [isDbLoaded, setIsDbLoaded] = useState(false);
 
-// --- Roster Page Content ---
-function RostersPageContent() {
-  const { database, updatePlayer, dbPlayerDistricts, dbPlayerSchools, isDbLoaded, toast } = useMasterDb();
-  const [sortConfig, setSortConfig] = useState<{ key: keyof PlayerRow | "Name"; direction: "asc" | "desc" } | null>(null);
-  const [districtFilter, setDistrictFilter] = useState<string>("all");
-  const [schoolFilter, setSchoolFilter] = useState<string>("all");
-  const [selectedPlayer, setSelectedPlayer] = useState<PlayerRow | null>(null);
-  const [searchText, setSearchText] = useState("");
+  const [searchCriteria, setSearchCriteria] = useState<Partial<SearchCriteria>>({});
+  const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [availableSchools, setAvailableSchools] = useState<string[]>([]);
 
-  // --- Safe transformation & merge duplicates ---
-  const players = useMemo(() => {
-    const map: Record<string, PlayerRow> = {};
-    database.forEach(p => {
-      const id = p.uscfId.toUpperCase() === "NEW" ? p.id : p.uscfId;
-      const email = p.email.toLowerCase();
-      if (!map[id]) {
-        map[id] = { ...p, uscfId: p.uscfId.toUpperCase(), middleName: p.middleName || "" };
-      } else {
-        // Merge data if duplicate
-        map[id] = { ...map[id], ...p };
+  // --- Safe .split() helper to prevent crashes ---
+  const safeSplit = (val: any, delimiter = ','): string[] => {
+    if (!val || typeof val !== 'string') return [];
+    return val.split(delimiter).map(s => s.trim()).filter(Boolean);
+  };
+
+  // --- Fetch districts and schools ---
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const [districtsRes, schoolsRes] = await Promise.all([
+          fetch('/api/districts'),
+          fetch('/api/schools')
+        ]);
+        const districts = await districtsRes.json();
+        const schools = await schoolsRes.json();
+
+        const safeDistricts = Array.isArray(districts)
+          ? districts.filter(d => typeof d === 'string' && d.trim() !== '')
+          : [];
+        const safeSchools = Array.isArray(schools)
+          ? schools.filter(s => typeof s === 'string' && s.trim() !== '')
+          : [];
+
+        setDbDistricts(safeDistricts);
+        setDbSchools(safeSchools);
+        setIsDbLoaded(true);
+      } catch (error) {
+        console.error('Failed to load districts or schools:', error);
+        setDbDistricts([]);
+        setDbSchools([]);
+        setIsDbLoaded(true);
       }
-    });
-    return Object.values(map);
-  }, [database]);
-
-  // --- Filtering ---
-  const filteredPlayers = useMemo(() => {
-    let list = [...players];
-    if (districtFilter !== "all") list = list.filter(p => p.district === districtFilter);
-    if (schoolFilter !== "all") list = list.filter(p => p.school === schoolFilter);
-    if (searchText.trim()) {
-      const txt = searchText.toLowerCase();
-      list = list.filter(p =>
-        `${p.firstName} ${p.middleName || ""} ${p.lastName}`.toLowerCase().includes(txt) ||
-        p.email.toLowerCase().includes(txt) ||
-        p.uscfId.toLowerCase().includes(txt)
-      );
     }
-    return list;
-  }, [players, districtFilter, schoolFilter, searchText]);
+    fetchData();
+  }, []);
 
-  // --- Sorting ---
-  const sortedPlayers = useMemo(() => {
-    if (!sortConfig) return filteredPlayers;
-    const sorted = [...filteredPlayers].sort((a, b) => {
-      let aVal: any, bVal: any;
-      if (sortConfig.key === "Name") {
-        aVal = `${a.lastName}, ${a.firstName} ${a.middleName || ""}`.toLowerCase();
-        bVal = `${b.lastName}, ${b.firstName} ${b.middleName || ""}`.toLowerCase();
-      } else {
-        aVal = (a as any)[sortConfig.key] ?? "";
-        bVal = (b as any)[sortConfig.key] ?? "";
+  // --- Filter schools by district ---
+  const getSchoolsForDistrict = useCallback(
+    async (district: string) => {
+      if (!district || district === 'all') {
+        setAvailableSchools(dbSchools);
+        return;
       }
-      if (aVal < bVal) return sortConfig.direction === "asc" ? -1 : 1;
-      if (aVal > bVal) return sortConfig.direction === "asc" ? 1 : -1;
-      return 0;
-    });
-    return sorted;
-  }, [filteredPlayers, sortConfig]);
+      try {
+        const res = await fetch(`/api/schools?district=${encodeURIComponent(district)}`);
+        const schools = await res.json();
+        const safeSchools = Array.isArray(schools)
+          ? schools.filter(s => typeof s === 'string' && s.trim() !== '')
+          : [];
+        setAvailableSchools(safeSchools);
+      } catch (error) {
+        console.error(`Failed to fetch schools for district ${district}:`, error);
+        setAvailableSchools([]);
+      }
+    },
+    [dbSchools]
+  );
 
-  const requestSort = (key: keyof PlayerRow | "Name") => {
-    setSortConfig(prev => prev?.key === key ? { key, direction: prev.direction === "asc" ? "desc" : "asc" } : { key, direction: "asc" });
+  const availableDistricts = React.useMemo(() => {
+    if (!Array.isArray(dbDistricts)) return [];
+    if (!userProfile || userProfile.role === 'organizer' || userProfile.isDistrictCoordinator) {
+      return dbDistricts;
+    }
+    if (userProfile.district && userProfile.district !== 'All Districts') {
+      return dbDistricts.filter(d => d === userProfile.district);
+    }
+    return dbDistricts;
+  }, [dbDistricts, userProfile]);
+
+  useEffect(() => {
+    if (isDbLoaded) {
+      getSchoolsForDistrict(searchCriteria.district || 'all');
+    }
+  }, [searchCriteria.district, isDbLoaded, getSchoolsForDistrict]);
+
+  // --- Initialize criteria based on user profile ---
+  useEffect(() => {
+    if (!userProfile) return;
+    const initialCriteria: Partial<SearchCriteria> = {};
+
+    if (userProfile.role !== 'organizer' && userProfile.district && userProfile.district !== 'All Districts') {
+      initialCriteria.district = userProfile.district;
+    }
+
+    if (!userProfile.isDistrictCoordinator && userProfile.role === 'sponsor' &&
+        userProfile.school && userProfile.school !== 'All Schools') {
+      initialCriteria.school = userProfile.school;
+    }
+
+    setSearchCriteria(initialCriteria);
+  }, [userProfile]);
+
+  // --- Update criteria fields ---
+  const updateField = (field: keyof SearchCriteria, value: any) => {
+    const newCriteria = { ...searchCriteria, [field]: value };
+    if (field === 'district') {
+      newCriteria.school = 'all';
+    }
+    setSearchCriteria(newCriteria);
   };
 
-  // --- Excel Export ---
-  const exportToExcel = () => {
-    const data = sortedPlayers.map(p => {
-      const dobFormatted = p.dob && isValid(parseISO(p.dob)) ? format(parseISO(p.dob), "MM/dd/yyyy") : "";
-      const uscfExpFormatted = p.uscfExpiration && isValid(parseISO(p.uscfExpiration)) ? format(parseISO(p.uscfExpiration), "MM/dd/yyyy") : "";
-      const expired = p.uscfExpiration && new Date(p.uscfExpiration).getTime() < Date.now();
-      return {
-        Name: `${p.lastName}, ${p.firstName} ${p.middleName || ""}`.trim(),
-        "Player USCF ID": p.uscfId,
-        Grade: p.grade,
-        DOB: dobFormatted,
-        Email: p.email,
-        Zip: p.zip,
-        District: p.district,
-        School: p.school,
-        "USCF Exp": expired ? "Expired" : uscfExpFormatted,
-      };
-    });
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Roster");
-    const wbout = XLSX.write(workbook, { type: "array", bookType: "xlsx" });
-    saveAs(new Blob([wbout], { type: "application/octet-stream" }), "Roster.xlsx");
-  };
-
-  // --- Save edited player ---
-  const handleSave = async (player: PlayerRow) => {
+  // --- Perform search ---
+  const handleSearch = async () => {
+    setIsSearching(true);
     try {
-      // Ensure required fields
-      const requiredFields: (keyof PlayerRow)[] = ["firstName", "lastName", "uscfId", "grade", "email", "dob", "zip"];
-      for (const field of requiredFields) {
-        if (!player[field] || (typeof player[field] === "string" && !player[field].trim())) {
-          toast({ title: `Error: ${field} is required`, variant: "destructive" });
-          return;
-        }
-      }
-      // Uppercase USCF ID if present
-      if (player.uscfId.toUpperCase() === "NEW") player.uscfId = "NEW";
-      await updatePlayer(player, null);
-      toast({ title: "Player saved successfully" });
-      setSelectedPlayer(null);
-    } catch (e) {
-      console.error(e);
-      toast({ title: "Error saving player", variant: "destructive" });
+      const result = await searchPlayers({ ...searchCriteria, pageSize: 100 });
+      setSearchResult(result);
+    } catch (error: any) {
+      console.error('Search failed:', error);
+      alert(`Search failed: ${error.message}`);
+    } finally {
+      setIsSearching(false);
     }
+  };
+
+  const clearSearch = () => {
+    setSearchCriteria({});
+    setSearchResult(null);
+  };
+
+  const handleSelectPlayer = (player: MasterPlayer) => {
+    alert(`Selected player: ${player.firstName} ${player.lastName}`);
   };
 
   return (
-    <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">Player Roster</h1>
+    <div className="p-6">
+      <h1 className="text-2xl font-bold mb-4">Roster Management</h1>
 
-      <div className="flex gap-4 mb-4 flex-wrap">
+      {/* --- Search Form --- */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
         <div>
-          <label className="block text-sm font-medium mb-1">District</label>
-          <select value={districtFilter} onChange={e => setDistrictFilter(e.target.value)} className="border p-2 rounded">
+          <label className="block mb-1">USCF ID</label>
+          <input
+            type="text"
+            value={searchCriteria.uscfId || ''}
+            onChange={e => updateField('uscfId', e.target.value)}
+            className="border rounded px-3 py-2 w-full"
+            placeholder="12345678"
+          />
+        </div>
+        <div>
+          <label className="block mb-1">First Name</label>
+          <input
+            type="text"
+            value={searchCriteria.firstName || ''}
+            onChange={e => updateField('firstName', e.target.value)}
+            className="border rounded px-3 py-2 w-full"
+            placeholder="John"
+          />
+        </div>
+        <div>
+          <label className="block mb-1">Last Name</label>
+          <input
+            type="text"
+            value={searchCriteria.lastName || ''}
+            onChange={e => updateField('lastName', e.target.value)}
+            className="border rounded px-3 py-2 w-full"
+            placeholder="Doe"
+          />
+        </div>
+        <div>
+          <label className="block mb-1">District</label>
+          <select
+            value={searchCriteria.district || 'all'}
+            onChange={e => updateField('district', e.target.value)}
+            className="border rounded px-3 py-2 w-full"
+            disabled={!isDbLoaded}
+          >
             <option value="all">All Districts</option>
-            {dbPlayerDistricts.map(d => <option key={d} value={d}>{d}</option>)}
+            {availableDistricts.map(d => <option key={d} value={d}>{d}</option>)}
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">School</label>
-          <select value={schoolFilter} onChange={e => setSchoolFilter(e.target.value)} className="border p-2 rounded">
+          <label className="block mb-1">School</label>
+          <select
+            value={searchCriteria.school || 'all'}
+            onChange={e => updateField('school', e.target.value)}
+            className="border rounded px-3 py-2 w-full"
+            disabled={!isDbLoaded}
+          >
             <option value="all">All Schools</option>
-            {dbPlayerSchools.map(s => <option key={s} value={s}>{s}</option>)}
+            {availableSchools.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">Search</label>
-          <input type="text" className="border p-2 rounded" value={searchText} onChange={e => setSearchText(e.target.value)} placeholder="Search name, email, USCF ID..." />
+          <label className="block mb-1">State</label>
+          <select
+            value={searchCriteria.state || ''}
+            onChange={e => updateField('state', e.target.value)}
+            className="border rounded px-3 py-2 w-full"
+          >
+            <option value="">All States</option>
+            <option value="TX">Texas</option>
+            <option value="CA">California</option>
+            <option value="NY">New York</option>
+            <option value="FL">Florida</option>
+          </select>
         </div>
-        <div className="flex items-end">
-          <Button variant="outline" onClick={() => { setDistrictFilter("all"); setSchoolFilter("all"); setSearchText(""); }}>
-            Clear Filters
-          </Button>
+        <div>
+          <label className="block mb-1">Min Rating</label>
+          <input
+            type="number"
+            value={searchCriteria.minRating || ''}
+            onChange={e => updateField('minRating', e.target.value ? parseInt(e.target.value) : undefined)}
+            className="border rounded px-3 py-2 w-full"
+          />
+        </div>
+        <div>
+          <label className="block mb-1">Max Rating</label>
+          <input
+            type="number"
+            value={searchCriteria.maxRating || ''}
+            onChange={e => updateField('maxRating', e.target.value ? parseInt(e.target.value) : undefined)}
+            className="border rounded px-3 py-2 w-full"
+          />
         </div>
       </div>
 
-      <div className="flex justify-between items-center gap-2 mb-4 flex-wrap">
-        <Button onClick={exportToExcel}>Export Roster</Button>
-        <span className="text-sm text-gray-600">Showing {sortedPlayers.length} of {players.length} players</span>
+      <div className="flex space-x-4 mb-4">
+        <button onClick={handleSearch} disabled={isSearching} className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700">
+          {isSearching ? 'Searching...' : 'Search Database'}
+        </button>
+        <button onClick={clearSearch} className="bg-gray-600 text-white px-6 py-2 rounded hover:bg-gray-700">
+          Clear
+        </button>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full border border-gray-300">
-          <thead className="bg-gray-100">
-            <tr>
-              {["Name", "Player USCF ID", "Grade", "DOB", "Email", "Zip", "District", "School", "USCF Exp"].map(col => (
-                <th
-                  key={col}
-                  className="p-2 border cursor-pointer"
-                  onClick={() => requestSort(col as keyof PlayerRow | "Name")}
-                >
-                  {col} {sortConfig?.key === col ? (sortConfig.direction === "asc" ? "▲" : "▼") : ""}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {sortedPlayers.map(player => {
-              const dobFormatted = player.dob && isValid(parseISO(player.dob)) ? format(parseISO(player.dob), "MM/dd/yyyy") : "";
-              const uscfExpFormatted = player.uscfExpiration && isValid(parseISO(player.uscfExpiration)) ? format(parseISO(player.uscfExpiration), "MM/dd/yyyy") : "";
-              const expired = player.uscfExpiration && new Date(player.uscfExpiration).getTime() < Date.now();
-              return (
-                <tr key={player.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setSelectedPlayer(player)}>
-                  <td className="p-2 border">{`${player.lastName}, ${player.firstName} ${player.middleName || ""}`.trim()}</td>
-                  <td className="p-2 border">{player.uscfId}</td>
-                  <td className="p-2 border">{player.grade}</td>
-                  <td className="p-2 border">{dobFormatted}</td>
-                  <td className="p-2 border">{player.email}</td>
-                  <td className="p-2 border">{player.zip}</td>
-                  <td className="p-2 border">{player.district}</td>
-                  <td className="p-2 border">{player.school}</td>
-                  <td className="p-2 border">{expired ? "Expired" : uscfExpFormatted}</td>
+      {/* --- Search Results --- */}
+      {searchResult && (
+        <div className="overflow-x-auto">
+          <table className="min-w-full border border-gray-300">
+            <thead>
+              <tr className="bg-gray-50">
+                <th className="border px-4 py-2">Name</th>
+                <th className="border px-4 py-2">USCF ID</th>
+                <th className="border px-4 py-2">State</th>
+                <th className="border px-4 py-2">School</th>
+                <th className="border px-4 py-2">Rating</th>
+                <th className="border px-4 py-2">Expiration</th>
+                <th className="border px-4 py-2">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {searchResult.players?.map(player => (
+                <tr key={player.id} className="hover:bg-gray-50">
+                  <td className="border px-4 py-2">{player.firstName} {player.middleName} {player.lastName}</td>
+                  <td className="border px-4 py-2">{player.uscfId}</td>
+                  <td className="border px-4 py-2">{player.state}</td>
+                  <td className="border px-4 py-2">{player.school}</td>
+                  <td className="border px-4 py-2">{player.regularRating}</td>
+                  <td className="border px-4 py-2">{player.expirationDate || 'N/A'}</td>
+                  <td className="border px-4 py-2">
+                    <button onClick={() => handleSelectPlayer(player)} className="bg-green-500 text-white px-2 py-1 rounded text-xs">Select</button>
+                  </td>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {selectedPlayer && (
-        <EnhancedPlayerSearchDialog
-          player={selectedPlayer}
-          onClose={() => setSelectedPlayer(null)}
-          onSave={handleSave}
-        />
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
+
+      {/* --- Enhanced Player Search Dialog --- */}
+      <EnhancedPlayerSearchDialog
+        isOpen={false} // Replace with actual state when you implement modal toggle
+        onOpenChange={() => {}}
+        onPlayerSelected={() => {}}
+        userProfile={userProfile || null}
+      />
     </div>
   );
-}
-
-export default function RosterPage() {
-  return <AppLayout><RostersPageContent /></AppLayout>;
 }
