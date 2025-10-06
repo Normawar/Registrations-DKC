@@ -250,33 +250,34 @@ function ManageEventsContent() {
     return eventDay < today ? "Completed" : "Open";
   };
   
- // const handleConsolidateGt = async (event: Event) => {
-    if (!profile || getUserRole(profile) !== 'organizer') return;
-    
-    setIsConsolidating(event.id);
-    try {
-      const result = await consolidateGtInvoices({
-        eventId: event.id,
-        eventName: event.name,
-        eventDate: event.date,
-        gtCoordinatorEmail: 'gt_coordinator@psjaisd.us',
-        gtCoordinatorName: 'PSJA GT Coordinator',
-      });
-      toast({
-        title: 'Consolidation Successful',
-        description: `Created invoice ${result.consolidatedInvoiceNumber} for ${result.totalGtStudents} GT students and canceled ${result.canceledInvoiceIds.length} individual invoices.`,
-      });
-      checkConsolidationForEvent(event.id);
-    } catch (error) {
-      console.error("Failed to consolidate GT invoices:", error);
-      toast({
-        variant: 'destructive',
-        title: 'Consolidation Failed',
-        description: error instanceof Error ? error.message : 'An unknown error occurred.',
-      });
-    } finally {
-      setIsConsolidating(null);
-    }
+// const handleConsolidateGt = async (event: Event) => {
+//   if (!profile || getUserRole(profile) !== 'organizer') return;
+//   
+//   setIsConsolidating(event.id);
+//   try {
+//     const result = await consolidateGtInvoices({
+//       eventId: event.id,
+//       eventName: event.name,
+//       eventDate: event.date,
+//       gtCoordinatorEmail: 'gt_coordinator@psjaisd.us',
+//       gtCoordinatorName: 'PSJA GT Coordinator',
+//     });
+//     toast({
+//       title: 'Consolidation Successful',
+//       description: `Created invoice ${result.consolidatedInvoiceNumber} for ${result.totalGtStudents} GT students and canceled ${result.canceledInvoiceIds.length} individual invoices.`,
+//     });
+//     checkConsolidationForEvent(event.id);
+//   } catch (error) {
+//     console.error("Failed to consolidate GT invoices:", error);
+//     toast({
+//       variant: 'destructive',
+//       title: 'Consolidation Failed',
+//       description: error instanceof Error ? error.message : 'An unknown error occurred.',
+//     });
+//   } finally {
+//     setIsConsolidating(null);
+//   }
+// };
  // };
   
  //const checkConsolidationForEvent = useCallback(async (eventId: string) => {
@@ -990,12 +991,6 @@ function ManageEventsContent() {
                                 <DropdownMenuItem onClick={() => handleEditEvent(event)}>
                                   <FilePenLine className="mr-2 h-4 w-4" />Edit
                                 </DropdownMenuItem>
-                                {canConsolidateInfo?.canConsolidate && (
-                                  <DropdownMenuItem onClick={() => handleConsolidateGt(event)} disabled={isConsolidating === event.id}>
-                                    {isConsolidating === event.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Combine className="mr-2 h-4 w-4" />}
-                                    Consolidate GT Invoices ({canConsolidateInfo.gtInvoiceCount})
-                                  </DropdownMenuItem>
-                                )}
                                 <DropdownMenuItem asChild>
                                   <Link href={`/organizer-registration?eventId=${event.id}`}>
                                     <PlusCircle className="mr-2 h-4 w-4" />Register Players
