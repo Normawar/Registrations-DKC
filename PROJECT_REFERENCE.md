@@ -484,3 +484,115 @@ When requested to make a component or feature "global," follow this procedure:
 2. Identify and restore invoicing improvements
 3. Identify and restore player details enhancements
 4. Commit working state as backup point
+
+## 13. Data Type Safety & Error Prevention (Added 10/06/25)
+
+### Critical Lesson: Defensive Data Sanitization
+
+**Problem**: Firestore data can have inconsistent types (strings, numbers, objects, Timestamps) even when TypeScript expects strings. Calling `.split()`, `parseISO()`, or other string methods on non-string values causes runtime crashes.
+
+**Root Cause**: 
+- CSV imports may store fields as numbers or mixed types
+- Firestore Timestamps need conversion to ISO strings
+- Type definitions don't enforce runtime type safety
+- Server-side rendering fails when encountering invalid data
+
+### ✅ Required Pattern: Safe Data Transformation
+
+**Always sanitize data from `useMasterDb()` before using it in components:**
+```typescript
+function MyComponent() {
+  const { database: allPlayers = [] } = useMasterDb();
+  
+  // REQUIRED: Transform data to ensure type safety
+  const safePlayers = useMemo(() => {
+    return allPlayers.map(player => {
+      // Helper for safe date conversion
+      const safeDate = (dateValue: any): string => {
+        if (!dateValue) return '';
+        if (typeof dateValue === 'string' && dateValue.trim() !== '') return dateValue;
+        try {
+          const d = new Date(dateValue);
+          if (isNaN(d.getTime())) return '';
+          return d.toISOString();
+        } catch {
+          return '';
+        }
+      };
+
+      return {
+        ...player,
+        // String fields - always convert to string
+        district: String(player.district || ''),
+        school: String(player.school || ''),
+        firstName: String(player.firstName || ''),
+        lastName: String(player.lastName || ''),
+        uscfId: String(player.uscfId || ''),
+        email: player.email ? String(player.email) : '',
+        
+        // Date fields - convert to ISO string safely
+        dob: safeDate(player.dob),
+        uscfExpiration: safeDate(player.uscfExpiration),
+      };
+    });
+  }, [allPlayers]);
+  
+  // Use safePlayers everywhere, NOT allPlayers
+  const filtered = safePlayers.filter(p => p.district === selectedDistrict);
+}
+
+## 13. Data Type Safety & Error Prevention (Added 10/06/25)
+
+### Critical Lesson: Defensive Data Sanitization
+
+**Problem**: Firestore data can have inconsistent types (strings, numbers, objects, Timestamps) even when TypeScript expects strings. Calling `.split()`, `parseISO()`, or other string methods on non-string values causes runtime crashes.
+
+**Root Cause**: 
+- CSV imports may store fields as numbers or mixed types
+- Firestore Timestamps need conversion to ISO strings
+- Type definitions don't enforce runtime type safety
+- Server-side rendering fails when encountering invalid data
+
+### ✅ Required Pattern: Safe Data Transformation
+
+**Always sanitize data from `useMasterDb()` before using it in components:**
+```typescript
+function MyComponent() {
+  const { database: allPlayers = [] } = useMasterDb();
+  
+  // REQUIRED: Transform data to ensure type safety
+  const safePlayers = useMemo(() => {
+    return allPlayers.map(player => {
+      // Helper for safe date conversion
+      const safeDate = (dateValue: any): string => {
+        if (!dateValue) return '';
+        if (typeof dateValue === 'string' && dateValue.trim() !== '') return dateValue;
+        try {
+          const d = new Date(dateValue);
+          if (isNaN(d.getTime())) return '';
+          return d.toISOString();
+        } catch {
+          return '';
+        }
+      };
+
+      return {
+        ...player,
+        // String fields - always convert to string
+        district: String(player.district || ''),
+        school: String(player.school || ''),
+        firstName: String(player.firstName || ''),
+        lastName: String(player.lastName || ''),
+        uscfId: String(player.uscfId || ''),
+        email: player.email ? String(player.email) : '',
+        
+        // Date fields - convert to ISO string safely
+        dob: safeDate(player.dob),
+        uscfExpiration: safeDate(player.uscfExpiration),
+      };
+    });
+  }, [allPlayers]);
+  
+  // Use safePlayers everywhere, NOT allPlayers
+  const filtered = safePlayers.filter(p => p.district === selectedDistrict);
+}

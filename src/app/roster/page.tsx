@@ -1,12 +1,11 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
-import { AppLayout } from "@/components/app-layout";
+import React, { useState, useMemo } from "react";
 import { useMasterDb } from "@/context/master-db-context";
 import { format, parseISO, isValid } from "date-fns";
 import { Button } from "@/components/ui/button";
 import * as XLSX from "xlsx";
-import { saveAs } from "file-saver/dist/FileSaver";
+import { saveAs } from "file-saver";
 
 type PlayerRow = {
   id: string;
@@ -19,71 +18,58 @@ type PlayerRow = {
   email?: string;
   zip?: string;
   uscfExpiration?: string;
-  district?: string;
-  school?: string;
 };
 
-function RostersPageContent() {
-  const { database: allPlayers = [], dbSchools = [], dbDistricts = [], isDbLoaded } = useMasterDb();
-  
-  // Sanitize all player data to prevent .split() and date parsing errors
-  const safeAllPlayers = useMemo(() => {
-    return allPlayers.map(player => {
-            const safeDate = (dateValue: any): string => {
-        if (!dateValue) return '';
-        if (typeof dateValue === 'string' && dateValue.trim() !== '') return dateValue;
-        try {
-          const d = new Date(dateValue);
-          if (isNaN(d.getTime())) return '';
-          return d.toISOString();
-        } catch {
-          return '';
-        }
-      };
+export default function RostersPage() {
+  const { players: allPlayers = [] } = useMasterDb() ?? {};
 
-      return {
-        ...player,
-        district: String(player.district || ''),
-        school: String(player.school || ''),
-        firstName: String(player.firstName || ''),
-        lastName: String(player.lastName || ''),
-        middleName: player.middleName ? String(player.middleName) : '',
-        uscfId: String(player.uscfId || ''),
-        email: player.email ? String(player.email) : '',
-        grade: player.grade ? String(player.grade) : '',
-        zip: player.zip ? String(player.zip) : '',
-        dob: safeDate(player.dob),
-        uscfExpiration: safeDate(player.uscfExpiration),
-      };
-    });
+  // ✅ Safe data transformation (Project Preference #13)
+  const safePlayers = useMemo(() => {
+    const safeDate = (dateValue: any): string => {
+      if (!dateValue) return "";
+      if (typeof dateValue === "string" && dateValue.trim() !== "") return dateValue;
+      try {
+        const d = new Date(dateValue);
+        if (isNaN(d.getTime())) return "";
+        return d.toISOString();
+      } catch {
+        return "";
+      }
+    };
+
+    return (allPlayers ?? []).map((p: any) => ({
+      id: String(p?.id || crypto.randomUUID()),
+      firstName: String(p?.firstName || ""),
+      middleName: String(p?.middleName || ""),
+      lastName: String(p?.lastName || ""),
+      uscfId: String(p?.uscfId || ""),
+      grade: p?.grade ?? "",
+      dob: safeDate(p?.dob),
+      email: p?.email ? String(p.email) : "",
+      zip: String(p?.zip || ""),
+      uscfExpiration: safeDate(p?.uscfExpiration),
+    }));
   }, [allPlayers]);
 
+  const [players, setPlayers] = useState<PlayerRow[]>(safePlayers);
   const [sortConfig, setSortConfig] = useState<{
     key: keyof PlayerRow | "Name";
     direction: "asc" | "desc";
   } | null>(null);
-  const [districtFilter, setDistrictFilter] = useState<string>("all");
-  const [schoolFilter, setSchoolFilter] = useState<string>("all");
-  const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>(dbSchools);
+
   const [newPlayer, setNewPlayer] = useState<Partial<PlayerRow>>({});
-  
-// Cascading filter: update schools when district changes
-useEffect(() => {
-  if (districtFilter === 'all') {
 
-      setSchoolsForDistrict(dbSchools);
-    } else {
-      const filteredSchools = [...new Set(safeAllPlayers.filter(p => p.district === districtFilter).map(p => p.school).filter(Boolean))].sort();
-      setSchoolsForDistrict(filteredSchools);
-    }
-    setSchoolFilter('all');
-  }, [districtFilter, dbSchools, safeAllPlayers]);
+  // Re-sync when Firestore data updates
+  React.useEffect(() => {
+    setPlayers(safePlayers);
+  }, [safePlayers]);
 
+  // Notifications for incomplete fields or duplicate emails
   const notifications = useMemo(() => {
     const incomplete: string[] = [];
     const emailMap: Record<string, string[]> = {};
 
-    (safeAllPlayers ?? []).forEach((p) => {
+    (players ?? []).forEach((p) => {
       const fullName = `${p?.lastName || ""}, ${p?.firstName || ""} ${p?.middleName || ""}`.trim();
 
       if (!p?.firstName || !p?.lastName || !p?.email) {
@@ -102,20 +88,11 @@ useEffect(() => {
       .map(([email, names]) => `${email} (${names.join(", ")})`);
 
     return { incomplete, duplicateEmails };
-  }, [safeAllPlayers]);
+  }, [players]);
 
+  // Sorting logic
   const sortedPlayers = useMemo(() => {
-    let sortable = [...(safeAllPlayers ?? [])];
-    
-    // Apply filters
-    if (districtFilter && districtFilter !== "all") {
-      sortable = sortable.filter(p => p.district === districtFilter);
-    }
-    if (schoolFilter && schoolFilter !== "all") {
-      sortable = sortable.filter(p => p.school === schoolFilter);
-    }
-    
-    // Apply sorting
+    const sortable = [...(players ?? [])];
     if (sortConfig) {
       sortable.sort((a, b) => {
         if (sortConfig.key === "Name") {
@@ -134,7 +111,7 @@ useEffect(() => {
       });
     }
     return sortable;
-  }, [safeAllPlayers, sortConfig, districtFilter, schoolFilter]);
+  }, [players, sortConfig]);
 
   const requestSort = (key: keyof PlayerRow | "Name") => {
     setSortConfig((prev) => {
@@ -145,12 +122,14 @@ useEffect(() => {
     });
   };
 
+  // Export to Excel
   const exportToExcel = () => {
     const data = (sortedPlayers ?? []).map((p) => {
       const dobFormatted = p?.dob && isValid(parseISO(p.dob)) ? format(parseISO(p.dob), "MM/dd/yyyy") : "";
-      const uscfExpFormatted = p?.uscfExpiration && isValid(parseISO(p.uscfExpiration))
-        ? format(parseISO(p.uscfExpiration), "MM/dd/yyyy")
-        : "";
+      const uscfExpFormatted =
+        p?.uscfExpiration && isValid(parseISO(p.uscfExpiration))
+          ? format(parseISO(p.uscfExpiration), "MM/dd/yyyy")
+          : "";
       const expired = p?.uscfExpiration && new Date(p.uscfExpiration).getTime() < Date.now();
 
       return {
@@ -160,8 +139,6 @@ useEffect(() => {
         DOB: dobFormatted,
         Email: p?.email ?? "",
         Zip: p?.zip ?? "",
-        District: p?.district ?? "",
-        School: p?.school ?? "",
         "USCF Exp": expired ? "Expired" : uscfExpFormatted,
       };
     });
@@ -173,10 +150,19 @@ useEffect(() => {
     saveAs(new Blob([wbout], { type: "application/octet-stream" }), "Roster.xlsx");
   };
 
+  const addNewPlayer = () => {
+    if (!newPlayer.firstName || !newPlayer.lastName || !newPlayer.email) {
+      alert("First Name, Last Name, and Email are required.");
+      return;
+    }
+
+    const id = `NEW_${Date.now()}_${newPlayer.firstName[0]}${newPlayer.lastName[0]}`;
+    setPlayers([...players, { ...newPlayer, id }]);
+    setNewPlayer({});
+  };
+
   return (
     <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">Player Roster</h1>
-      
       {(notifications.incomplete.length > 0 || notifications.duplicateEmails.length > 0) && (
         <div className="bg-yellow-100 p-4 mb-4 border-l-4 border-yellow-500">
           {notifications.incomplete.length > 0 && (
@@ -188,92 +174,102 @@ useEffect(() => {
         </div>
       )}
 
-      {/* Filters */}
-      <div className="flex gap-4 mb-4 flex-wrap">
-        <div>
-          <label className="block text-sm font-medium mb-1">District</label>
-          <select 
-            value={districtFilter} 
-            onChange={(e) => setDistrictFilter(e.target.value)}
-            className="border p-2 rounded"
-          >
-            <option value="all">All Districts</option>
-            {dbDistricts.map(d => <option key={d} value={d}>{d}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">School</label>
-          <select 
-            value={schoolFilter} 
-            onChange={(e) => setSchoolFilter(e.target.value)}
-            className="border p-2 rounded"
-          >
-            <option value="all">All Schools</option>
-            {schoolsForDistrict.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-        </div>
-        <div className="flex items-end">
-          <Button 
-            variant="outline"
-            onClick={() => {
-              setDistrictFilter("all");
-              setSchoolFilter("all");
-            }}
-          >
-            Clear Filters
-          </Button>
+      <div className="flex justify-between items-center gap-2 mb-4">
+        <Button onClick={exportToExcel}>Export Roster</Button>
+        <div className="flex gap-2 flex-wrap">
+          <input
+            placeholder="First Name"
+            value={newPlayer.firstName || ""}
+            onChange={(e) => setNewPlayer({ ...newPlayer, firstName: e.target.value })}
+            className="border p-1"
+          />
+          <input
+            placeholder="Middle Name"
+            value={newPlayer.middleName || ""}
+            onChange={(e) => setNewPlayer({ ...newPlayer, middleName: e.target.value })}
+            className="border p-1"
+          />
+          <input
+            placeholder="Last Name"
+            value={newPlayer.lastName || ""}
+            onChange={(e) => setNewPlayer({ ...newPlayer, lastName: e.target.value })}
+            className="border p-1"
+          />
+          <input
+            placeholder="Email"
+            value={newPlayer.email || ""}
+            onChange={(e) => setNewPlayer({ ...newPlayer, email: e.target.value })}
+            className="border p-1"
+          />
+          <input
+            placeholder="USCF ID"
+            value={newPlayer.uscfId || ""}
+            onChange={(e) => setNewPlayer({ ...newPlayer, uscfId: e.target.value })}
+            className="border p-1"
+          />
+          <input
+            placeholder="Grade"
+            value={newPlayer.grade || ""}
+            onChange={(e) => setNewPlayer({ ...newPlayer, grade: e.target.value })}
+            className="border p-1"
+          />
+          <input
+            placeholder="DOB (YYYY-MM-DD)"
+            value={newPlayer.dob || ""}
+            onChange={(e) => setNewPlayer({ ...newPlayer, dob: e.target.value })}
+            className="border p-1"
+          />
+          <input
+            placeholder="Zip"
+            value={newPlayer.zip || ""}
+            onChange={(e) => setNewPlayer({ ...newPlayer, zip: e.target.value })}
+            className="border p-1"
+          />
+          <Button onClick={addNewPlayer}>Create New Player</Button>
         </div>
       </div>
 
-      <div className="flex justify-between items-center gap-2 mb-4 flex-wrap">
-        <div className="flex gap-2 items-center">
-          <Button onClick={exportToExcel}>Export Roster</Button>
-          <span className="text-sm text-gray-600">
-            Showing {sortedPlayers.length} of {safeAllPlayers.length} players
-          </span>
-        </div>
-      </div>
+      <table className="min-w-full border border-gray-300">
+        <thead className="bg-gray-100">
+          <tr>
+            {["Name", "Player USCF ID", "Grade", "DOB", "Email", "Zip", "USCF Exp"].map((col) => (
+              <th
+                key={col}
+                className="p-2 border-b cursor-pointer"
+                onClick={() => requestSort(col as keyof PlayerRow | "Name")}
+              >
+                {col}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {(sortedPlayers ?? []).map((p) => {
+            const dob = p?.dob && isValid(parseISO(p.dob)) ? format(parseISO(p.dob), "MM/dd/yyyy") : "";
+            const expired = p?.uscfExpiration && new Date(p.uscfExpiration).getTime() < Date.now();
+            const uscfExp =
+              p?.uscfExpiration && isValid(parseISO(p.uscfExpiration))
+                ? format(parseISO(p.uscfExpiration), "MM/dd/yyyy")
+                : expired
+                ? "Expired"
+                : "";
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full border border-gray-300">
-          <thead className="bg-gray-100">
-            <tr>
-              {["Name", "Player USCF ID", "Grade", "DOB", "Email", "Zip", "District", "School", "USCF Exp"].map((col) => (
-                <th key={col} className="p-2 border-b cursor-pointer hover:bg-gray-200" onClick={() => requestSort(col as keyof PlayerRow | "Name")}>{col}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {(sortedPlayers ?? []).map((p) => {
-              const dob = p?.dob && isValid(parseISO(p.dob)) ? format(parseISO(p.dob), "MM/dd/yyyy") : "";
-              const expired = p?.uscfExpiration && new Date(p.uscfExpiration).getTime() < Date.now();
-              const uscfExp = p?.uscfExpiration && isValid(parseISO(p.uscfExpiration)) ? format(parseISO(p.uscfExpiration), "MM/dd/yyyy") : expired ? "Expired" : "";
-
-              return (
-                <tr key={p?.id ?? Math.random().toString()} className="border-b hover:bg-gray-50">
-                  <td className="p-2">{`${p?.lastName || ""}, ${p?.firstName || ""} ${p?.middleName || ""}`.trim()}</td>
-                  <td className="p-2">{p?.uscfId ?? ""}</td>
-                  <td className="p-2">{p?.grade === "K" ? "K" : p?.grade ?? ""}</td>
-                  <td className="p-2">{dob}</td>
-                  <td className="p-2">{p?.email ?? ""}</td>
-                  <td className="p-2">{p?.zip ?? ""}</td>
-                  <td className="p-2">{p?.district ?? ""}</td>
-                  <td className="p-2">{p?.school ?? ""}</td>
-                  <td className={`p-2 ${expired ? "text-red-600 font-bold" : ""}`}>{expired ? "Expired" : uscfExp}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+            return (
+              <tr key={p?.id ?? Math.random().toString()} className="border-b hover:bg-gray-50">
+                <td className="p-2">{`${p?.lastName || ""}, ${p?.firstName || ""} ${p?.middleName || ""}`.trim()}</td>
+                <td className="p-2">{p?.uscfId ?? ""}</td>
+                <td className="p-2">{p?.grade === "K" ? "K" : p?.grade ?? ""}</td>
+                <td className="p-2">{dob}</td>
+                <td className="p-2">{p?.email ?? ""}</td>
+                <td className="p-2">{p?.zip ?? ""}</td>
+                <td className={`p-2 ${expired ? "text-red-600 font-bold" : ""}`}>
+                  {expired ? "Expired" : uscfExp}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
-  );
-}
-
-export default function RostersPage() {
-  return (
-    <AppLayout>
-      <RostersPageContent />
-    </AppLayout>
   );
 }
