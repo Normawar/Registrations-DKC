@@ -22,15 +22,30 @@ type PlayerRow = {
   district?: string;
   school?: string;
 };
-
 function RostersPageContent() {
   const { 
-    database: allPlayers = [], 
+    database: safeAllPlayers  = [], 
     dbPlayerSchools = [], 
     dbPlayerDistricts = [], 
     getSchoolsForDistrictFromPlayers,
     isDbLoaded 
   } = useMasterDb();
+
+  // Sanitize all player data to prevent .split() errors
+  const safeAllPlayers = useMemo(() => {
+    return allPlayers.map(player => ({
+      ...player,
+      district: String(player.district || ''),
+      school: String(player.school || ''),
+      firstName: String(player.firstName || ''),
+      lastName: String(player.lastName || ''),
+      middleName: player.middleName ? String(player.middleName) : '',
+      uscfId: String(player.uscfId || ''),
+      email: player.email ? String(player.email) : '',
+      grade: player.grade ? String(player.grade) : '',
+      zip: player.zip ? String(player.zip) : '',
+    }));
+  }, [allPlayers]);
 
   // Ultra-defensive filtering - ensure ONLY valid strings make it through
   const safeDistricts = useMemo(() => {
@@ -38,15 +53,9 @@ function RostersPageContent() {
       console.warn('dbPlayerDistricts is not an array:', typeof dbPlayerDistricts);
       return ['Homeschool'];
     }
-    const filtered = dbPlayerDistricts.filter(d => {
-      if (d === null || d === undefined) return false;
-      if (typeof d !== 'string') {
-        console.error('Invalid district type found:', typeof d, d);
-        return false;
-      }
-      if (d.trim() === '') return false;
-      return true;
-    });
+    const filtered = dbPlayerDistricts
+      .map(d => String(d || ''))
+      .filter(d => d.trim() !== '');
     return filtered.length > 0 ? filtered : ['Homeschool'];
   }, [dbPlayerDistricts]);
 
@@ -55,17 +64,11 @@ function RostersPageContent() {
       console.warn('dbPlayerSchools is not an array:', typeof dbPlayerSchools);
       return [];
     }
-    return dbPlayerSchools.filter(s => {
-      if (s === null || s === undefined) return false;
-      if (typeof s !== 'string') {
-        console.error('Invalid school type found:', typeof s, s);
-        return false;
-      }
-      if (s.trim() === '') return false;
-      return true;
-    });
+    return dbPlayerSchools
+      .map(s => String(s || ''))
+      .filter(s => s.trim() !== '');
   }, [dbPlayerSchools]);
-  
+
   const [sortConfig, setSortConfig] = useState<{
     key: keyof PlayerRow | "Name";
     direction: "asc" | "desc";
@@ -91,7 +94,7 @@ function RostersPageContent() {
     const incomplete: string[] = [];
     const emailMap: Record<string, string[]> = {};
 
-    (allPlayers ?? []).forEach((p) => {
+    (safeAllPlayers  ?? []).forEach((p) => {
       const fullName = `${p?.lastName || ""}, ${p?.firstName || ""} ${p?.middleName || ""}`.trim();
 
       if (!p?.firstName || !p?.lastName || !p?.email) {
@@ -113,7 +116,7 @@ function RostersPageContent() {
   }, [allPlayers]);
 
   const sortedPlayers = useMemo(() => {
-    let sortable = [...(allPlayers ?? [])];
+    let sortable = [...(safeAllPlayers  ?? [])];
     
     // Apply filters
     if (districtFilter && districtFilter !== "all") {
