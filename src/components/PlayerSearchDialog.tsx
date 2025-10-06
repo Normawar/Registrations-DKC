@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { useMasterDb } from '@/context/master-db-context';
 import { format, parseISO, isValid } from 'date-fns';
 import { Button } from '@/components/ui/button';
+import { useMasterDb } from '@/context/master-db-context';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 
@@ -24,75 +24,31 @@ type PlayerRow = {
   pdUscf?: string;
 };
 
-export default function RostersPage() {
+export default function PlayerSearchDialog() {
   const { players: initialPlayers = [] } = useMasterDb() ?? {};
-
-  // -------------------------
-  // Safe data transformation
-  // -------------------------
-  const safePlayers = useMemo(() => {
-    return (initialPlayers ?? []).map((p) => {
-      const safeDate = (val: any): string => {
-        if (!val) return '';
-        if (typeof val === 'string' && val.trim()) return val;
-        try {
-          const d = new Date(val);
-          return isNaN(d.getTime()) ? '' : d.toISOString();
-        } catch {
-          return '';
-        }
-      };
-
-      return {
+  const [players, setPlayers] = useState<PlayerRow[]>(
+    () =>
+      initialPlayers.map((p) => ({
         ...p,
         firstName: String(p.firstName || ''),
         middleName: String(p.middleName || ''),
         lastName: String(p.lastName || ''),
         uscfId: String(p.uscfId || ''),
         grade: p.grade !== undefined ? String(p.grade) : '',
-        dob: safeDate(p.dob),
+        dob: p.dob ? new Date(p.dob).toISOString() : '',
         email: p.email ? String(p.email) : '',
         zip: p.zip ? String(p.zip) : '',
-        uscfExpiration: safeDate(p.uscfExpiration),
+        uscfExpiration: p.uscfExpiration ? new Date(p.uscfExpiration).toISOString() : '',
         registrationInvoice: p.registrationInvoice ? String(p.registrationInvoice) : '',
         uscfInvoice: p.uscfInvoice ? String(p.uscfInvoice) : '',
         pdReg: p.pdReg ? String(p.pdReg) : '',
         pdUscf: p.pdUscf ? String(p.pdUscf) : '',
-      };
-    });
-  }, [initialPlayers]);
+      }))
+  );
 
-  const [players, setPlayers] = useState<PlayerRow[]>(safePlayers);
   const [sortConfig, setSortConfig] = useState<{ key: keyof PlayerRow | 'Name'; direction: 'asc' | 'desc' } | null>(null);
   const [newPlayer, setNewPlayer] = useState<Partial<PlayerRow>>({});
 
-  // -------------------------
-  // Notifications
-  // -------------------------
-  const notifications = useMemo(() => {
-    const incomplete: string[] = [];
-    const emailMap: Record<string, string[]> = {};
-
-    players.forEach((p) => {
-      const fullName = `${p.lastName}, ${p.firstName} ${p.middleName}`.trim();
-      if (!p.firstName || !p.lastName || !p.email) incomplete.push(fullName);
-      if (p.email) {
-        const email = p.email.toLowerCase();
-        emailMap[email] = emailMap[email] || [];
-        emailMap[email].push(fullName);
-      }
-    });
-
-    const duplicateEmails = Object.entries(emailMap)
-      .filter(([, names]) => names.length > 1)
-      .map(([email, names]) => `${email} (${names.join(', ')})`);
-
-    return { incomplete, duplicateEmails };
-  }, [players]);
-
-  // -------------------------
-  // Sorting
-  // -------------------------
   const sortedPlayers = useMemo(() => {
     const sortable = [...players];
     if (sortConfig) {
@@ -114,17 +70,18 @@ export default function RostersPage() {
   }, [players, sortConfig]);
 
   const requestSort = (key: keyof PlayerRow | 'Name') => {
-    setSortConfig((prev) => (prev?.key === key ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' } : { key, direction: 'asc' }));
+    setSortConfig((prev) =>
+      prev?.key === key
+        ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' }
+        : { key, direction: 'asc' }
+    );
   };
 
-  // -------------------------
-  // Export to Excel
-  // -------------------------
   const exportToExcel = () => {
     const data = sortedPlayers.map((p) => {
       const dobFormatted = p.dob && isValid(parseISO(p.dob)) ? format(parseISO(p.dob), 'MM/dd/yyyy') : '';
-      const expFormatted = p.uscfExpiration && isValid(parseISO(p.uscfExpiration)) ? format(parseISO(p.uscfExpiration), 'MM/dd/yyyy') : '';
       const expired = p.uscfExpiration && new Date(p.uscfExpiration).getTime() < Date.now();
+      const expFormatted = expired ? 'Expired' : p.uscfExpiration && isValid(parseISO(p.uscfExpiration)) ? format(parseISO(p.uscfExpiration), 'MM/dd/yyyy') : '';
 
       return {
         Name: `${p.lastName}, ${p.firstName} ${p.middleName}`.trim(),
@@ -133,7 +90,7 @@ export default function RostersPage() {
         DOB: dobFormatted,
         Email: p.email ?? '',
         Zip: p.zip ?? '',
-        'USCF Exp': expired ? 'Expired' : expFormatted,
+        'USCF Exp': expFormatted,
         'Registration Invoice': p.registrationInvoice ?? '',
         'USCF Invoice': p.uscfInvoice ?? '',
         'PD REG': p.pdReg ?? '',
@@ -148,36 +105,18 @@ export default function RostersPage() {
     saveAs(new Blob([wbout], { type: 'application/octet-stream' }), 'Roster.xlsx');
   };
 
-  // -------------------------
-  // Add new player
-  // -------------------------
   const addNewPlayer = () => {
     if (!newPlayer.firstName || !newPlayer.lastName || !newPlayer.email) {
       alert('First Name, Last Name, and Email are required.');
       return;
     }
-
     const id = `NEW_${Date.now()}_${newPlayer.firstName[0]}${newPlayer.lastName[0]}`;
     setPlayers([...players, { ...newPlayer, id }]);
     setNewPlayer({});
   };
 
-  // -------------------------
-  // Render
-  // -------------------------
   return (
     <div className="p-4">
-      {(notifications.incomplete.length > 0 || notifications.duplicateEmails.length > 0) && (
-        <div className="bg-yellow-100 p-4 mb-4 border-l-4 border-yellow-500">
-          {notifications.incomplete.length > 0 && (
-            <p>Players with incomplete required fields: {notifications.incomplete.join(', ')}</p>
-          )}
-          {notifications.duplicateEmails.length > 0 && (
-            <p>Duplicate emails detected: {notifications.duplicateEmails.join('; ')}</p>
-          )}
-        </div>
-      )}
-
       <div className="flex justify-between items-center gap-2 mb-4 flex-wrap">
         <Button onClick={exportToExcel}>Export Roster</Button>
         <div className="flex gap-2 flex-wrap">
@@ -208,11 +147,7 @@ export default function RostersPage() {
           {sortedPlayers.map((p) => {
             const dob = p.dob && isValid(parseISO(p.dob)) ? format(parseISO(p.dob), 'MM/dd/yyyy') : '';
             const expired = p.uscfExpiration && new Date(p.uscfExpiration).getTime() < Date.now();
-            const uscfExp = p.uscfExpiration && isValid(parseISO(p.uscfExpiration))
-              ? format(parseISO(p.uscfExpiration), 'MM/dd/yyyy')
-              : expired
-              ? 'Expired'
-              : '';
+            const uscfExp = expired ? 'Expired' : p.uscfExpiration && isValid(parseISO(p.uscfExpiration)) ? format(parseISO(p.uscfExpiration), 'MM/dd/yyyy') : '';
 
             return (
               <tr key={p.id} className="border-b hover:bg-gray-50">
@@ -222,7 +157,7 @@ export default function RostersPage() {
                 <td className="p-2">{dob}</td>
                 <td className="p-2">{p.email ?? ''}</td>
                 <td className="p-2">{p.zip ?? ''}</td>
-                <td className={`p-2 ${expired ? 'text-red-600 font-bold' : ''}`}>{expired ? 'Expired' : uscfExp}</td>
+                <td className={`p-2 ${expired ? 'text-red-600 font-bold' : ''}`}>{uscfExp}</td>
                 <td className="p-2">{p.registrationInvoice ?? ''}</td>
                 <td className="p-2">{p.uscfInvoice ?? ''}</td>
                 <td className="p-2">{p.pdReg ?? ''}</td>
@@ -235,6 +170,3 @@ export default function RostersPage() {
     </div>
   );
 }
-
-export default PlayerSearchDialog;
-
