@@ -33,21 +33,35 @@ function RostersPageContent() {
 
   // Sanitize all player data to prevent .split() errors
   const safeAllPlayers = useMemo(() => {
-    return allPlayers.map(player => ({
-      ...player,
-      district: String(player.district || ''),
-      school: String(player.school || ''),
-      firstName: String(player.firstName || ''),
-      lastName: String(player.lastName || ''),
-      middleName: player.middleName ? String(player.middleName) : '',
-      uscfId: String(player.uscfId || ''),
-      email: player.email ? String(player.email) : '',
-      grade: player.grade ? String(player.grade) : '',
-      zip: player.zip ? String(player.zip) : '',
-      // Fix date fields - convert to ISO string if not already
-      dob: player.dob ? (typeof player.dob === 'string' ? player.dob : new Date(player.dob).toISOString()) : '',
-      uscfExpiration: player.uscfExpiration ? (typeof player.uscfExpiration === 'string' ? player.uscfExpiration : new Date(player.uscfExpiration).toISOString()) : '',
-    }));
+    return allPlayers.map(player => {
+      // Helper to safely convert dates
+      const safeDate = (dateValue: any): string => {
+        if (!dateValue) return '';
+        if (typeof dateValue === 'string' && dateValue.trim() !== '') return dateValue;
+        try {
+          const d = new Date(dateValue);
+          if (isNaN(d.getTime())) return '';
+          return d.toISOString();
+        } catch {
+          return '';
+        }
+      };
+  
+      return {
+        ...player,
+        district: String(player.district || ''),
+        school: String(player.school || ''),
+        firstName: String(player.firstName || ''),
+        lastName: String(player.lastName || ''),
+        middleName: player.middleName ? String(player.middleName) : '',
+        uscfId: String(player.uscfId || ''),
+        email: player.email ? String(player.email) : '',
+        grade: player.grade ? String(player.grade) : '',
+        zip: player.zip ? String(player.zip) : '',
+        dob: safeDate(player.dob),
+        uscfExpiration: safeDate(player.uscfExpiration),
+      };
+    });
   }, [allPlayers]);
 
   // Ultra-defensive filtering - ensure ONLY valid strings make it through
