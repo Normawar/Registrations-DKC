@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef, type ChangeEvent, useCallback } from 'react';
@@ -101,7 +99,7 @@ import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { generateTeamCode } from '@/lib/school-utils';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
-import { canConsolidateGtInvoices, consolidateGtInvoices } from '@/ai/flows/consolidate-gt-invoices-flow';
+// import { canConsolidateGtInvoices, consolidateGtInvoices } from '@/ai/flows/consolidate-gt-invoices-flow';
 import { OrganizerGuard } from '@/app/auth-guard';
 
 const eventFormSchema = z.object({
@@ -290,12 +288,14 @@ function ManageEventsContent() {
     }
   }, []);
 
-  useEffect(() => {
-    const psjaEvents = events.filter(e => getDistrictForLocation(e.location) === 'PHARR-SAN JUAN-ALAMO ISD');
-    psjaEvents.forEach(event => {
-      checkConsolidationForEvent(event.id);
-    });
-  }, [events, getDistrictForLocation, checkConsolidationForEvent]);
+// TEMPORARILY DISABLED - GT consolidation feature causing 500 errors
+// This feature is optional and can be re-enabled after debugging
+// useEffect(() => {
+//   const psjaEvents = events.filter(e => getDistrictForLocation(e.location) === 'PHARR-SAN JUAN-ALAMO ISD');
+//   psjaEvents.forEach(event => {
+//     checkConsolidationForEvent(event.id);
+//   });
+// }, [events, getDistrictForLocation, checkConsolidationForEvent]);
 
   const sortedEvents = useMemo(() => {
     const isTestEvent = (event: Event) => {
