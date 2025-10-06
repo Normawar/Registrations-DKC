@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -10,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useMasterDb, type MasterPlayer } from "@/context/master-db-context";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
@@ -41,7 +41,12 @@ export function SponsorRegistrationDialog({
   
   const [rosterPlayers, setRosterPlayers] = useState<MasterPlayer[]>([]);
   const [isLoadingPlayers, setIsLoadingPlayers] = useState(true);
-  const [selectedStudents, setSelectedStudents] = useState<Record<string, { section: string; uscfStatus: string }>>({});
+  const [selectedStudents, setSelectedStudents] = useState<Record<string, { 
+    section: string; 
+    uscfStatus: string;
+    gender: 'Male' | 'Female';
+    byes: string;
+  }>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [registrations, setRegistrations] = useState<any[]>([]);
   const [showConfirmation, setShowConfirmation] = useState(false);
@@ -105,26 +110,37 @@ export function SponsorRegistrationDialog({
   const toggleStudentSelection = (student: MasterPlayer) => {
     const status = getStudentRegistrationStatus(student);
     if (status.isRegistered) return;
-
+  
     setSelectedStudents(prev => {
       const { [student.id]: isSelected, ...rest } = prev;
       if (isSelected) {
         return rest;
       } else {
+        // Gender is required - if missing from database, we must have a default
+        if (!student.gender) {
+          toast({
+            variant: 'destructive',
+            title: 'Missing Gender',
+            description: `${student.firstName} ${student.lastName} does not have gender set. Please update their profile first.`
+          });
+          return prev; // Don't allow selection
+        }
+        
         const isExpired = !student.uscfExpiration || new Date(student.uscfExpiration) < new Date(event?.date);
         return {
           ...prev,
           [student.id]: {
             section: student.section || 'High School K-12',
-            uscfStatus: !student.uscfId || student.uscfId.toUpperCase() === 'NEW' ? 'new' : isExpired ? 'renewing' : 'current'
+            uscfStatus: !student.uscfId || student.uscfId.toUpperCase() === 'NEW' ? 'new' : isExpired ? 'renewing' : 'current',
+            gender: student.gender, // No fallback, must exist
+            byes: ''
           }
         };
       }
     });
   };
 
-  const updateStudentSelection = (studentId: string, field: 'section' | 'uscfStatus', value: string) => {
-    if (!value || value.trim() === '') return;
+  const updateStudentSelection = (studentId: string, field: 'section' | 'uscfStatus' | 'gender' | 'byes', value: string) => {
     setSelectedStudents(prev => ({
       ...prev,
       [studentId]: {
@@ -183,17 +199,17 @@ export function SponsorRegistrationDialog({
 
     // GT breakdown (only registration fees)
     const gtRegistrationFees = gtStudents.length * event.regularFee;
-    const gtLateFees = gtStudents.length * lateFeePerStudent; // Will be moved to school invoice
+    const gtLateFees = gtStudents.length * lateFeePerStudent;
 
     // Independent/School breakdown
     const indRegistrationFees = independentStudents.length * event.regularFee;
-    const allLateFees = lateFeeTotal; // School pays ALL late fees (GT + Independent)
+    const allLateFees = lateFeeTotal;
     
     // USCF fees (Independent students only, exclude GT)
     const uscfFee = 24;
     const uscfPlayersToCharge = independentStudents.filter(([playerId, details]) => {
       if (details.uscfStatus === 'current') return false;
-      return true; // Independent students pay USCF fees
+      return true;
     });
     const uscfTotal = uscfPlayersToCharge.length * uscfFee;
     
@@ -205,11 +221,11 @@ export function SponsorRegistrationDialog({
       feeType: feeType,
       gtBreakdown: {
         registrationFees: gtRegistrationFees,
-        lateFees: 0, // GT never pays late fees
+        lateFees: 0,
       },
       schoolBreakdown: {
         registrationFees: indRegistrationFees,
-        lateFees: allLateFees, // School pays ALL late fees
+        lateFees: allLateFees,
         uscfFees: uscfTotal,
       }
     };
@@ -244,15 +260,17 @@ export function SponsorRegistrationDialog({
     const hasIndependent = allSelectedPlayers.some(p => p.player?.studentType !== 'gt');
   
     if (isPsjaDistrict) {
-      // Route ALL PSJA invoices to PSJA-specific flows
       if (hasGt && hasIndependent) {
-        // PSJA Mixed: GT + Independent players
         await handlePsjaSplitInvoice();
       } else {
-        // PSJA Uniform: All GT or All Independent
         await handlePsjaSingleInvoice();
       }
     } else if (splitUscfFees) {
+      await handleSplitInvoices();
+    } else {
+      await handleStandardInvoice();
+    }
+  };
 
   const handleStandardInvoice = async () => {
     if (!profile || !event) return;
@@ -303,7 +321,6 @@ export function SponsorRegistrationDialog({
   const handleSplitInvoices = async () => {
     if (!profile || !event) return;
   
-    // 1. Create invoice for registrations
     const registrationPlayers = Object.entries(selectedStudents).map(([playerId, details]) => {
       const student = rosterPlayers.find(p => p.id === playerId);
       const { fee: currentFee } = getFeeForEvent();
@@ -313,13 +330,12 @@ export function SponsorRegistrationDialog({
         uscfId: student?.uscfId || '',
         baseRegistrationFee: event.regularFee,
         lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0,
-        uscfAction: false, // USCF fees handled separately
+        uscfAction: false,
         isGtPlayer: student?.studentType === 'gt',
         section: details.section,
       };
     });
   
-    // 2. Create invoice for USCF fees
     const uscfPlayers = Object.entries(selectedStudents)
       .filter(([_, details]) => details.uscfStatus !== 'current')
       .map(([playerId, details]) => {
@@ -419,7 +435,6 @@ export function SponsorRegistrationDialog({
         players: playersToInvoice
       });
   
-      // Save confirmations for both invoices
       if (result.gtInvoice) {
         const gtPlayers = playersToInvoice.filter(p => p.isGtPlayer);
         await saveConfirmation(result.gtInvoice.invoiceId, result.gtInvoice, gtPlayers, 0, "GT");
@@ -444,6 +459,7 @@ export function SponsorRegistrationDialog({
       setIsSubmitting(false);
     }
   };
+
   const handlePsjaSingleInvoice = async () => {
     if (!profile || !event) return;
 
@@ -485,9 +501,9 @@ export function SponsorRegistrationDialog({
           description: `${result.playerType.toUpperCase()} invoice created successfully.`
         });
         
-        setInvoiceResult(result);
-        setShowConfirmation(false);
-        setShowInvoiceDetails(true);
+        setCreatedInvoiceId(result.invoiceId);
+        setShowInvoiceModal(true);
+        resetState();
       } else {
         throw new Error(result.message || 'Failed to create PSJA invoice');
       }
@@ -507,26 +523,27 @@ export function SponsorRegistrationDialog({
     if(!profile || !event || !db) return;
     
     const teamCode = generateTeamCode({ schoolName: profile.school, district: profile.district });
-    
     const validatedSelections = Object.fromEntries(
-      Object.entries(selectedStudents)
-        .filter(([playerId]) => {
-          const student = rosterPlayers.find(p => p.id === playerId);
-          return playersInInvoice.some(p => p.playerName === `${student?.firstName} ${student?.lastName}`);
-        })
-        .map(([playerId, details]) => {
-          if (!details.section || !details.uscfStatus) {
-            throw new Error(`Missing details for player ${playerId}`);
-          }
-          return [
-            playerId, { 
-              section: details.section.trim(),
-              uscfStatus: details.uscfStatus.trim(),
-              status: 'active' 
+        Object.entries(selectedStudents)
+          .filter(([playerId]) => {
+            const student = rosterPlayers.find(p => p.id === playerId);
+            return playersInInvoice.some(p => p.playerName === `${student?.firstName} ${student?.lastName}`);
+          })
+          .map(([playerId, details]) => {
+            if (!details.section || !details.uscfStatus || !details.gender) {
+              throw new Error(`Missing required details for player ${playerId}`);
             }
-          ];
-        })
-    );
+            return [
+              playerId, { 
+                section: details.section.trim(),
+                uscfStatus: details.uscfStatus.trim(),
+                gender: details.gender,
+                byes: details.byes?.trim() || '',
+                status: 'active' 
+              }
+            ];
+          })
+      );
     
     let eventName = event.name;
     if (type) {
@@ -561,7 +578,7 @@ export function SponsorRegistrationDialog({
     const invoiceDocRef = doc(db, 'invoices', invoiceId);
     await setDoc(invoiceDocRef, newConfirmation);
     
-    if(!splitUscfFees) {
+    if(!splitUscfFees && !type) {
         setCreatedInvoiceId(invoiceId);
         setShowInvoiceModal(true);
         toast({title: `Invoice #${result.invoiceNumber} created successfully!`});
@@ -597,10 +614,12 @@ export function SponsorRegistrationDialog({
           const isExpired = !student.uscfExpiration || new Date(student.uscfExpiration) < new Date(event?.date);
           acc[student.id] = {
             section: student.section || 'High School K-12',
-            uscfStatus: !student.uscfId || student.uscfId.toUpperCase() === 'NEW' ? 'new' : isExpired ? 'renewing' : 'current'
+            uscfStatus: !student.uscfId || student.uscfId.toUpperCase() === 'NEW' ? 'new' : isExpired ? 'renewing' : 'current',
+            gender: student.gender || 'Male',
+            byes: ''
           };
           return acc;
-        }, {} as Record<string, { section: string; uscfStatus: string }>);
+        }, {} as Record<string, { section: string; uscfStatus: string; gender: 'Male' | 'Female'; byes: string }>);
       setSelectedStudents(newSelections);
     } else {
       setSelectedStudents({});
@@ -648,7 +667,7 @@ export function SponsorRegistrationDialog({
     });
   
     if (!hasGt && !hasIndependent) {
-      return renderStandardFeeBreakdown(); // Fall back to standard breakdown
+      return renderStandardFeeBreakdown();
     }
   
     return (
@@ -887,6 +906,33 @@ export function SponsorRegistrationDialog({
                                 </SelectContent>
                               </Select>
                             </div>
+
+                            <div>
+                              <Label htmlFor={`gender-${student.id}`}>Gender *</Label>
+                              <Select
+                                value={selectedStudents[student.id]?.gender || ''}
+                                onValueChange={(value) => updateStudentSelection(student.id, 'gender', value)}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select gender" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Male">Male</SelectItem>
+                                  <SelectItem value="Female">Female</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div>
+                              <Label htmlFor={`byes-${student.id}`}>Byes (Optional)</Label>
+                              <Input
+                                id={`byes-${student.id}`}
+                                placeholder="e.g., 1,4"
+                                value={selectedStudents[student.id]?.byes || ''}
+                                onChange={(e) => updateStudentSelection(student.id, 'byes', e.target.value)}
+                              />
+                              <p className="text-xs text-muted-foreground mt-1">Enter round numbers separated by commas</p>
+                            </div>
                           </div>
                         )}
                       </CardContent>
@@ -992,7 +1038,7 @@ export function SponsorRegistrationDialog({
               Back to Selection
             </Button>
             <Button onClick={handleCreateInvoice} disabled={isSubmitting}>
-              {isSubmitting ? 'Registering...' : `Register Now ($${feeBreakdown.total.toFixed(2)})`}
+              {isSubmitting ? 'Registering...' : `Register Now (${feeBreakdown.total.toFixed(2)})`}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1009,6 +1055,4 @@ export function SponsorRegistrationDialog({
       )}
     </>
   );
-}
-}
 }

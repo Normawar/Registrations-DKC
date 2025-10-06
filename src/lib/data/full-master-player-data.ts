@@ -1,4 +1,3 @@
-
 export type MasterPlayer = {
   id: string;
   uscfId: string;
@@ -16,6 +15,7 @@ export type MasterPlayer = {
   phone?: string;
   zipCode?: string;
   studentType?: 'gt' | 'independent';
+  gender: 'Male' | 'Female';  // Required, no ?
   school: string;
   district: string;
   events: number;
@@ -48,7 +48,3 @@ export type MasterPlayer = {
     uscfHistoryUrl?: string;
   };
 };
-
-// This is a placeholder for a much larger dataset.
-// In a real application, this would be fetched from a server.
-export const fullMasterPlayerData: MasterPlayer[] = [];

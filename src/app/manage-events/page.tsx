@@ -618,9 +618,20 @@ function ManageEventsContent() {
     }
 
     const invoicesCol = collection(db, 'invoices');
-    const q = query(invoicesCol, where('eventId', '==', event.id));
-    const invoiceSnapshot = await getDocs(q);
-    const allConfirmations = invoiceSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+    const [queryByEventId, queryByEventName] = await Promise.all([
+      getDocs(query(invoicesCol, where('eventId', '==', event.id))),
+      getDocs(query(invoicesCol, where('eventName', '==', event.name)))
+    ]);
+    
+    // Deduplicate invoices by ID
+    const allInvoiceDocs = new Map();
+    queryByEventId.docs.forEach(doc => allInvoiceDocs.set(doc.id, doc));
+    queryByEventName.docs.forEach(doc => allInvoiceDocs.set(doc.id, doc));
+    
+    const allConfirmations = Array.from(allInvoiceDocs.values()).map(doc => ({ 
+      id: doc.id, 
+      ...doc.data() 
+    })) as any[];
     
     const playerMap = new Map(allPlayers.map(p => [p.id, p]));
     const invoicesMap = new Map<string, InvoiceGrouping>();

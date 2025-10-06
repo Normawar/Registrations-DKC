@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -80,6 +79,8 @@ import { Badge } from './ui/badge';
 import { Checkbox } from './ui/checkbox';
 import { generateTeamCode } from '@/lib/school-utils';
 import { DollarSign } from 'lucide-react';
+import { AppLayout } from '@/components/app-layout';
+import { OrganizerGuard } from '@/app/auth-guard';
 
 // --- Types and Schemas ---
 
@@ -100,6 +101,8 @@ const playerFormSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email." }),
   dob: z.date({ required_error: "Date of birth is required."}),
   zipCode: z.string().min(5, { message: "A valid 5-digit zip code is required." }),
+  gender: z.enum(['Male', 'Female'], { required_error: "Gender is required." }),
+  byes: z.string().optional(),
 }).refine(data => {
     if (data.uscfId.toUpperCase() !== 'NEW') { return data.uscfExpiration !== undefined; }
     return true;
@@ -116,7 +119,6 @@ type PlayerFormValues = z.infer<typeof playerFormSchema>;
 
 type StagedPlayer = PlayerFormValues & {
     uscfStatus: 'current' | 'new' | 'renewing';
-    byes: { round1: string; round2: string };
     studentType?: 'gt' | 'independent';
 };
 
@@ -158,7 +160,17 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
 
     const playerForm = useForm<PlayerFormValues>({
         resolver: zodResolver(playerFormSchema),
-        defaultValues: { grade: '', section: '', uscfId: '', firstName: '', lastName: '', email: '', zipCode: ''}
+        defaultValues: { 
+            grade: '', 
+            section: '', 
+            uscfId: '', 
+            firstName: '', 
+            lastName: '', 
+            email: '', 
+            zipCode: '',
+            gender: undefined,
+            byes: ''
+        }
     });
 
     const invoiceForm = useForm<InvoiceRecipientValues>({
@@ -240,9 +252,10 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             zipCode: player.zipCode,
             grade: player.grade,
             section: player.section,
+            gender: player.gender || 'Male',
+            byes: '',
             uscfStatus: uscfStatus,
             studentType: player.studentType,
-            byes: { round1: 'none', round2: 'none' }
         };
         setStagedPlayers(prev => [...prev, playerToStage]);
         toast({ title: "Player Added", description: `${player.firstName} ${player.lastName} has been staged for registration.` });
@@ -266,10 +279,11 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                         email: player.email,
                         zipCode: player.zipCode,
                         grade: player.grade,
-                        section: player.section, // Use existing section
+                        section: player.section,
+                        gender: player.gender || 'Male',
+                        byes: '',
                         uscfStatus: uscfStatus,
                         studentType: player.studentType,
-                        byes: { round1: 'none', round2: 'none' }
                     };
                 });
             setStagedPlayers(prev => [...prev, ...playersToStage]);
@@ -278,7 +292,6 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             setStagedPlayers(prev => prev.filter(p => !rosterIds.has(p.id!)));
         }
     };
-
 
     const handlePlayerFormSubmit = (values: PlayerFormValues) => {
         if (!event) return;
@@ -292,7 +305,6 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             id: values.id || `temp-${Date.now()}`,
             uscfStatus,
             studentType: playerDetails?.studentType,
-            byes: { round1: 'none', round2: 'none' }
         };
 
         if (editingPlayer) {
@@ -302,7 +314,6 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         }
         setIsPlayerDialogOpen(false);
     };
-
     const handleEditPlayer = (player: StagedPlayer) => {
         setEditingPlayer(player);
         playerForm.reset(player);
@@ -413,12 +424,9 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         const hasIndependent = stagedPlayers.some(p => p.studentType !== 'gt');
         
         if (isPsjaDistrict) {
-            // Route ALL PSJA invoices to PSJA-specific flows
             if (hasGt && hasIndependent) {
-                // PSJA Mixed: GT + Independent players
                 await handlePsjaSplitInvoice(recipient, district);
             } else {
-                // PSJA Uniform: All GT or All Independent
                 await handlePsjaSingleInvoice(recipient, district);
             }
             return;
@@ -483,24 +491,22 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         const { fee: currentFee } = getFeeForEvent();
         const lateFeeAmount = currentFee - event.regularFee;
       
-        // 1. Create invoice for registrations + late fees
         const registrationPlayers = stagedPlayers.map(p => ({
           playerName: `${p.firstName} ${p.lastName}`,
           uscfId: p.uscfId,
           baseRegistrationFee: event.regularFee,
           lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0,
-          uscfAction: false, // USCF fees handled separately
+          uscfAction: false,
           isGtPlayer: p.studentType === 'gt',
           section: p.section,
         }));
       
-        // 2. Create invoice for USCF fees only
         const uscfPlayers = stagedPlayers
           .filter(p => p.uscfStatus !== 'current')
           .map(p => ({
             playerName: `${p.firstName} ${p.lastName}`,
             uscfId: p.uscfId,
-            baseRegistrationFee: 0, // No registration fee on this invoice
+            baseRegistrationFee: 0,
             lateFee: 0,
             uscfAction: true,
             isGtPlayer: p.studentType === 'gt',
@@ -508,7 +514,6 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
           }));
       
         try {
-          // Create Registration Invoice
           if (registrationPlayers.length > 0) {
             const regResult = await createInvoice({
               ...recipient,
@@ -523,7 +528,6 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             await saveConfirmation(regResult.invoiceId, regResult, registrationPlayers, feeBreakdown.registrationFees + feeBreakdown.lateFees, "Registration");
           }
       
-          // Create USCF Invoice
           if (uscfPlayers.length > 0) {
             const uscfResult = await createInvoice({
               ...recipient,
@@ -602,80 +606,62 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         } finally {
             setIsSubmitting(false);
         }
-      };
+    };
 
-  const handlePsjaSingleInvoice = async (recipient: InvoiceRecipientValues, district: string) => {
-    const { fee: currentFee } = getFeeForEvent();
-    const lateFeeAmount = currentFee - event.regularFee;
+    const handlePsjaSingleInvoice = async (recipient: InvoiceRecipientValues, district: string) => {
+        if (!event) return;
+        setIsSubmitting(true);
 
-    const playersToInvoice = stagedPlayers.map((player) => ({
-      playerName: `${player.firstName} ${player.lastName}`,
-      uscfId: player.uscfId,
-      baseRegistrationFee: event.regularFee,
-      lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0,
-      uscfAction: player.uscfStatus !== 'current',
-      isGtPlayer: player.studentType === 'gt',
-      section: player.section,
-    }));
+        const { fee: currentFee } = getFeeForEvent();
+        const lateFeeAmount = currentFee - event.regularFee;
 
-    try {
-      const result = await createPsjaSingleInvoice({
-        sponsorName: recipient.sponsorName,
-        sponsorEmail: recipient.sponsorEmail,
-        schoolName: recipient.schoolName,
-        district: 'PHARR-SAN JUAN-ALAMO ISD',
-        eventName: event.name,
-        eventDate: event.date,
-        uscfFee: 24,
-        players: playersToInvoice,
-        description: `PSJA Registration for ${event.name}`
-      });
+        const playersToInvoice = stagedPlayers.map((player) => ({
+          playerName: `${player.firstName} ${player.lastName}`,
+          uscfId: player.uscfId,
+          baseRegistrationFee: event.regularFee,
+          lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0,
+          uscfAction: player.uscfStatus !== 'current',
+          isGtPlayer: player.studentType === 'gt',
+          section: player.section,
+        }));
 
-      if (result.success && result.invoiceId) {
-        const confirmationData: ConfirmationItem = {
-          confirmationId: `conf_${Date.now()}`,
-          invoiceId: result.invoiceId,
-          invoiceNumber: result.invoiceNumber || '',
-          publicUrl: result.publicUrl || '',
-          totalInvoiced: result.totalAmount || 0,
-          sponsorName: recipient.sponsorName,
-          sponsorEmail: recipient.sponsorEmail,
-          schoolName: recipient.schoolName,
-          district: district,
-          teamCode: generateTeamCode({ schoolName: recipient.schoolName, district }),
-          eventId: event.id,
-          eventName: event.name,
-          eventDate: event.date,
-          registrationDate: new Date().toISOString(),
-          status: 'pending',
-          paymentStatus: 'unpaid',
-          selections: {},
-          playerType: result.playerType,
-        };
+        try {
+          const result = await createPsjaSingleInvoice({
+            sponsorName: recipient.sponsorName,
+            sponsorEmail: recipient.sponsorEmail,
+            schoolName: recipient.schoolName,
+            district: 'PHARR-SAN JUAN-ALAMO ISD',
+            eventName: event.name,
+            eventDate: event.date,
+            uscfFee: 24,
+            players: playersToInvoice,
+            description: `PSJA Registration for ${event.name}`
+          });
 
-        const confirmationRef = doc(db, 'confirmations', confirmationData.confirmationId);
-        await setDoc(confirmationRef, confirmationData);
+          if (result.success && result.invoiceId) {
+            await saveConfirmation(result.invoiceId, result, playersToInvoice, 0, result.playerType);
+            
+            toast({ 
+              title: "PSJA Invoice Created!", 
+              description: `${result.playerType.toUpperCase()} invoice created successfully.`
+            });
 
-        toast({ 
-          title: "PSJA Invoice Created!", 
-          description: `${result.playerType.toUpperCase()} invoice created successfully.`
-        });
-
-        setStep(3);
-      } else {
-        throw new Error(result.message || 'Failed to create PSJA invoice');
-      }
-    } catch (error: any) {
-      console.error('Error creating PSJA single invoice:', error);
-      toast({
-        variant: 'destructive',
-        title: 'PSJA Invoice Creation Failed',
-        description: error.message || 'Failed to create invoice. Please try again.'
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+            setStagedPlayers([]);
+            setView('selection');
+          } else {
+            throw new Error(result.message || 'Failed to create PSJA invoice');
+          }
+        } catch (error: any) {
+          console.error('Error creating PSJA single invoice:', error);
+          toast({
+            variant: 'destructive',
+            title: 'PSJA Invoice Creation Failed',
+            description: error.message || 'Failed to create invoice. Please try again.'
+          });
+        } finally {
+          setIsSubmitting(false);
+        }
+    };
 
     const handleGenerateIndividualInvoices = async (recipient: InvoiceRecipientValues) => {
         if (!event || !db || stagedPlayers.length === 0) return;
@@ -738,7 +724,6 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         setView('selection');
         setIsSubmitting(false);
     };
-
     const saveConfirmation = async (invoiceId: string, result: any, playersInInvoice: any[], total: number, type?: "Registration" | "USCF" | "GT" | "Independent") => {
         if (!event || !db) {
           console.error('Missing event or db in saveConfirmation');
@@ -760,7 +745,8 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                   section: player.section,
                   email: player.email,
                   zipCode: player.zipCode,
-                  byes: player.byes,
+                  gender: player.gender,
+                  byes: player.byes || '',
                   uscfStatus: player.uscfStatus,
                   studentType: player.studentType,
                   status: 'active'
@@ -816,11 +802,23 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             const district = masterDatabase.find(p => p.school === recipient.schoolName)?.district;
             
             const newConfirmation = {
-                id: confirmationId, invoiceId: confirmationId, eventId: event.id,
+                id: confirmationId, 
+                invoiceId: confirmationId, 
+                eventId: event.id,
                 eventName: event.name.replace(/\(PSJA students only\)/i, '').trim(),
                 eventDate: event.date,
                 submissionTimestamp: new Date().toISOString(),
-                selections: stagedPlayers.reduce((acc, p) => ({ ...acc, [p.id!]: { byes: p.byes, section: p.section, uscfStatus: p.uscfStatus, studentType: p.studentType, status: 'active' } }), {}),
+                selections: stagedPlayers.reduce((acc, p) => ({ 
+                    ...acc, 
+                    [p.id!]: { 
+                        gender: p.gender,
+                        byes: p.byes || '',
+                        section: p.section, 
+                        uscfStatus: p.uscfStatus, 
+                        studentType: p.studentType, 
+                        status: 'active' 
+                    } 
+                }), {}),
                 totalInvoiced: 0,
                 teamCode: recipient.teamCode,
                 invoiceStatus: 'COMPED',
@@ -1202,6 +1200,43 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <FormField control={playerForm.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem> )} />
                                     <FormField control={playerForm.control} name="zipCode" render={({ field }) => ( <FormItem><FormLabel>Zip Code</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <FormField 
+                                        control={playerForm.control} 
+                                        name="gender" 
+                                        render={({ field }) => ( 
+                                            <FormItem>
+                                                <FormLabel>Gender *</FormLabel>
+                                                <Select onValueChange={field.onChange} value={field.value}>
+                                                    <FormControl>
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder="Select gender" />
+                                                        </SelectTrigger>
+                                                    </FormControl>
+                                                    <SelectContent>
+                                                        <SelectItem value="Male">Male</SelectItem>
+                                                        <SelectItem value="Female">Female</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                                <FormMessage />
+                                            </FormItem> 
+                                        )} 
+                                    />
+                                    <FormField 
+                                        control={playerForm.control} 
+                                        name="byes" 
+                                        render={({ field }) => ( 
+                                            <FormItem>
+                                                <FormLabel>Byes (Optional)</FormLabel>
+                                                <FormControl>
+                                                    <Input placeholder="e.g., 1,4" {...field} />
+                                                </FormControl>
+                                                <FormDescription>Enter round numbers separated by commas</FormDescription>
+                                                <FormMessage />
+                                            </FormItem> 
+                                        )} 
+                                    />
                                 </div>
                             </form>
                         </Form>
