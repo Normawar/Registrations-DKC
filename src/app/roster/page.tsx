@@ -66,9 +66,11 @@ function RostersPageContent() {
   const [schoolFilter, setSchoolFilter] = useState<string>("all");
   const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>(dbSchools);
   const [newPlayer, setNewPlayer] = useState<Partial<PlayerRow>>({});
+  
+// Cascading filter: update schools when district changes
+useEffect(() => {
+  if (districtFilter === 'all') {
 
-  // Cascading filter: update schools when district changes  useEffect(() => {
-    if (districtFilter === 'all') {
       setSchoolsForDistrict(dbSchools);
     } else {
       const filteredSchools = [...new Set(safeAllPlayers.filter(p => p.district === districtFilter).map(p => p.school).filter(Boolean))].sort();
