@@ -24,7 +24,7 @@ type PlayerRow = {
 };
 function RostersPageContent() {
   const { 
-    database: safeAllPlayers  = [], 
+    database: allPlayers = [],  // Change back to allPlayers
     dbPlayerSchools = [], 
     dbPlayerDistricts = [], 
     getSchoolsForDistrictFromPlayers,
