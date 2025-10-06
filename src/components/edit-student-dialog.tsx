@@ -23,3 +23,4 @@ export function EditStudentDialog({
   
   return null; // This will be built out later
 }
+export default EditStudentDialog;
