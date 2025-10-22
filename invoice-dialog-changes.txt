@@ -1,0 +1,39 @@
+diff --git a/src/components/invoice-details-dialog.tsx b/src/components/invoice-details-dialog.tsx
+index 1e7b3da9..10601cc0 100644
+--- a/src/components/invoice-details-dialog.tsx
++++ b/src/components/invoice-details-dialog.tsx
+@@ -2,6 +2,7 @@
+ 'use client';
+ 
+ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
++import { getUserRole } from '@/lib/role-utils';
+ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+ import { Button } from "@/components/ui/button";
+ import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from "@/components/ui/card";
+@@ -554,7 +555,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
+             <div className="flex justify-between"><span className="text-gray-600">Sponsor Email</span><span className="font-medium">{sponsorEmail}</span></div>
+             <div className="flex justify-between"><span className="text-gray-600">Sponsor Phone</span><span className="font-medium">{knownPhone ? `${knownPhone} (from records)` : invoice.purchaserPhone || invoice.sponsorPhone || 'Phone not provided'}</span></div>
+             <div className="flex justify-between"><span className="text-gray-600">School</span><span className="font-medium">{invoice.schoolName || 'SHARYLAND PIONEER H S'}</span></div>
+-            {profile?.role === 'organizer' && knownPhone && (
++            {getUserRole(profile) === 'organizer' && knownPhone && (
+               <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                 <h4 className="text-sm font-medium text-blue-800 mb-2">📞 Organizer Contact Info</h4>
+                 <div className="text-sm space-y-1"><div><strong>Phone:</strong> {knownPhone}</div><div><strong>Email:</strong> {sponsorEmail}</div></div>
+@@ -642,7 +643,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
+                             </Button>
+                         </div>
+                     )}
+-                    {profile?.role === 'organizer' && (
++                    {getUserRole(profile) === 'organizer' && (
+                         <Button onClick={handleApprove} disabled={isUpdating} className="w-full mt-2">
+                             {isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Check className="mr-2 h-4 w-4"/>}
+                             Approve & Record Payment
+@@ -707,7 +708,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
+         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+           <div><div className="bg-white rounded-lg border p-4"><h3 className="text-lg font-semibold mb-4">Registration Details</h3><RegistrationDetailsSection invoice={confirmation} profile={profile} /><div className="mt-4"><h4 className="text-md font-medium mb-2">Registered Players</h4><Table><TableHeader><TableRow><TableHead>Name</TableHead><TableHead>USCF ID</TableHead><TableHead className="text-right">Reg. Fee</TableHead><TableHead className="text-right">Late Fee</TableHead><TableHead className="text-right">USCF Fee</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader><TableBody>{registeredPlayers.length === 0 && (<TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No players on this invoice.</TableCell></TableRow>)}{registeredPlayers.map(player => { const playerDetails = confirmation?.selections?.[player.id]; if (!playerDetails) return null; const regFee = eventDetails?.regularFee || 0; const lateFee = (confirmation.totalInvoiced / Object.keys(confirmation.selections).length) - regFee - ((playerDetails?.uscfStatus !== 'current' && ('studentType' in player && player.studentType !== 'gt')) ? uscfFee : 0); const playerUscfFee = (playerDetails?.uscfStatus !== 'current' && ('studentType' in player && player.studentType !== 'gt')) ? uscfFee : 0; const playerTotal = regFee + lateFee + playerUscfFee; return (<TableRow key={player.id}><TableCell>{player.firstName} {player.lastName}</TableCell><TableCell>{player.uscfId}</TableCell><TableCell className="text-right">${regFee.toFixed(2)}</TableCell><TableCell className="text-right">${lateFee > 0 ? lateFee.toFixed(2) : '0.00'}</TableCell><TableCell className="text-right">${playerUscfFee.toFixed(2)}</TableCell><TableCell className="text-right font-medium">${playerTotal.toFixed(2)}</TableCell></TableRow>);})}</TableBody></Table></div>
+           </div></div>
+-          <div><div className="bg-white rounded-lg border p-4"><h3 className="text-lg font-semibold mb-4">Submit Payment Information</h3>{profile?.role === 'sponsor' || isIndividualInvoice ? (<SponsorPaymentComponent confirmation={confirmation} onPaymentSubmitted={setConfirmation} />) : (<PaymentFormComponent invoice={confirmation} />)}</div></div>
++          <div><div className="bg-white rounded-lg border p-4"><h3 className="text-lg font-semibold mb-4">Submit Payment Information</h3>{getUserRole(profile) === 'sponsor' || isIndividualInvoice ? (<SponsorPaymentComponent confirmation={confirmation} onPaymentSubmitted={setConfirmation} />) : (<PaymentFormComponent invoice={confirmation} />)}</div></div>
+         </div>
+       </DialogContent>
+     </Dialog>

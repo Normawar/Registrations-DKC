@@ -1,0 +1,827 @@
+'use client';
+
+import { useState, useEffect, Suspense, ReactNode } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { useForm, useFieldArray } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { format, isValid, parse } from 'date-fns';
+import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import Image from 'next/image';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '@/lib/services/firestore-service';
+import dynamic from 'next/dynamic';
+
+import { AppLayout } from "@/components/app-layout";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardFooter
+} from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { useToast } from '@/hooks/use-toast';
+import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
+import { auth, storage } from '@/lib/firebase';
+import { cn } from '@/lib/utils';
+import { createMembershipInvoice, type CreateMembershipInvoiceOutput } from '@/ai/flows/create-membership-invoice-flow';
+import { updateInvoiceTitle } from '@/ai/flows/update-invoice-title-flow';
+import { getInvoiceStatus } from '@/ai/flows/get-invoice-status-flow';
+import { Badge } from '@/components/ui/badge';
+import {
+    Info,
+    Loader2,
+    UploadCloud,
+    File as FileIcon,
+    Download,
+    CalendarIcon,
+    ExternalLink,
+    RefreshCw,
+    Trash2,
+    PlusCircle,
+    Search
+} from 'lucide-react';
+import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+const PlayerSearchDialog = dynamic(() => import('@/components/EnhancedPlayerSearchDialog').then(mod => mod.PlayerSearchDialog), {
+  ssr: false,
+  loading: () => <div className="p-4">Loading Search...</div>
+});
+
+const playerSchema = z.object({
+    id: z.string().optional(),
+    firstName: z.string().min(1, { message: 'First name is required.' }),
+    middleName: z.string().optional(),
+    lastName: z.string().min(1, { message: 'Last name is required.' }),
+    uscfId: z.string().min(1, { message: 'USCF ID is required.' }),
+    uscfExpiration: z.date().optional(),
+    email: z.string().email({ message: 'A valid email is required.' }),
+    phone: z.string().min(1, { message: 'Phone number is required.' }),
+    dob: z.date({ required_error: "Date of birth is required."}),
+    zipCode: z.string().min(5, { message: "A valid 5-digit zip code is required." }),
+    uscfStatus: z.enum(['new', 'renewing'], { required_error: "Please select New or Renewing."}),
+});
+
+const playerInfoSchema = z.object({
+    players: z.array(playerSchema).min(1, 'At least one player is required.'),
+});
+
+type PaymentMethod = 'po' | 'check' | 'cashapp' | 'zelle';
+
+type PaymentInputs = {
+  paymentMethod: PaymentMethod;
+  poNumber: string;
+  checkNumber: string;
+  checkDate?: Date;
+  amountPaid: string;
+  file: File | null;
+  paymentFileName?: string;
+  paymentFileUrl?: string;
+};
+
+type InvoiceState = CreateMembershipInvoiceOutput & {
+    id: string;
+    invoiceTitle: string;
+    playerCount: number;
+    membershipType: string;
+    submissionTimestamp: string;
+    totalInvoiced: number;
+    purchaserName: string;
+    purchaserEmail: string;
+    schoolName: string;
+    district: string;
+    invoiceStatus: string;
+    status: string;
+    totalAmount: number;
+    sponsorEmail: string;
+    sponsorPhone: string;
+    contactEmail: string;
+    isUscfInvoice: boolean;
+};
+
+
+export default function UscfPurchaseComponent() {
+    const searchParams = useSearchParams();
+    const { toast } = useToast();
+    const { profile: sponsorProfile } = useSponsorProfile();
+    const { database: rosterPlayers, isDbLoaded } = useMasterDb();
+
+    const membershipType = searchParams.get('type') || 'Unknown Membership';
+    const justification = searchParams.get('justification') || 'No justification provided.';
+    const price = parseFloat(searchParams.get('price') || '0');
+
+    const [invoice, setInvoice] = useState<InvoiceState | null>(null);
+    const [isCreatingInvoice, setIsCreatingInvoice] = useState(false);
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+    const [paymentInputs, setPaymentInputs] = useState<Partial<PaymentInputs>>({
+        paymentMethod: 'po',
+        poNumber: '',
+        checkNumber: '',
+        amountPaid: '',
+        checkDate: undefined,
+        file: null,
+    });
+    const [isUpdatingPayment, setIsUpdatingPayment] = useState<boolean>(false);
+    const [isAuthReady, setIsAuthReady] = useState(false);
+    const [authError, setAuthError] = useState<string | null>(null);
+    const [invoiceStatus, setInvoiceStatus] = useState<string | null>(null);
+    const [isRefreshingStatus, setIsRefreshingStatus] = useState(false);
+
+    const form = useForm<z.infer<typeof playerInfoSchema>>({
+        resolver: zodResolver(playerInfoSchema),
+        defaultValues: {
+            players: [],
+        },
+    });
+
+    const { fields, append, remove, replace } = useFieldArray({
+        control: form.control,
+        name: "players"
+    });
+
+    useEffect(() => {
+        if (!isDbLoaded) return;
+        if (fields.length === 0) {
+            append({
+                firstName: '',
+                middleName: '',
+                lastName: '',
+                uscfId: '',
+                uscfExpiration: undefined,
+                email: '',
+                phone: '',
+                dob: undefined,
+                zipCode: '',
+                uscfStatus: undefined,
+            });
+        }
+    }, [isDbLoaded, fields.length, append]);
+
+
+    useEffect(() => {
+        if (!auth || !storage) {
+            setIsAuthReady(false);
+            setAuthError("Firebase is not configured, so file uploads are disabled. Please check your .env file.");
+            return;
+        }
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            if (user) {
+                setIsAuthReady(true);
+                setAuthError(null);
+            } else {
+                signInAnonymously(auth).catch((error) => {
+                    console.error("Anonymous sign-in failed:", error);
+                    if (error instanceof Error && (error as any).code === 'auth/admin-restricted-operation') {
+                        setAuthError("File uploads are disabled. Anonymous sign-in is not enabled in the Firebase console. Please contact your administrator.");
+                    }
+                    setIsAuthReady(false);
+                });
+            }
+        });
+        return () => unsubscribe();
+    }, []);
+
+    const handleCreateInvoice = async (values: z.infer<typeof playerInfoSchema>) => {
+        setIsCreatingInvoice(true);
+        if (!sponsorProfile) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Sponsor profile not loaded.' });
+            setIsCreatingInvoice(false);
+            return;
+        }
+
+        let hasError = false;
+        const emailsInForm = values.players.map(p => p.email.toLowerCase());
+        const emailCounts = emailsInForm.reduce((acc, email) => {
+            acc[email] = (acc[email] || 0) + 1;
+            return acc;
+        }, {} as Record<string, number>);
+
+        values.players.forEach((player, index) => {
+            const email = player.email.toLowerCase();
+            if (emailCounts[email] > 1) {
+                form.setError(`players.${index}.email`, { type: 'manual', message: 'This email is used more than once in this form.' });
+                hasError = true;
+            }
+            const existingPlayer = rosterPlayers.find(rp => rp.email && rp.email.toLowerCase() === email);
+            if (existingPlayer && existingPlayer.id !== player.id) {
+                form.setError(`players.${index}.email`, { type: 'manual', message: `Email is already assigned to ${existingPlayer.firstName} ${existingPlayer.lastName}.` });
+                hasError = true;
+            }
+        });
+
+        if (hasError) {
+            toast({ variant: 'destructive', title: 'Validation Error', description: 'Please fix the errors before proceeding.' });
+            setIsCreatingInvoice(false);
+            return;
+        }
+
+        try {
+            const playersToInvoice = values.players.map(p => ({
+                ...p,
+                dob: p.dob.toISOString(),
+            }));
+
+            const firstPlayerName = `${values.players[0].firstName} ${values.players[0].middleName || ''} ${values.players[0].lastName}`.replace(/\\s+/g, ' ').trim();
+            const invoiceTitle = values.players.length > 1
+                ? `USCF ${membershipType} for ${values.players.length} players`
+                : `USCF ${membershipType} for ${firstPlayerName}`;
+
+            const result = await createMembershipInvoice({
+                purchaserName: `${sponsorProfile.firstName} ${sponsorProfile.lastName}`,
+                purchaserEmail: sponsorProfile.email,
+                schoolName: sponsorProfile.school,
+                membershipType: membershipType,
+                fee: price,
+                players: playersToInvoice
+            });
+
+            const newMembershipInvoice: InvoiceState = {
+                ...result,
+                id: result.invoiceId,
+                invoiceTitle: invoiceTitle,
+                invoiceStatus: result.status,
+                status: result.status,
+                playerCount: values.players.length,
+                membershipType: membershipType,
+                submissionTimestamp: new Date().toISOString(),
+                totalInvoiced: price * values.players.length,
+                totalAmount: price * values.players.length,
+                purchaserName: `${sponsorProfile.firstName} ${sponsorProfile.lastName}`,
+                purchaserEmail: sponsorProfile.email,
+                schoolName: sponsorProfile.school,
+                district: sponsorProfile.district,
+                sponsorEmail: sponsorProfile.email,
+                sponsorPhone: sponsorProfile.phone || '',
+                contactEmail: sponsorProfile.email,
+                isUscfInvoice: true,
+            };
+
+            setInvoice(newMembershipInvoice);
+            setInvoiceStatus(result.status);
+
+            const invoiceDocRef = doc(db, 'invoices', result.invoiceId);
+            await setDoc(invoiceDocRef, newMembershipInvoice);
+
+            toast({ title: 'Invoice Created', description: `Invoice ${result.invoiceNumber} for ${values.players.length} player(s) has been created.` });
+        } catch (error) {
+            const description = error instanceof Error ? error.message : "An unknown error occurred.";
+            toast({ variant: 'destructive', title: 'Invoice Creation Failed', description });
+        } finally {
+            setIsCreatingInvoice(false);
+        }
+    };
+
+    const handlePlayerSelected = (player: MasterPlayer) => {
+        const newPlayer = {
+            id: player.id,
+            firstName: player.firstName,
+            lastName: player.lastName,
+            middleName: player.middleName || '',
+            uscfId: player.uscfId || '',
+            uscfExpiration: player.uscfExpiration ? new Date(player.uscfExpiration) : undefined,
+            email: player.email || '',
+            phone: player.phone || '',
+            dob: player.dob ? new Date(player.dob) : undefined,
+            zipCode: player.zipCode || '',
+            uscfStatus: 'renewing',
+        };
+
+        if (fields.length === 1 && !fields[0].firstName && !fields[0].lastName) {
+            replace([newPlayer]);
+        } else {
+            append(newPlayer);
+        }
+        setIsSearchOpen(false);
+    };
+
+    const handleInputChange = (field: keyof PaymentInputs, value: any) => {
+        setPaymentInputs(prev => ({ ...prev, [field]: value }));
+    };
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0] || null;
+        handleInputChange('file', file);
+    };
+
+    const fetchInvoiceStatus = async () => {
+        if (!invoice?.invoiceId) return;
+        setIsRefreshingStatus(true);
+        try {
+            const { status } = await getInvoiceStatus({ invoiceId: invoice.invoiceId });
+            setInvoiceStatus(status);
+        } catch (error) {
+            console.error(`Failed to fetch status for invoice ${invoice.invoiceId}:`, error);
+            toast({ variant: "destructive", title: "Could not refresh status" });
+        } finally {
+            setIsRefreshingStatus(false);
+        }
+    };
+
+    const handleSavePayment = async () => {
+        if (!invoice) return;
+        setIsUpdatingPayment(true);
+        const { paymentMethod = 'po', file } = paymentInputs;
+
+        try {
+            let paymentFileName = paymentInputs.paymentFileName;
+            let paymentFileUrl = paymentInputs.paymentFileUrl;
+
+            if (file) {
+                if (!isAuthReady) {
+                    const message = authError || "Authentication is not ready. Cannot upload files.";
+                    toast({ variant: 'destructive', title: 'Upload Failed', description: message });
+                    setIsUpdatingPayment(false);
+                    return;
+                }
+                if (!storage) {
+                    toast({ variant: 'destructive', title: 'Upload Failed', description: 'Firebase Storage is not configured.' });
+                    setIsUpdatingPayment(false);
+                    return;
+                }
+
+                const storageRef = ref(storage, `uscf-payments/${invoice.invoiceId}/${file.name}`);
+                const snapshot = await uploadBytes(storageRef, file);
+                paymentFileUrl = await getDownloadURL(snapshot.ref);
+                paymentFileName = file.name;
+            }
+
+            let newTitle = invoice.invoiceTitle;
+            let toastMessage = "Payment information has been saved.";
+
+            switch (paymentMethod) {
+                case 'po':
+                    if (paymentInputs.poNumber) newTitle += ` PO: ${paymentInputs.poNumber}`;
+                    break;
+                case 'check':
+                    if (paymentInputs.checkNumber) newTitle += ` via Check #${paymentInputs.checkNumber}`;
+                    if (paymentInputs.checkDate) newTitle += ` dated ${format(paymentInputs.checkDate, 'MM/dd/yy')}`;
+                    break;
+                case 'cashapp':
+                    newTitle += ` via CashApp`;
+                    break;
+                case 'zelle':
+                    newTitle += ` via Zelle`;
+                    break;
+            }
+
+            await updateInvoiceTitle({ invoiceId: invoice.invoiceId, title: newTitle });
+            toastMessage = "Payment information has been saved and the invoice has been updated.";
+            fetchInvoiceStatus();
+
+            setPaymentInputs(prev => ({
+                ...prev,
+                file: null,
+                paymentFileName: paymentFileName,
+                paymentFileUrl: paymentFileUrl,
+            }));
+
+            toast({ title: "Success", description: toastMessage });
+
+        } catch (error) {
+            console.error("Failed to update payment information:", error);
+            const description = error instanceof Error ? error.message : "An unknown error occurred.";
+            toast({ variant: "destructive", title: "Update Failed", description });
+        } finally {
+            setIsUpdatingPayment(false);
+        }
+    };
+
+    const getStatusBadgeVariant = (status?: string | null): string => {
+        if (!status) return 'bg-gray-400';
+        switch (status.toUpperCase()) {
+            case 'PAID': return 'bg-green-600 text-white';
+            case 'DRAFT': return 'bg-gray-500';
+            case 'PUBLISHED': return 'bg-blue-500 text-white';
+            case 'UNPAID': case 'PARTIALLY_PAID': return 'bg-yellow-500 text-black';
+            case 'CANCELED': case 'VOIDED': case 'FAILED': return 'bg-red-600 text-white';
+            case 'PAYMENT_PENDING': return 'bg-purple-500 text-white';
+            case 'REFUNDED': case 'PARTIALLY_REFUNDED': return 'bg-indigo-500 text-white';
+            default: return 'bg-muted text-muted-foreground';
+        }
+    };
+
+    const selectedMethod = paymentInputs.paymentMethod || 'po';
+    const isLoading = isUpdatingPayment || !isAuthReady;
+
+
+    return (
+        <AppLayout>
+            <div className="space-y-8">
+                <div>
+                    <h1 className="text-3xl font-bold font-headline">Purchase USCF Membership</h1>
+                    <p className="text-muted-foreground">
+                        Complete the form below to generate an invoice for a USCF membership.
+                    </p>
+                </div>
+
+                <Card>
+                    <CardHeader className='flex-row justify-between items-center'>
+                        <CardTitle>Search for Player</CardTitle>
+                        <Button variant="outline" onClick={() => setIsSearchOpen(true)}><Search className="mr-2 h-4 w-4"/>Search Database</Button>
+                    </CardHeader>
+                    <CardContent>
+                        <p className="text-sm text-muted-foreground">
+                            Search the master database to pre-fill a player's information.
+                        </p>
+                    </CardContent>
+                </Card>
+
+
+                <Alert variant="destructive">
+                    <Info className="h-4 w-4" />
+                    <AlertTitle>Membership Only</AlertTitle>
+                    <AlertDescription>
+                        Please note: This purchase is for a USCF membership only and does not register the player for any events.
+                    </AlertDescription>
+                </Alert>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Membership Details</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div>
+                            <Label className="text-sm text-muted-foreground">Suggested Membership</Label>
+                            <p className="text-lg font-bold">{membershipType}</p>
+                        </div>
+                        <div>
+                            <Label className="text-sm text-muted-foreground">Justification</Label>
+                            <p>{justification}</p>
+                        </div>
+                         <div>
+                            <Label className="text-sm text-muted-foreground">Price per Player</Label>
+                            <p className="text-lg font-bold">${price.toFixed(2)}</p>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {!invoice ? (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Player Information</CardTitle>
+                            <CardDescription>Enter the details for each player this membership is for.</CardDescription>
+                        </CardHeader>
+                        <Form {...form}>
+                            <form onSubmit={form.handleSubmit(handleCreateInvoice)}>
+                                <CardContent className="space-y-6">
+                                    {fields.map((field, index) => (
+                                        <div key={field.id} className="border rounded-lg p-4 space-y-4 relative">
+                                            <div className="flex justify-between items-start">
+                                                <h3 className="font-semibold text-lg pt-1">Player {index + 1}</h3>
+                                                {fields.length > 1 && (
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => remove(index)}
+                                                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                )}
+                                            </div>
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                <FormField control={form.control} name={`players.${index}.firstName`} render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input placeholder="John" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                                <FormField control={form.control} name={`players.${index}.middleName`} render={({ field }) => ( <FormItem><FormLabel>Middle Name (Optional)</FormLabel><FormControl><Input placeholder="Michael" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                                <FormField control={form.control} name={`players.${index}.lastName`} render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input placeholder="Doe" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                            </div>
+                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <FormField control={form.control} name={`players.${index}.uscfId`} render={({ field }) => ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input placeholder="Enter USCF ID or NEW" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                                <FormField control={form.control} name={`players.${index}.uscfExpiration`} render={({ field }) => ( <FormItem><FormLabel>USCF Expiration</FormLabel><FormControl><Input type="date" value={field.value ? format(field.value, 'yyyy-MM-dd') : ''} onChange={(e) => { const date = e.target.valueAsDate; field.onChange(date ? new Date(date.getTime() + date.getTimezoneOffset() * 60000) : undefined); }} /></FormControl><FormMessage /></FormItem> )} />
+                                             </div>
+                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <FormField control={form.control} name={`players.${index}.email`} render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="player@example.com" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                                <FormField control={form.control} name={`players.${index}.phone`} render={({ field }) => ( <FormItem><FormLabel>Player Phone Number</FormLabel><FormControl><Input type="tel" placeholder="(555) 555-5555" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                             </div>
+                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <FormField
+                                                  control={form.control}
+                                                  name={`players.${index}.dob`}
+                                                  render={({ field }) => (
+                                                    <FormItem className='flex flex-col'>
+                                                      <FormLabel>Date of Birth</FormLabel>
+                                                      <div className="flex gap-2">
+                                                        <FormControl>
+                                                          <Input
+                                                            type="date"
+                                                            value={field.value ? format(field.value, 'yyyy-MM-dd') : ''}
+                                                            onChange={(e) => {
+                                                              const dateValue = e.target.value;
+                                                              if (dateValue) {
+                                                                const parsedDate = new Date(dateValue + 'T00:00:00');
+                                                                if (!isNaN(parsedDate.getTime())) {
+                                                                  field.onChange(parsedDate);
+                                                                }
+                                                              } else {
+                                                                field.onChange(undefined);
+                                                              }
+                                                            }}
+                                                            className="flex-1"
+                                                            placeholder="yyyy-mm-dd"
+                                                            max={format(new Date(), 'yyyy-MM-dd')}
+                                                            min="1900-01-01"
+                                                          />
+                                                        </FormControl>
+
+                                                        <Popover>
+                                                          <PopoverTrigger asChild>
+                                                            <Button variant="outline" size="icon" type="button">
+                                                              <CalendarIcon className="h-4 w-4" />
+                                                            </Button>
+                                                          </PopoverTrigger>
+                                                          <PopoverContent className="w-auto p-0" align="start">
+                                                            <Calendar
+                                                              mode="single"
+                                                              selected={field.value}
+                                                              onSelect={field.onChange}
+                                                              disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                                                              initialFocus
+                                                              captionLayout="dropdown-buttons"
+                                                              fromYear={new Date().getFullYear() - 100}
+                                                              toYear={new Date().getFullYear()}
+                                                            />
+                                                          </PopoverContent>
+                                                        </Popover>
+                                                      </div>
+                                                      <FormMessage />
+                                                    </FormItem>
+                                                  )}
+                                                />
+                                                <FormField control={form.control} name={`players.${index}.zipCode`} render={({ field }) => ( <FormItem><FormLabel>Zip Code</FormLabel><FormControl><Input placeholder="78501" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                             </div>
+                                            <FormField control={form.control} name={`players.${index}.uscfStatus`} render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>USCF Status (New/Renewal)</FormLabel>
+                                                    <Select onValueChange={field.onChange} value={field.value}>
+                                                        <FormControl>
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder="Select status..." />
+                                                        </SelectTrigger>
+                                                        </FormControl>
+                                                        <SelectContent>
+                                                            <SelectItem value="new">New Membership</SelectItem>
+                                                            <SelectItem value="renewing">Renewing Membership</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )} />
+                                        </div>
+                                    ))}
+                                    <div className="flex items-center gap-4">
+                                        <Button type="button" variant="outline" size="sm" onClick={() => append({ firstName: '', middleName: '', lastName: '', email: '', phone: '', dob: undefined, zipCode: '', uscfId: '', uscfExpiration: undefined, uscfStatus: undefined })}>
+                                            <PlusCircle className="mr-2 h-4 w-4" />
+                                            Add Another Membership Manually
+                                        </Button>
+                                        <span className="text-sm text-muted-foreground">or</span>
+                                        <Button type="button" variant="outline" size="sm" onClick={() => setIsSearchOpen(true)}>
+                                            <Search className="mr-2 h-4 w-4" />
+                                            Search Database to Add
+                                        </Button>
+                                    </div>
+                                </CardContent>
+                                <CardFooter>
+                                    <Button type="submit" disabled={isCreatingInvoice}>
+                                        {isCreatingInvoice && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                        Create Invoice for {fields.length} Player(s)
+                                    </Button>
+                                </CardFooter>
+                            </form>
+                        </Form>
+                    </Card>
+                ) : (
+                    <Card>
+                        <CardHeader>
+                            <div className="flex justify-between items-center flex-wrap gap-2">
+                                <div>
+                                    <CardTitle>Payment Information</CardTitle>
+                                    <CardDescription>The invoice has been created. Please provide payment details.</CardDescription>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Badge variant="default" className={cn('capitalize', getStatusBadgeVariant(invoiceStatus))}>
+                                        {invoiceStatus?.replace(/_/g, ' ').toLowerCase() || 'Unknown'}
+                                    </Badge>
+                                    <Button variant="ghost" size="sm" onClick={fetchInvoiceStatus} disabled={isRefreshingStatus}>
+                                        <RefreshCw className={cn("mr-2 h-4 w-4", isRefreshingStatus && "animate-spin")} />
+                                        Refresh
+                                    </Button>
+                                    <Button asChild variant="outline" size="sm">
+                                        <a href={invoice.invoiceUrl || '#'} target="_blank" rel="noopener noreferrer">
+                                            <ExternalLink className="mr-2 h-4 w-4" /> View Invoice
+                                        </a>
+                                    </Button>
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="space-y-6 pt-6">
+                            {authError && (
+                              <Alert variant="destructive">
+                                <AlertTitle>File Uploads Disabled</AlertTitle>
+                                <AlertDescription>{authError}</AlertDescription>
+                              </Alert>
+                            )}
+
+                             <RadioGroup value={selectedMethod} onValueChange={(value) => handleInputChange('paymentMethod', value as PaymentMethod)} className="grid grid-cols-2 md:grid-cols-4 gap-4" disabled={isLoading}>
+                                <div><RadioGroupItem value="po" id={`po-${invoice.invoiceId}`} className="peer sr-only" />
+                                    <Label htmlFor={`po-${invoice.invoiceId}`} className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                                    Purchase Order</Label></div>
+                                <div><RadioGroupItem value="check" id={`check-${invoice.invoiceId}`} className="peer sr-only" />
+                                    <Label htmlFor={`check-${invoice.invoiceId}`} className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                                    Pay with Check</Label></div>
+                                <div><RadioGroupItem value="cashapp" id={`cashapp-${invoice.invoiceId}`} className="peer sr-only" />
+                                    <Label htmlFor={`cashapp-${invoice.invoiceId}`} className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                                    Cash App</Label></div>
+                                <div><RadioGroupItem value="zelle" id={`zelle-${invoice.invoiceId}`} className="peer sr-only" />
+                                    <Label htmlFor={`zelle-${invoice.invoiceId}`} className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                                    Zelle</Label></div>
+                             </RadioGroup>
+
+                             {selectedMethod === 'po' && (
+                                <div className="grid md:grid-cols-2 gap-4 items-start">
+                                    <div className="space-y-2">
+                                    <Label htmlFor={`po-number-${invoice.invoiceId}`}>PO Number</Label>
+                                    <Input
+                                        id={`po-number-${invoice.invoiceId}`}
+                                        placeholder="Enter PO Number"
+                                        value={paymentInputs.poNumber || ''}
+                                        onChange={(e) => handleInputChange('poNumber', e.target.value)}
+                                        disabled={isLoading}
+                                    />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                    <Label htmlFor={`po-file-${invoice.invoiceId}`}>Upload PO Document</Label>
+                                    <Input
+                                        id={`po-file-${invoice.invoiceId}`}
+                                        type="file"
+                                        onChange={handleFileChange}
+                                        disabled={isLoading}
+                                    />
+
+                                    {paymentInputs.file ? (
+                                        <div className="text-sm text-muted-foreground flex items-center gap-2 pt-1">
+                                        <FileIcon className="h-4 w-4" />
+                                        <span>Selected: {paymentInputs.file.name}</span>
+                                        </div>
+                                    ) : paymentInputs.paymentFileUrl && paymentInputs.paymentMethod === 'po' ? (
+                                        <div className="pt-1">
+                                        <Button asChild variant="link" className="p-0 h-auto">
+                                            <a
+                                            href={paymentInputs.paymentFileUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            >
+                                            <Download className="mr-2 h-4 w-4" /> View {paymentInputs.paymentFileName}
+                                            </a>
+                                        </Button>
+                                        </div>
+                                    ) : null}
+                                    </div>
+                                </div>
+                                )}
+
+{selectedMethod === 'check' && (
+                                <div className="grid md:grid-cols-2 gap-4 items-start">
+                                    <div className="space-y-2">
+                                        <Label htmlFor={`check-number-${invoice.invoiceId}`}>Check Number</Label>
+                                        <Input
+                                            id={`check-number-${invoice.invoiceId}`}
+                                            placeholder="Enter Check Number"
+                                            value={paymentInputs.checkNumber || ''}
+                                            onChange={(e) => handleInputChange('checkNumber', e.target.value)}
+                                            disabled={isLoading}
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor={`check-date-${invoice.invoiceId}`}>Check Date</Label>
+                                        <Input
+                                            id={`check-date-${invoice.invoiceId}`}
+                                            type="date"
+                                            value={
+                                                paymentInputs.checkDate
+                                                    ? format(paymentInputs.checkDate, 'yyyy-MM-dd')
+                                                    : ''
+                                            }
+                                            onChange={(e) =>
+                                                handleInputChange(
+                                                    'checkDate',
+                                                    e.target.valueAsDate || undefined
+                                                )
+                                            }
+                                            disabled={isLoading}
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2 md:col-span-2">
+                                        <Label htmlFor={`check-file-${invoice.invoiceId}`}>Upload Check Image</Label>
+                                        <Input
+                                            id={`check-file-${invoice.invoiceId}`}
+                                            type="file"
+                                            onChange={handleFileChange}
+                                            disabled={isLoading}
+                                        />
+                                        {paymentInputs.file ? (
+                                            <div className="text-sm text-muted-foreground flex items-center gap-2 pt-1">
+                                                <FileIcon className="h-4 w-4" />
+                                                <span>Selected: {paymentInputs.file.name}</span>
+                                            </div>
+                                        ) : paymentInputs.paymentFileUrl &&
+                                          paymentInputs.paymentMethod === 'check' ? (
+                                            <div className="pt-1">
+                                                <Button asChild variant="link" className="p-0 h-auto">
+                                                    <a
+                                                        href={paymentInputs.paymentFileUrl}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                    >
+                                                        <Download className="mr-2 h-4 w-4" /> View{' '}
+                                                        {paymentInputs.paymentFileName}
+                                                    </a>
+                                                </Button>
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                </div>
+                            )}
+
+                            {(selectedMethod === 'cashapp' || selectedMethod === 'zelle') && (
+                                <div className="space-y-4">
+                                    <div className="space-y-2">
+                                        <Label>Amount Paid</Label>
+                                        <Input
+                                            type="number"
+                                            step="0.01"
+                                            placeholder="Enter amount"
+                                            value={paymentInputs.amountPaid || ''}
+                                            onChange={(e) => handleInputChange('amountPaid', e.target.value)}
+                                            disabled={isLoading}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Upload Screenshot (Optional)</Label>
+                                        <Input
+                                            type="file"
+                                            onChange={handleFileChange}
+                                            disabled={isLoading}
+                                        />
+                                        {paymentInputs.file ? (
+                                            <div className="text-sm text-muted-foreground flex items-center gap-2 pt-1">
+                                                <FileIcon className="h-4 w-4" />
+                                                <span>Selected: {paymentInputs.file.name}</span>
+                                            </div>
+                                        ) : paymentInputs.paymentFileUrl &&
+                                          (paymentInputs.paymentMethod === 'cashapp' ||
+                                              paymentInputs.paymentMethod === 'zelle') ? (
+                                            <div className="pt-1">
+                                                <Button asChild variant="link" className="p-0 h-auto">
+                                                    <a
+                                                        href={paymentInputs.paymentFileUrl}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                    >
+                                                        <Download className="mr-2 h-4 w-4" /> View{' '}
+                                                        {paymentInputs.paymentFileName}
+                                                    </a>
+                                                </Button>
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                </div>
+                            )}
+                        </CardContent>
+
+                        <CardFooter className="flex justify-end">
+                            <Button onClick={handleSavePayment} disabled={isUpdatingPayment}>
+                                {isUpdatingPayment && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Save Payment
+                            </Button>
+                        </CardFooter>
+                    </Card>
+                )}
+            </div>
+
+            <Suspense fallback={null}>
+                {isSearchOpen && (
+                    <PlayerSearchDialog
+                        open={isSearchOpen}
+                        onOpenChange={setIsSearchOpen}
+                        onPlayerSelect={handlePlayerSelected}
+                    />
+                )}
+            </Suspense>
+        </AppLayout>
+    );
+}

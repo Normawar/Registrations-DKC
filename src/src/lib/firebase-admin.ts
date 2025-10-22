@@ -1,0 +1,1 @@
+export { admin, db, adminAuth } from '@/server/firebase-admin';

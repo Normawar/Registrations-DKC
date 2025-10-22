@@ -1,0 +1,369 @@
+
+"use client";
+
+import * as React from "react";
+import { getUserRole } from '@/lib/role-utils';
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import {
+  SidebarProvider,
+  Sidebar,
+  SidebarHeader,
+  SidebarContent,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarFooter,
+  SidebarInset,
+  SidebarMenuBadge,
+  SidebarTrigger,
+  SidebarGroup,
+  SidebarGroupLabel,
+} from "@/components/ui/sidebar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  KingIcon,
+  QueenIcon,
+  RookIcon,
+  PawnIcon,
+  BishopIcon,
+  KnightIcon,
+  Wrench,
+} from "@/components/icons/chess-icons";
+import { Button } from "@/components/ui/button";
+import { User, LogOut, ClipboardCheck, Receipt, FolderKanban, School, PlusCircle, History, Users, ShieldCheck, LayoutDashboard, BookOpen, UserCheck, FileText, Code, Building, Repeat, FileBarChart, FileQuestion, TestTube2, Trash2 } from "lucide-react";
+import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
+import { generateTeamCode } from "@/lib/school-utils";
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import type { ChangeRequest } from '@/lib/data/requests-data';
+
+const sponsorMenuItems = [
+  { href: "/profile", icon: User, label: "Profile" },
+  { href: "/dashboard", icon: QueenIcon, label: "Dashboard" },
+  { href: "/roster", icon: PawnIcon, label: "Roster" },
+  { href: "/events", icon: RookIcon, label: "Register for event" },
+  { href: "/invoices", icon: Receipt, label: "Invoices & Payments" },
+  { href: "/requests", icon: KnightIcon, label: "Change Requests" },
+  { href: "/membership", icon: BishopIcon, label: "USCF Membership ONLY" },
+  { href: "/previous-events", icon: History, label: "Previous Events" },
+  { href: "/quick-start-guide", icon: BookOpen, label: "Quick Start Guide" },
+];
+
+const districtCoordinatorMenuItems = [
+    { href: "/profile", icon: User, label: "Profile" },
+    { href: "/district-dashboard", icon: LayoutDashboard, label: "District Dashboard" },
+    { href: "/roster", icon: Users, label: "District Rosters" },
+    { href: "/district-registrations", icon: UserCheck, label: "District Registrations" },
+    { href: "/invoices", icon: Receipt, label: "District Invoices" },
+    { href: "/requests", icon: KnightIcon, label: "District Requests" },
+    { href: "/membership", icon: BishopIcon, label: "USCF Membership ONLY" },
+    { href: "/previous-events", icon: History, label: "Previous Events" },
+];
+
+const organizerMenuStructure = {
+  "Tournament Data": [
+    { href: "/manage-events", icon: FolderKanban, label: "Manage Events" },
+    { href: "/requests", icon: KnightIcon, label: "Change Requests" },
+    { href: "/organizers/vouchers", icon: FileText, label: "Voucher Management" },
+    { href: "/membership", icon: BishopIcon, label: "Purchase USCF Membership" },
+    { href: "/players", icon: PawnIcon, label: "Master Player Database" },
+    { href: "/roster", icon: Users, label: "District Rosters" },
+    { href: "/schools", icon: School, label: "Schools & Districts" },
+    { href: "/previous-events", icon: History, label: "Previous Events" },
+    { href: "/quick-start-guide", icon: BookOpen, label: "Quick Start Guide" },
+  ],
+  "Accounting": [
+    { href: "/payment-authorization", icon: ShieldCheck, label: "Payment Authorization" },
+    { href: "/invoices", icon: Receipt, label: "All Invoices" },
+    { href: "/organizer-invoice", icon: PlusCircle, label: "Create Custom Invoice" },
+    { href: "/reports", icon: FileBarChart, label: "Reports"},
+  ],
+  "Backend": [
+    { href: "/users", icon: Users, label: "User Management" },
+    { href: "/debug-auth", icon: Wrench, label: "Auth Debugger" },
+    { href: "/debug-scripts/data-repair", icon: Wrench, label: "Data Repair Tool" },
+    { href: "/debug-scripts/import-from-square", icon: Wrench, label: "Square Importer" },
+    { href: "/debug-scripts/import-uscf-top-players", icon: Wrench, label: "Import USCF Top Players" },
+    { href: "/debug-scripts/cleanup-players", icon: Trash2, label: "Cleanup Players DB" },
+    { href: "/debug-scripts/import-test-players", icon: Wrench, label: "Import Test Players" },
+    { href: "/debug-scripts/dynamic-uscf-test", icon: TestTube2, label: "Dynamic USCF Test" },
+    { href: "/debug-scripts/force-delete-user", icon: Trash2, label: "Force Delete User" },
+    { href: "/debug-scripts/delete-mock-invoices", icon: Trash2, label: "Delete Mock Invoices" },
+    { href: "/debug-scripts/cancel-unpaid-psja-invoices", icon: Trash2, label: "Cancel Unpaid PSJA Invoices" },
+    { href: "/debug-scripts/delete-canceled-invoices", icon: Trash2, label: "Delete Canceled Invoices" },
+  ]
+};
+
+const individualMenuItems = [
+  { href: "/profile", icon: User, label: "Profile" },
+  { href: "/individual-dashboard", icon: QueenIcon, label: "Dashboard" },
+  { href: "/roster", icon: Users, label: "My Students" },
+  { href: "/events", icon: RookIcon, label: "Register for event" },
+  { href: "/invoices", icon: Receipt, label: "Invoices & Payments" },
+  { href: "/membership", icon: BishopIcon, label: "USCF Membership ONLY" },
+  { href: "/previous-events", icon: History, label: "Previous Events" },
+  { href: "/quick-start-guide", icon: BookOpen, label: "Quick Start Guide" },
+];
+
+const icons: { [key: string]: React.ElementType } = {
+  KingIcon,
+  QueenIcon,
+  RookIcon,
+  BishopIcon,
+  KnightIcon,
+  PawnIcon,
+  Wrench,
+};
+
+export function AppLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const { profile, updateProfile } = useSponsorProfile();
+  
+  const [changeRequests, setChangeRequests] = useState<ChangeRequest[]>([]);
+  const [confirmations, setConfirmations] = useState<any[]>([]);
+
+  useEffect(() => {
+    const loadData = async () => {
+      if (!profile) return;
+      try {
+          // Dynamic import to avoid build-time issues
+          const { db } = await import("@/lib/firebase");
+          const { collection, getDocs, query, where, limit } = await import("firebase/firestore");
+          
+          const queries = [];
+          
+          queries.push(getDocs(query(
+              collection(db, 'requests'), 
+              where('status', '==', 'Pending'),
+              limit(100)
+          )));
+          
+          queries.push(getDocs(query(
+              collection(db, 'invoices'),
+              where('paymentStatus', '==', 'pending-po'),
+              limit(50)
+          )));
+  
+          const [requestSnapshot, invoiceSnapshot] = await Promise.all(queries);
+          
+          const allRequests = requestSnapshot.docs.map(doc => doc.data() as ChangeRequest);
+          setChangeRequests(allRequests);
+          
+          const allConfirmations = invoiceSnapshot.docs.map(doc => doc.data());
+          setConfirmations(allConfirmations);
+          
+      } catch (error) {
+          console.error("Failed to load sidebar notification data:", error);
+          setChangeRequests([]);
+          setConfirmations([]);
+      }
+  };
+      loadData();
+  }, [profile]);
+
+  const pendingRequestsCount = useMemo(() => {
+    if (!profile) return 0;
+    const userRole = getUserRole(profile);
+    if (userRole === 'organizer') {
+        return changeRequests.filter(r => r.status === 'Pending').length;
+    }
+    return 0;
+  }, [profile, changeRequests]);
+
+  const pendingPaymentsCount = useMemo(() => {
+    if (!profile) return 0;
+    const userRole = getUserRole(profile);
+    if (userRole !== 'organizer') return 0;
+    return confirmations.filter(c => c.paymentStatus === 'pending-po').length;
+  }, [profile, confirmations]);
+
+  const handleLogout = () => {
+    localStorage.removeItem('current_user_profile');
+    // We dispatch a storage event so all tabs know to log out.
+    window.dispatchEvent(new Event('storage'));
+    router.push('/');
+  };
+  
+  const handleRoleToggle = () => {
+    const userRole = getUserRole(profile);
+    if (profile?.isDistrictCoordinator && userRole !== 'organizer') {
+        router.push('/auth/role-selection');
+    }
+  };
+
+  const getMenuItems = () => {
+    if (!profile) return [];
+    
+    // CRITICAL: Normalize role - handle both string and array formats
+    const userRole = getUserRole(profile);
+    
+    let items = [];
+    switch(userRole) {
+        case 'organizer': return null; // Special handling for organizer
+        case 'individual': items = individualMenuItems; break;
+        case 'district_coordinator': items = districtCoordinatorMenuItems; break;
+        default: items = sponsorMenuItems; break;
+    }
+    return [...items, { href: "/help", icon: FileQuestion, label: "Help" }];
+  }
+
+  const menuItems = getMenuItems();
+  const profileUpdateRequired = profile?.forceProfileUpdate === true;
+  
+  const userRole = profile ? (Array.isArray(profile.role) ? profile.role[0] : profile.role) : '';
+
+  const AvatarComponent = profile && profile.avatarType === 'icon' ? icons[profile.avatarValue] : null;
+  const teamCode = profile ? generateTeamCode({ schoolName: profile.school, district: profile.district }) : null;
+
+  return (
+    <SidebarProvider>
+      <div className="flex min-h-screen">
+        <Sidebar>
+          <SidebarHeader>
+            <div className="flex items-center gap-3">
+                <Link href="/profile" prefetch={false} aria-label="Profile">
+                    {profile?.avatarType === 'upload' ? (
+                        <Avatar className="h-8 w-8">
+                            <AvatarImage src={profile.avatarValue} alt="User Avatar" />
+                            <AvatarFallback>{profile.firstName?.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                    ) : AvatarComponent ? (
+                        <AvatarComponent className="w-8 h-8 text-sidebar-primary shrink-0" />
+                    ) : (
+                        <KingIcon className="w-8 h-8 text-sidebar-primary shrink-0" />
+                    )}
+                </Link>
+                <div className="flex flex-col overflow-hidden group-data-[collapsible=icon]:hidden">
+                    <p className="font-headline text-base font-bold text-sidebar-foreground truncate">
+                        {profile ? `${''}${profile.firstName} ${''}${profile.lastName}` : 'User Name'}
+                    </p>
+                    {userRole === 'sponsor' && (
+                      <>
+                        <p className="text-xs text-sidebar-foreground/80 truncate">
+                            {profile.isDistrictCoordinator ? `${''}${profile.district} Coordinator` : profile.school || 'School Name'}
+                        </p>
+                        {teamCode && !profile.isDistrictCoordinator && (
+                          <p className="text-xs font-bold text-sidebar-primary truncate font-mono">
+                            {teamCode}
+                          </p>
+                        )}
+                      </>
+                    )}
+                    {userRole === 'organizer' && (
+                        <p className="text-xs text-sidebar-primary truncate font-semibold">
+                            Organizer
+                        </p>
+                    )}
+                    {userRole === 'individual' && (
+                        <p className="text-xs text-sidebar-primary truncate font-semibold">
+                            Individual Player
+                        </p>
+                    )}
+                     {userRole === 'district_coordinator' && (
+                        <p className="text-xs text-sidebar-primary truncate font-semibold">
+                            District Coordinator
+                        </p>
+                    )}
+                </div>
+            </div>
+          </SidebarHeader>
+          <SidebarContent>
+            {profile?.isDistrictCoordinator && userRole !== 'organizer' && (
+                 <div className="px-2 mb-2">
+                    <Button variant="secondary" className="w-full h-auto py-2 group-data-[collapsible=icon]:w-auto group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:p-2" onClick={handleRoleToggle}>
+                       <Repeat className="w-4 h-4 mr-2 group-data-[collapsible=icon]:mr-0" />
+                        <span className="group-data-[collapsible=icon]:hidden">
+                            Switch Role
+                        </span>
+                    </Button>
+                </div>
+            )}
+            <SidebarMenu>
+              {userRole === 'organizer' ? (
+                Object.entries(organizerMenuStructure).map(([groupName, items]) => (
+                  <SidebarGroup key={groupName}>
+                    <SidebarGroupLabel>{groupName}</SidebarGroupLabel>
+                    {items.map(item => {
+                        let badgeCount = 0;
+                        if (item.href === '/requests') badgeCount = pendingRequestsCount;
+                        else if (item.href === '/payment-authorization') badgeCount = pendingPaymentsCount;
+                        
+                        const isDisabled = profileUpdateRequired && item.href !== '/profile';
+
+                        return (
+                           <SidebarMenuItem key={item.href}>
+                              <SidebarMenuButton asChild isActive={pathname.startsWith(item.href)} disabled={isDisabled} tooltip={{ children: item.label, side: "right" }}>
+                                  <Link href={isDisabled ? '#' : item.href} aria-disabled={isDisabled}>
+                                      <item.icon className="w-5 h-5" />
+                                      <span>{item.label}</span>
+                                  </Link>
+                              </SidebarMenuButton>
+                              {badgeCount > 0 && ( <SidebarMenuBadge className="bg-destructive text-destructive-foreground">{badgeCount}</SidebarMenuBadge> )}
+                          </SidebarMenuItem>
+                        )
+                    })}
+                  </SidebarGroup>
+                ))
+              ) : (
+                menuItems?.map((item) => {
+                  let badgeCount = 0;
+                  if (item.href === '/requests') badgeCount = pendingRequestsCount;
+                  else if (item.href === '/payment-authorization') badgeCount = pendingPaymentsCount;
+                  
+                  const isDisabled = profileUpdateRequired && item.href !== '/profile';
+
+                  return (
+                    <SidebarMenuItem key={item.href}>
+                      <SidebarMenuButton asChild isActive={pathname.startsWith(item.href)} disabled={isDisabled} tooltip={{ children: item.label, side: "right" }}>
+                        <Link href={isDisabled ? '#' : item.href} aria-disabled={isDisabled} tabIndex={isDisabled ? -1 : undefined}>
+                          <item.icon className="w-5 h-5" />
+                          <span>{item.label}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                      {badgeCount > 0 && ( <SidebarMenuBadge className="bg-destructive text-destructive-foreground">{badgeCount}</SidebarMenuBadge> )}
+                    </SidebarMenuItem>
+                  );
+                })
+              )}
+            </SidebarMenu>
+          </SidebarContent>
+          <SidebarFooter>
+            <div className="flex items-center gap-3">
+              <Avatar className="h-10 w-10">
+                {profile?.avatarType === 'upload' ? (
+                  <AvatarImage src={profile.avatarValue} alt="@user" />
+                ) : null }
+                <AvatarFallback>{profile ? profile.firstName.charAt(0) : 'U'}</AvatarFallback>
+              </Avatar>
+              <div className="flex-1 overflow-hidden group-data-[collapsible=icon]:hidden">
+                <p className="font-semibold text-sm truncate">{profile ? `${''}${profile.firstName} ${''}${profile.lastName}` : 'User'}</p>
+                <p className="text-xs text-sidebar-foreground/70 truncate">
+                  {profile ? profile.email : 'user@chessmate.com'}
+                </p>
+              </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="group-data-[collapsible=icon]:w-10"
+                    aria-label="Log out"
+                    onClick={handleLogout}
+                  >
+                    <LogOut className="h-5 w-5" />
+                  </Button>
+            </div>
+          </SidebarFooter>
+        </Sidebar>
+        <SidebarInset>
+            <header className="sticky top-0 z-10 flex h-14 items-center justify-end gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 md:hidden">
+                <SidebarTrigger />
+            </header>
+            <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+              {children}
+            </main>
+        </SidebarInset>
+      </div>
+    </SidebarProvider>
+  );
+}
+export default AppLayout;

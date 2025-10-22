@@ -1,0 +1,162 @@
+diff --git a/src/hooks/use-sponsor-profile.ts b/src/hooks/use-sponsor-profile.ts
+index d67c844a..fd31c974 100644
+--- a/src/hooks/use-sponsor-profile.ts
++++ b/src/hooks/use-sponsor-profile.ts
+@@ -1,8 +1,7 @@
+-
+ 'use client';
+ 
+-import { useState, useEffect, useCallback } from 'react';
+-import { doc, getDoc, setDoc } from 'firebase/firestore';
++import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
++import { doc, setDoc } from 'firebase/firestore';
+ import { db } from '@/lib/firebase';
+ import { User } from 'firebase/auth';
+ import { AuthService } from '@/lib/auth';
+@@ -19,74 +18,111 @@ export type SponsorProfile = {
+   gtCoordinatorEmail?: string;
+   bookkeeperEmail?: string;
+   avatarType: 'icon' | 'upload';
+-  avatarValue: string; // Icon name or image URL
++  avatarValue: string;
+   role: 'sponsor' | 'organizer' | 'individual' | 'district_coordinator';
+   isDistrictCoordinator?: boolean;
+-  uid: string; // UID is now required
+-  forceProfileUpdate?: boolean; // Flag to force profile completion
++  uid: string;
++  forceProfileUpdate?: boolean;
+   createdAt?: string;
+   updatedAt?: string;
+   migratedAt?: string;
+-  studentIds?: string[]; // For individual users to track their students
++  studentIds?: string[];
+ };
+ 
+-// This hook now manages the auth user and their profile data together
+ export function useSponsorProfile() {
+   const [user, setUser] = useState<User | null>(null);
+   const [profile, setProfile] = useState<SponsorProfile | null>(null);
+   const [loading, setLoading] = useState(true);
++  const isFirstLoad = useRef(true);
+ 
+-  // Listen for auth state changes to keep user and profile in sync
+   useEffect(() => {
+     const unsubscribe = AuthService.onAuthStateChanged(async (authUser, userProfile) => {
+-        if (authUser && userProfile) {
+-            setUser(authUser);
+-            setProfile(userProfile);
+-        } else {
+-            setUser(null);
+-            setProfile(null);
+-        }
++      if (!authUser) {
++        // No user - clear everything and stop loading
++        setUser(null);
++        setProfile(null);
++        setLoading(false);
++        isFirstLoad.current = false;
++        return;
++      }
++
++      // User exists
++      setUser(authUser);
++      
++      if (userProfile) {
++        // Profile loaded successfully
++        setProfile(userProfile);
+         setLoading(false);
++        isFirstLoad.current = false;
++      } else if (isFirstLoad.current) {
++        // First load and no profile - keep loading true
++        // The user might have just signed up and needs to create profile
++        setProfile(null);
++        // Keep loading true to prevent flash
++      } else {
++        // Subsequent loads with no profile - user needs to create one
++        setProfile(null);
++        setLoading(false);
++      }
+     });
++
+     return () => unsubscribe();
+   }, []);
+ 
+-
+-  const updateProfile = useCallback(async (newProfileData: Partial<SponsorProfile> | null, authUser?: User | null) => {
++  const updateProfile = useCallback(async (
++    newProfileData: Partial<SponsorProfile> | null,
++    authUser?: User | null
++  ) => {
+     const userToUpdate = authUser || user;
++    
+     if (!userToUpdate) {
+-        console.error("Cannot update profile: no user logged in.");
+-        return;
++      console.error("Cannot update profile: no user logged in.");
++      return;
+     }
++
+     if (!db) {
+-        console.error("Firestore is not initialized. Cannot update profile.");
+-        return;
++      console.error("Firestore is not initialized. Cannot update profile.");
++      return;
+     }
+ 
+     if (newProfileData === null) {
+       setProfile(null);
+-      // Also clear from local storage
+       localStorage.removeItem(`user_profile_${userToUpdate.uid}`);
+       return;
+     }
+ 
+-    // Merge new data with existing profile
+-    const updatedProfile = { ...(profile || {}), ...newProfileData, email: userToUpdate.email, uid: userToUpdate.uid } as SponsorProfile;
++    const updatedProfile = {
++      ...(profile || {}),
++      ...newProfileData,
++      email: userToUpdate.email,
++      uid: userToUpdate.uid,
++    } as SponsorProfile;
+ 
+     try {
+-        // Update Firestore
+-        const docRef = doc(db, "users", userToUpdate.uid);
+-        await setDoc(docRef, updatedProfile, { merge: true });
+-        
+-        // Update local state and localStorage
+-        setProfile(updatedProfile);
+-        localStorage.setItem(`user_profile_${userToUpdate.uid}`, JSON.stringify(updatedProfile));
+-
++      const docRef = doc(db, "users", userToUpdate.uid);
++      await setDoc(docRef, updatedProfile, { merge: true });
++      
++      setProfile(updatedProfile);
++      localStorage.setItem(
++        `user_profile_${userToUpdate.uid}`,
++        JSON.stringify(updatedProfile)
++      );
++      
++      // Now that profile is set, we're no longer in first load
++      isFirstLoad.current = false;
+     } catch (error) {
+-        console.error("Failed to save sponsor profile to Firestore", error);
++      console.error("Failed to save sponsor profile to Firestore", error);
++      throw error;
+     }
+-
+   }, [profile, user]);
+   
+-  return { user, profile, updateProfile, isProfileLoaded: !loading, loading };
+-}
++  const value = useMemo(() => ({
++    user,
++    profile,
++    updateProfile,
++    isProfileLoaded: !loading,
++    loading
++  }), [user, profile, updateProfile, loading]);
++
++  return value;
++}
+\ No newline at end of file
